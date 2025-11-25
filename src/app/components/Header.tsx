@@ -1,118 +1,157 @@
 import React from 'react';
 import { SearchBar } from './SearchBar';
-import { AdvancedFilters } from './AdvancedFilters'; 
-import { TagFilter } from './TagFilter';
-import { YearFilter } from './YearFilter';
-
-interface PersonOption {
-  value: number;
-  label: string;
-}
+import { PersonOption } from '../../models/PersonOption';
 
 interface HeaderProps {
   onSearch: (searchTerm: string) => void;
   onClearCache: () => void;
-  onClearFilters: () => void; // New prop for clearing filters
-  dateFrom: Date | null;
-  setDateFrom: (date: Date | null) => void;
-  dateTo: Date | null;
-  setDateTo: (date: Date | null) => void;
-  selectedPerson: PersonOption[] | null;
-  setSelectedPerson: (person: PersonOption[] | null) => void;
-  personCondition: 'any' | 'all';
-  setPersonCondition: (condition: 'any' | 'all') => void;
-  selectedTags: string[];
-  setSelectedTags: (tags: string[]) => void;
-  selectedYears: number[]; // Updated type
-  setSelectedYears: (years: number[]) => void; // Updated type
+  lang: 'en' | 'ar';
+  setLang: (lang: 'en' | 'ar') => void;
+  theme: 'light' | 'dark';
+  onThemeChange: (theme: 'light' | 'dark') => void;
+  t: Function;
   apiURL: string;
   onOpenUploadModal: () => void;
   isProcessing: boolean;
-  hasActiveFilters: boolean; // New prop to show/hide clear button
+  onLogout: () => void;
+  isEditor: boolean;
+  isSidebarOpen: boolean;
+  toggleSidebar: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
-  onSearch, onClearCache, onClearFilters,
-  dateFrom, setDateFrom, dateTo, setDateTo, 
-  selectedPerson, setSelectedPerson,
-  personCondition, setPersonCondition,
-  selectedTags, setSelectedTags,
-  selectedYears, setSelectedYears,
+export const Header: React.FC<HeaderProps> = ({
+  onSearch,
+  onClearCache,
   apiURL,
   onOpenUploadModal,
   isProcessing,
-  hasActiveFilters
-}) => (
-  <header className="sticky top-0 z-40 bg-[#212121] border-b border-gray-700 px-4 sm:px-6 lg:px-8">
-    <div className="flex items-center justify-between h-16">
-      <div className="flex-shrink-0">
-        <h1 className="text-xl font-bold text-white">
-          <span className="text-red-500">Smart</span> EDMS 
-        </h1>
-      </div>
+  onLogout,
+  isEditor,
+  lang,
+  setLang,
+  theme,
+  onThemeChange,
+  t,
+  isSidebarOpen,
+  toggleSidebar,
+}) => {
+  const handleLanguageChange = async () => {
+    const newLang = lang === 'en' ? 'ar' : 'en';
+    try {
+      await fetch('/api/user/language', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lang: newLang }),
+      });
+      setLang(newLang);
+    } catch (error) {
+      console.error('Failed to update language', error);
+    }
+  };
 
-      <div className="flex-1 flex justify-center px-4 items-center gap-4">
-        <div className="w-full max-w-md">
-          <SearchBar onSearch={onSearch} />
-        </div>
-        <TagFilter 
-          apiURL={apiURL}
-          selectedTags={selectedTags}
-          setSelectedTags={setSelectedTags}
-        />
-        <YearFilter
-          selectedYears={selectedYears}
-          setSelectedYears={setSelectedYears}
-        />
-        <AdvancedFilters
-          dateFrom={dateFrom}
-          setDateFrom={setDateFrom}
-          dateTo={dateTo}
-          setDateTo={setDateTo}
-          selectedPerson={selectedPerson}
-          setSelectedPerson={setSelectedPerson}
-          personCondition={personCondition}
-          setPersonCondition={setPersonCondition}
-          apiURL={apiURL}
-        />
-        {/* Conditional Clear Filters Button */}
-        {hasActiveFilters && (
+  const rtlClass = lang === 'ar' ? 'flex-row-reverse' : '';
+  const searchBarMargin = lang === 'ar' ? 'mr-auto' : 'ml-auto';
+  const logoMargin = lang === 'ar' ? 'mr-4' : 'ml-4';
+
+  return (
+    <header
+      className={`sticky top-0 z-40 bg-[var(--color-bg-header)] border-b border-[var(--color-border-primary)] px-4 sm:px-6 lg:px-8 ${rtlClass}`}
+    >
+      <div className={`flex items-center justify-between h-16 ${rtlClass}`}>
+        <div className={`flex-shrink-0 flex items-center ${rtlClass}`}>
           <button
-            onClick={onClearFilters}
-            className="px-3 py-2 bg-gray-700 text-white text-xs font-medium rounded-md hover:bg-red-600 transition flex items-center gap-1"
-            title="Clear all active filters (except search)"
+            onClick={toggleSidebar}
+            className="p-2 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+            aria-label={isSidebarOpen ? 'Close menu' : 'Open menu'}
           >
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="red" strokeWidth={2}>
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-             </svg>
-            Clear Filters
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M4 6h16M4 12h16M4 18h16"
+              ></path>
+            </svg>
           </button>
-        )}
-      </div>
+          <a href="/">
+            <h1
+              className={`text-xl font-bold text-gray-900 dark:text-white ${logoMargin} cursor-pointer`}
+            >
+              <span className="text-red-500">EDMS</span> Media
+            </h1>
+          </a>
+          <button
+            onClick={handleLanguageChange}
+            className={`px-3 py-1.5 bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-white text-sm font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-700 ${logoMargin}`}
+          >
+            {lang === 'en' ? 'العربية' : 'English'}
+          </button>
+          {/* Theme Toggle Button */}
+          <button
+            onClick={() => onThemeChange(theme === 'light' ? 'dark' : 'light')}
+            className={`p-2 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 ${logoMargin}`}
+            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {theme === 'light' ? (
+              <img src="/moon.svg" alt="Dark Mode" className="w-5 h-5" />
+            ) : (
+              <img src="/sun.svg" alt="Light Mode" className="w-5 h-5 invert" />
+            )}
+          </button>
+        </div>
 
-      <div className="flex items-center gap-4">
-        {isProcessing && (
-          <div className="flex items-center gap-2 text-white text-sm">
-            <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-            <span>Processing...</span>
+        {/* Center: Search Bar */}
+        <div className="flex-1 flex justify-center px-4 items-center">
+          <div className="w-full max-w-md">
+            <SearchBar onSearch={onSearch} t={t} lang={lang} />
           </div>
-        )}
-        <button
-          onClick={onOpenUploadModal}
-          className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition flex items-center gap-2"
+        </div>
+
+        {/* Right Side: Actions */}
+        <div
+          className={`flex items-center gap-4 ${searchBarMargin} ${rtlClass}`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-          Upload
-        </button>
-        <button hidden={true}
-          onClick={onClearCache}
-          className="px-3 py-2 bg-gray-700 text-white text-xs font-medium rounded-md hover:bg-gray-600 transition"
-        >
-          Clear Cache
-        </button>
+          {isProcessing && (
+            <div className="flex items-center gap-2 text-gray-900 dark:text-white text-sm">
+              <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+              <span>{t('processing')}</span>
+            </div>
+          )}
+          {isEditor && (
+            <button
+              onClick={onOpenUploadModal}
+              className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition flex items-center gap-2"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>{t('upload')}</span>
+            </button>
+          )}
+          <button
+            onClick={onLogout}
+            className="px-4 py-2 bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-white text-sm font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-700 transition flex items-center gap-2"
+          >
+            <img src="/logout.svg" alt="Logout" className="h-5 w-5 dark:brightness-0 dark:invert" />
+            <span>{t('logout')}</span>
+          </button>
+        </div>
       </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};

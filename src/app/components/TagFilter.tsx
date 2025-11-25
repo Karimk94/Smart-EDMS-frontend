@@ -6,9 +6,11 @@ interface TagFilterProps {
   apiURL: string;
   selectedTags: string[];
   setSelectedTags: (tags: string[]) => void;
+  t: Function;
+  lang: 'en' | 'ar';
 }
 
-export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setSelectedTags }) => {
+export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setSelectedTags, t, lang }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +27,7 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
     if (!tagsFetched) {
       setIsLoading(true);
       try {
-        const response = await fetch(`${apiURL}/tags`);
+        const response = await fetch(`${apiURL}/tags?lang=${lang}`);
         if (!response.ok) throw new Error('Failed to fetch tags');
         const data = await response.json();
         setAllTags(data);
@@ -50,6 +52,11 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
     };
   }, [wrapperRef]);
 
+  useEffect(() => {
+    setTagsFetched(false);
+    setAllTags([]);
+  }, [lang]);
+
   const handleTagClick = (tag: string) => {
     const newSelectedTags = selectedTags.includes(tag)
       ? selectedTags.filter(t => t !== tag)
@@ -58,7 +65,7 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
   };
 
   const handleClearTags = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent dropdown from closing
+    e.stopPropagation();
     setSelectedTags([]);
   };
 
@@ -91,10 +98,10 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
     <div className="relative" ref={wrapperRef}>
       <button
         onClick={() => isOpen ? setIsOpen(false) : handleOpen()}
-        className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-600 transition"
+        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-white text-sm font-medium rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition shadow-sm"
       >
-        <img src="/tag.svg" alt="Tags" className="h-5 w-5" />
-        Tags
+        <img src="/tag.svg" alt="Tags" className="h-5 w-5 invert dark:invert-0" />
+        {t('tags')}
         {selectedTags.length > 0 && (
           <span className="ml-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
             {selectedTags.length}
@@ -103,29 +110,29 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-80 bg-[#282828] border border-gray-600 rounded-lg shadow-lg z-50 p-4">
+        <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-[#282828] border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 p-4">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-white">Filter by Tags</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('filterByTags')}</h3>
             {selectedTags.length > 0 && (
                <button
                   onClick={handleClearTags}
                   className="px-2 py-0.5 text-xs text-red-400 hover:text-red-300 rounded-md border border-red-400 hover:border-red-300"
                 >
-                  Clear All
+                  {t('clearAllTags')}
                 </button>
             )}
           </div>
           <div className="relative mb-4">
             <input
               type="text"
-              placeholder="Search tags..."
+              placeholder={t('searchTags')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 bg-[#121212] text-gray-200 border border-gray-600 rounded-md focus:ring-2 focus:ring-red-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] text-gray-900 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-red-500 focus:outline-none"
             />
           </div>
           {isLoading ? (
-            <p className="text-gray-400">Loading tags...</p>
+            <p className="text-gray-500 dark:text-gray-400">{t('loadingTags')}</p>
           ) : (
             <div
               ref={scrollContainerRef}
@@ -139,17 +146,17 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
                   className={`px-2 py-1 text-xs font-medium rounded-md transition ${
                     selectedTags.includes(tag)
                       ? 'bg-red-600 text-white'
-                      : 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500'
                   }`}
                 >
                   {tag}
                 </button>
               ))}
                {sortedTags.length === 0 && !searchTerm && (
-                 <p className="text-sm text-gray-500 italic px-1">No tags available.</p>
+                 <p className="text-sm text-gray-600 dark:text-gray-500 italic px-1">{t('noTagsAvailable')}</p>
                )}
                {sortedTags.length === 0 && searchTerm && (
-                 <p className="text-sm text-gray-500 italic px-1">No tags match '{searchTerm}'.</p>
+                 <p className="text-sm text-gray-600 dark:text-gray-500 italic px-1">{t('noTagsMatch')}</p>
                )}
             </div>
           )}

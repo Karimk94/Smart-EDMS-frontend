@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { UploadFileItem } from './UploadFileItem';
 import ExifReader from 'exifreader';
-import { EventEditor } from './EventEditor';
 import { UploadStatus, UploadableFile } from '../../interfaces';
 
 const formatDateTimeForAPI = (date: Date | null): string | null => {
@@ -72,17 +71,11 @@ export interface UploadModalProps {
   theme: 'light' | 'dark';
 }
 
-interface EventOption {
-  value: number;
-  label: string;
-}
-
 export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileIdCounter = useRef(0);
-  const [selectedEvent, setSelectedEvent] = useState<EventOption | null>(null);
 
   const extractExifDate = async (file: File): Promise<Date | null> => {
     try {
@@ -196,9 +189,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
         formData.append('docname', (editedFileName && editedFileName.trim()) ? editedFileName.trim() : removeExtension(file.name)); // MODIFIED: Use removeExtension as fallback
         formData.append('abstract', ``);
 
-        if (selectedEvent) {
-          formData.append('event_id', String(selectedEvent.value));
-        }
 
         const formattedDate = formatDateTimeForAPI(editedDateTaken);
         //console.log(`File ${id}: Original Date:`, editedDateTaken, `Formatted Date for API:`, formattedDate);
@@ -271,7 +261,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
       </div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 overflow-hidden">
-        {/* Left Side: Dropzone & Event Editor */}
+        {/* Left Side: Dropzone */}
         <div className="w-full md:w-1/3 flex flex-col">
           <div
             onDrop={onDrop}
@@ -285,15 +275,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
               Browse Files
             </label>
             <input id="file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
-          </div>
-          {/* --- EventEditor for Upload --- */}
-          <div className="mt-4">
-            <EventEditor
-              apiURL={apiURL}
-              selectedEvent={selectedEvent}
-              setSelectedEvent={setSelectedEvent}
-              theme={theme}
-            />
           </div>
         </div>
 

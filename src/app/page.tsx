@@ -12,11 +12,7 @@ import { Document } from '../models/Document';
 import { UploadModal } from './components/UploadModal';
 import { UploadableFile } from '../interfaces';
 import { DocumentItemSkeleton } from './components/DocumentItemSkeleton';
-import { MemoriesStack } from './components/MemoriesStack';
-import { EventStack } from './components/EventStack';
-import { EventItem as EventStackItem } from '../models/EventItem';
-import { EventDocumentModal } from './components/EventDocumentModal';
-import { Journey } from './components/Journey';
+import { Folders } from './components/Folders';
 import { useTranslations } from './hooks/useTranslations';
 import HtmlLangUpdater from './components/HtmlLangUpdater';
 import HtmlThemeUpdater from './components/HtmlThemeUpdater';
@@ -29,7 +25,7 @@ import { enGB } from 'date-fns/locale/en-GB';
 import { User } from '../models/User';
 import { PersonOption } from '../models/PersonOption';
 
-type ActiveSection = 'recent' | 'favorites' | 'events' | 'memories' | 'journey';
+type ActiveSection = 'recent' | 'favorites' | 'folders';
 
 const formatToApiDateTime = (date: Date | null): string => {
   if (!date) return '';
@@ -48,15 +44,10 @@ export default function HomePage() {
   const router = useRouter();
 
   const [activeSection, setActiveSection] = useState<ActiveSection>('recent');
+  const [activeFolder, setActiveFolder] = useState<'images' | 'videos' | 'files' | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [events, setEvents] = useState<EventStackItem[]>([]);
-  const [memoryStackItems, setMemoryStackItems] = useState<Document[]>([]);
-  const [isShowingFullMemories, setIsShowingFullMemories] =
-    useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isLoadingMemoryStack, setIsLoadingMemoryStack] =
-    useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -77,10 +68,6 @@ export default function HomePage() {
   const [selectedPdf, setSelectedPdf] = useState<Document | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [processingDocs, setProcessingDocs] = useState<number[]>([]);
-
-  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-  const [selectedEventIdForModal, setSelectedEventIdForModal] = useState<number | null>(null);
-  const [selectedEventNameForModal, setSelectedEventNameForModal] = useState<string>('');
 
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -127,16 +114,10 @@ export default function HomePage() {
   };
 
   const fetchSectionData = useCallback(
-    async (isMemoryFetch = false) => {
-      if (!isLoadingMemoryStack || isMemoryFetch || activeSection === 'events') {
-        setIsLoading(true);
-      }
+    async () => {
+      setIsLoading(true);
       setError(null);
-      if (activeSection === 'events') {
-        setEvents([]);
-      } else {
-        setDocuments([]);
-      }
+      setDocuments([]);
 
       let url: URL;
       const params = new URLSearchParams();
@@ -144,31 +125,32 @@ export default function HomePage() {
       params.append('pageSize', '20');
       params.append('lang', lang);
 
-      if (!isMemoryFetch) {
-        if (searchTerm) params.append('search', searchTerm);
-        if (selectedPerson && selectedPerson.length > 0) {
-          const personNames = selectedPerson
-            .map((p) => p.label.split(' - ')[0])
-            .join(',');
-          params.append('persons', personNames);
-          if (selectedPerson.length > 1) {
-            params.append('person_condition', personCondition);
-          }
+      if (searchTerm) params.append('search', searchTerm);
+      if (selectedPerson && selectedPerson.length > 0) {
+        const personNames = selectedPerson
+          .map((p) => p.label.split(' - ')[0])
+          .join(',');
+        params.append('persons', personNames);
+        if (selectedPerson.length > 1) {
+          params.append('person_condition', personCondition);
         }
-        if (selectedTags.length > 0) {
-          params.append('tags', selectedTags.join(','));
-        }
-        const formattedDateFrom = formatToApiDateTime(dateFrom);
-        if (formattedDateFrom) params.append('date_from', formattedDateFrom);
-        const formattedDateTo = formatToApiDateTime(dateTo);
-        if (formattedDateTo) params.append('date_to', formattedDateTo);
-        if (selectedYears.length > 0) {
-          params.append('years', selectedYears.join(','));
-        }
-      } else {
-        const now = new Date();
-        params.append('memoryMonth', String(now.getMonth() + 1));
-        params.append('sort', 'rtadocdate_desc');
+      }
+      if (selectedTags.length > 0) {
+        params.append('tags', selectedTags.join(','));
+      }
+      const formattedDateFrom = formatToApiDateTime(dateFrom);
+      if (formattedDateFrom) params.append('date_from', formattedDateFrom);
+      const formattedDateTo = formatToApiDateTime(dateTo);
+      if (formattedDateTo) params.append('date_to', formattedDateTo);
+      if (selectedYears.length > 0) {
+        params.append('years', selectedYears.join(','));
+      }
+
+      // Add media_type filter if in a specific folder
+      if (activeSection === 'folders' && activeFolder) {
+        if (activeFolder === 'images') params.append('media_type', 'image');
+        else if (activeFolder === 'videos') params.append('media_type', 'video');
+        else if (activeFolder === 'files') params.append('media_type', 'pdf');
       }
 
       try {
@@ -177,37 +159,30 @@ export default function HomePage() {
         let dataKey = 'documents';
         let totalPagesKey = 'total_pages';
 
-        if (isMemoryFetch) {
-          endpoint = '/documents';
-          dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
-          dataKey = 'documents';
-        } else {
-          switch (activeSection) {
-            case 'recent':
+        switch (activeSection) {
+          case 'recent':
+            endpoint = '/documents';
+            params.append('sort', 'date_desc');
+            dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
+            dataKey = 'documents';
+            break;
+          case 'favorites':
+            endpoint = '/favorites';
+            dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
+            dataKey = 'documents';
+            break;
+          case 'folders':
+            if (activeFolder) {
               endpoint = '/documents';
-              params.append('sort', 'date_desc');
               dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
               dataKey = 'documents';
-              break;
-            case 'favorites':
-              endpoint = '/favorites';
-              dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
-              dataKey = 'documents';
-              break;
-            case 'events':
-              endpoint = '/events';
-              dataSetter = setEvents as React.Dispatch<React.SetStateAction<EventStackItem[]>>;
-              dataKey = 'events';
-              params.append('fetch_all', 'false');
-              break;
-            case 'journey':
-              endpoint = '/journey';
-              dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
-              dataKey = 'events';
-              break;
-            default:
-              throw new Error(`Invalid section: ${activeSection} `);
-          }
+            } else {
+              setIsLoading(false);
+              return;
+            }
+            break;
+          default:
+            throw new Error(`Invalid section: ${activeSection} `);
         }
 
         if (endpoint) {
@@ -219,18 +194,27 @@ export default function HomePage() {
             throw new Error(`Failed to fetch.Status: ${response.status} `);
           const data = await response.json();
 
-          dataSetter(data[dataKey] || []);
+          let fetchedDocs = data[dataKey] || [];
+
+          if (activeSection === 'folders' && activeFolder) {
+            fetchedDocs = fetchedDocs.filter((doc: Document) => {
+              if (activeFolder === 'images') return doc.media_type === 'image';
+              if (activeFolder === 'videos') return doc.media_type === 'video';
+              if (activeFolder === 'files') return doc.media_type === 'pdf';
+              return true;
+            });
+          }
+
+          dataSetter(fetchedDocs);
           setTotalPages(data[totalPagesKey] || 1);
-        } else if (!isMemoryFetch) {
+        } else {
           setDocuments([]);
-          setEvents([]);
           setTotalPages(1);
         }
       } catch (err: any) {
         console.error(`Error fetching: `, err);
         setError(`Failed to fetch.${err.message} `);
         setDocuments([]);
-        setEvents([]);
         setTotalPages(1);
       } finally {
         setIsLoading(false);
@@ -242,6 +226,7 @@ export default function HomePage() {
     },
     [
       activeSection,
+      activeFolder,
       currentPage,
       searchTerm,
       dateFrom,
@@ -250,49 +235,16 @@ export default function HomePage() {
       personCondition,
       selectedTags,
       selectedYears,
-      isLoadingMemoryStack,
       initialLoadDone,
       lang
     ]
   );
 
-  const fetchMemoryStack = async () => {
-    setIsLoadingMemoryStack(true);
-    try {
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const url = new URL(`${API_PROXY_URL}/memories`, window.location.origin);
-      url.searchParams.append('month', String(month));
-      url.searchParams.append('limit', '5');
-
-      const response = await fetch(url);
-      if (!response.ok)
-        throw new Error('Failed to fetch memory stack items.');
-      const data = await response.json();
-      setMemoryStackItems(data.memories || []);
-    } catch (err: any) {
-      console.error('Error fetching memory stack:', err);
-      setMemoryStackItems([]);
-    } finally {
-      setIsLoadingMemoryStack(false);
-    }
-  };
-
   useEffect(() => {
     if (user) {
-      if (isShowingFullMemories) {
-        fetchSectionData(true);
-      } else {
-        fetchSectionData(false);
-      }
+      fetchSectionData();
     }
-  }, [fetchSectionData, isShowingFullMemories, currentPage, user?.username, lang]);
-
-  useEffect(() => {
-    if (user) {
-      fetchMemoryStack();
-    }
-  }, [user?.username]);
+  }, [fetchSectionData, currentPage, user?.username, lang]);
 
   useEffect(() => {
     if (user) {
@@ -339,8 +291,8 @@ export default function HomePage() {
             setProcessingDocs(stillProcessing);
             if (stillProcessing.length === 0) {
               clearInterval(interval);
-              if (activeSection === 'recent' || activeSection === 'events' || isShowingFullMemories) {
-                fetchSectionData(isShowingFullMemories);
+              if (activeSection === 'recent' || (activeSection === 'folders' && activeFolder)) {
+                fetchSectionData();
               }
             }
           } else if (stillProcessing.length === 0) {
@@ -357,18 +309,16 @@ export default function HomePage() {
     processingDocs,
     fetchSectionData,
     activeSection,
-    isShowingFullMemories,
+    activeFolder,
     user?.username,
   ]);
 
   const handleSearch = (newSearchTerm: string) => {
-    setIsShowingFullMemories(false);
     setSearchTerm(newSearchTerm);
     setCurrentPage(1);
   };
 
   const handleClearFilters = () => {
-    setIsShowingFullMemories(false);
     setDateFrom(null);
     setDateTo(null);
     setSelectedPerson(null);
@@ -386,8 +336,7 @@ export default function HomePage() {
         if (!response.ok)
           throw new Error(`Cache clear failed: ${response.statusText}`);
         window.alert('Thumbnail cache cleared.');
-        fetchSectionData(isShowingFullMemories);
-        fetchMemoryStack();
+        fetchSectionData();
       } catch (err: any) {
         console.error('Cache clear error:', err);
         window.alert(`Failed to clear cache: ${err.message}`);
@@ -403,13 +352,16 @@ export default function HomePage() {
   };
 
   const handleSectionChange = (section: ActiveSection) => {
-    if (section === 'memories') {
-      handleMemoryStackClick();
-    } else if (section !== activeSection || isShowingFullMemories) {
-      setIsShowingFullMemories(false);
+    if (section !== activeSection) {
       setActiveSection(section);
+      setActiveFolder(null);
       setCurrentPage(1);
     }
+  };
+
+  const handleFolderClick = (folder: 'images' | 'videos' | 'files') => {
+    setActiveFolder(folder);
+    setCurrentPage(1);
   };
 
   const handleDocumentClick = (doc: Document) => {
@@ -418,19 +370,7 @@ export default function HomePage() {
     else setSelectedDoc(doc);
   };
 
-  const handleEventClick = (eventId: number) => {
-    const clickedEvent = events.find(e => e.id === eventId);
-    if (clickedEvent) {
-      setSelectedEventIdForModal(eventId);
-      setSelectedEventNameForModal(clickedEvent.name);
-      setIsEventModalOpen(true);
-    } else {
-      console.warn(`Could not find event details for ID: ${eventId}`);
-    }
-  };
-
   const handleTagSelect = (tag: string) => {
-    setIsShowingFullMemories(false);
     if (!selectedTags.includes(tag)) {
       setSelectedTags([...selectedTags, tag]);
     }
@@ -438,17 +378,14 @@ export default function HomePage() {
   };
 
   const handleYearSelect = (years: number[]) => {
-    setIsShowingFullMemories(false);
     setSelectedYears(years);
     setCurrentPage(1);
   };
 
   const handleUpdateMetadataSuccess = () => {
-    fetchSectionData(isShowingFullMemories);
+    fetchSectionData();
     const updatedDocId = selectedDoc?.doc_id || selectedVideo?.doc_id || selectedPdf?.doc_id;
-    if (updatedDocId && memoryStackItems.some((item) => item.doc_id === updatedDocId)) {
-      fetchMemoryStack();
-    }
+
     setSelectedDoc(null);
     setSelectedVideo(null);
     setSelectedPdf(null);
@@ -459,7 +396,6 @@ export default function HomePage() {
     setIsUploadModalOpen(false);
     const newProcessingDocs = Array.from(new Set([...processingDocs, ...docnumbers]));
     setProcessingDocs(newProcessingDocs);
-    setIsShowingFullMemories(false);
     setActiveSection('recent');
     setCurrentPage(1);
     fetch(`${API_PROXY_URL}/process_uploaded_documents`, {
@@ -470,12 +406,6 @@ export default function HomePage() {
       console.error('Error initiating processing:', error);
       setProcessingDocs((prev) => prev.filter((d) => !docnumbers.includes(d)));
     });
-  };
-
-  const handleMemoryStackClick = () => {
-    setIsShowingFullMemories(true);
-    setActiveSection('memories');
-    setCurrentPage(1);
   };
 
   const handleToggleFavorite = async (docId: number, isFavorite: boolean) => {
@@ -494,11 +424,8 @@ export default function HomePage() {
         );
       }
       if (activeSection === 'favorites' && !isFavorite) {
-        fetchSectionData(false);
+        fetchSectionData();
       }
-      setMemoryStackItems(
-        memoryStackItems.map(m => m.doc_id === docId ? { ...m, is_favorite: isFavorite } : m)
-      );
     } catch (error) {
       console.error(error);
     }
@@ -544,64 +471,36 @@ export default function HomePage() {
       );
     }
 
-    if (isShowingFullMemories) {
-      if (documents.length === 0) {
-        return (
-          <p className="text-center text-gray-500 dark:text-gray-400 py-10">
-            {t('noMemoriesFound')}
-          </p>
-        );
-      }
+    if (activeSection === 'folders' && !activeFolder) {
+      return <Folders onFolderClick={handleFolderClick} t={t} />;
+    }
+
+    const backButton = activeSection === 'folders' && activeFolder && (
+      <div className="mb-4 flex items-center gap-2">
+        <button onClick={() => setActiveFolder(null)} className="text-blue-600 hover:underline flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          {t('backToFolders')}
+        </button>
+        <span className="text-gray-400">/</span>
+        <span className="font-semibold text-gray-700 dark:text-gray-300">{t(activeFolder)}</span>
+      </div>
+    );
+
+    if (documents.length === 0) {
       return (
         <>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            {t('memoriesFromPast')}
-          </h2>
-          <DocumentList
-            documents={documents}
-            onDocumentClick={handleDocumentClick}
-            apiURL={API_PROXY_URL}
-            onTagSelect={handleTagSelect}
-            isLoading={false}
-            processingDocs={processingDocs}
-            onToggleFavorite={handleToggleFavorite}
-            lang={lang}
-          />
+          {backButton}
+          <p className="text-center text-gray-500 dark:text-gray-400 py-10">
+            {t('noDocumentsFound')}
+          </p>
         </>
       );
     }
-
-    if (activeSection === 'events') {
-      if (events.length === 0) {
-        return (
-          <p className="text-center text-gray-500 dark:text-gray-400 py-10">
-            {t('noDocumentsFound')}
-          </p>
-        );
-      }
-      return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
-          {events.map((event) => (
-            <EventStack
-              key={event.id}
-              event={event}
-              apiURL={API_PROXY_URL}
-              onClick={() => handleEventClick(event.id)}
-            />
-          ))}
-        </div>
-      );
-    }
-
-    else {
-      if (documents.length === 0) {
-        return (
-          <p className="text-center text-gray-500 dark:text-gray-400 py-10">
-            {t('noDocumentsFound')}
-          </p>
-        );
-      }
-      return (
+    return (
+      <>
+        {backButton}
         <DocumentList
           documents={documents}
           onDocumentClick={handleDocumentClick}
@@ -612,8 +511,8 @@ export default function HomePage() {
           onToggleFavorite={handleToggleFavorite}
           lang={lang}
         />
-      );
-    }
+      </>
+    );
   };
 
   if (!user) {
@@ -653,14 +552,14 @@ export default function HomePage() {
             isSidebarOpen={isSidebarOpen}
             activeSection={activeSection}
             handleSectionChange={handleSectionChange}
-            isShowingFullMemories={isShowingFullMemories}
+            isShowingFullMemories={false}
             t={t}
             lang={lang}
           />
 
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-w-0">
 
-            {activeSection !== 'journey' && !isShowingFullMemories && (
+            {(
               <div className={`flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700 justify-end ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>
                 <TagFilter
                   apiURL={API_PROXY_URL}
@@ -722,44 +621,17 @@ export default function HomePage() {
             )}
 
             {/* --- Main Content --- */}
-            {activeSection === 'journey' ? (
-              <Journey apiURL={API_PROXY_URL} t={t} />
-            ) : (
-              renderContent()
-            )}
+            {renderContent()}
+
 
             {/* --- Pagination (conditonal) --- */}
-            {activeSection !== 'journey' && !isLoading && totalPages > 1 && (
+            {activeSection !== 'folders' && !isLoading && totalPages > 1 && (
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={handlePageChange}
                 t={t}
               />
-            )}
-
-            {/* --- Memories Stack (conditional) --- */}
-            {activeSection !== 'journey' && !isShowingFullMemories && (
-              <section className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                  {t('memoriesFromPast')}
-                </h2>
-                {isLoadingMemoryStack ? (
-                  <div className="h-40 w-full max-w-xs rounded-lg skeleton-loader"></div>
-                ) : memoryStackItems.length > 0 ? (
-                  <div className="max-w-xs">
-                    <MemoriesStack
-                      memories={memoryStackItems}
-                      apiURL={API_PROXY_URL}
-                      onClick={handleMemoryStackClick}
-                    />
-                  </div>
-                ) : (
-                  <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg text-center text-gray-500 dark:text-gray-400">
-                    {t('noMemoriesFound')}
-                  </div>
-                )}
-              </section>
             )}
           </main>
         </div>
@@ -769,14 +641,6 @@ export default function HomePage() {
         {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         {isUploadModalOpen && user?.security_level === 'Editor' && <UploadModal onClose={() => setIsUploadModalOpen(false)} apiURL={API_PROXY_URL} onAnalyze={handleAnalyze} theme={theme} />}
-        <EventDocumentModal
-          isOpen={isEventModalOpen}
-          onClose={() => setIsEventModalOpen(false)}
-          initialEventId={selectedEventIdForModal}
-          initialEventName={selectedEventNameForModal}
-          apiURL={API_PROXY_URL}
-          theme={theme}
-        />
       </div>
     </>
   );

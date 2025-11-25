@@ -1,15 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Document } from '../../models/Document';
 import { TagEditor } from './TagEditor';
-import { EventEditor } from './EventEditor';
 import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
-import { ReadOnlyEventDisplay } from './ReadOnlyEventDisplay';
-
-interface EventOption {
-  value: number;
-  label: string;
-}
 
 interface PdfModalProps {
   doc: Document;
@@ -70,32 +63,6 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
-  const [selectedEvent, setSelectedEvent] = useState<EventOption | null>(null);
-
-  useEffect(() => {
-    const fetchDocumentEvent = async () => {
-      try {
-        const response = await fetch(`${apiURL}/document/${doc.doc_id}/event`);
-        if (response.ok) {
-          const eventData = await response.json();
-          if (eventData && eventData.event_id && eventData.event_name) {
-            setSelectedEvent({ value: eventData.event_id, label: eventData.event_name });
-          } else {
-            setSelectedEvent(null);
-          }
-        } else if (response.status !== 404) {
-          console.error(`Failed to fetch document event (${response.status}):`, await response.text());
-        } else {
-          setSelectedEvent(null);
-        }
-      } catch (err) {
-        console.error("Network or parsing error fetching document event:", err);
-        setSelectedEvent(null);
-      }
-    };
-    setSelectedEvent(null);
-    fetchDocumentEvent();
-  }, [doc.doc_id, apiURL]);
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -184,24 +151,6 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
     onToggleFavorite(doc.doc_id, newFavoriteStatus);
-  };
-
-  const handleEventChangeInModal = async (docIdParam: number, eventId: number | null): Promise<boolean> => {
-    try {
-      const response = await fetch(`${apiURL}/document/${docIdParam}/event`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: eventId }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update event association');
-      }
-      return true;
-    } catch (error: any) {
-      console.error('Failed to update event association:', error);
-      return false;
-    }
   };
 
   return (
@@ -316,18 +265,6 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
                 </p>
               )}
             </div>
-            {isEditor ? (
-              <EventEditor
-                docId={doc.doc_id}
-                apiURL={apiURL}
-                selectedEvent={selectedEvent}
-                setSelectedEvent={setSelectedEvent}
-                onEventChange={handleEventChangeInModal}
-                theme={theme}
-              />
-            ) : (
-              <ReadOnlyEventDisplay event={selectedEvent} t={t} />
-            )}
             {isEditor ? (
               <TagEditor docId={doc.doc_id} apiURL={apiURL} lang={lang} theme={theme} t={t} />
             ) : (

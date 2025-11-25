@@ -1,6 +1,5 @@
 import React from 'react';
 import { SearchBar } from './SearchBar';
-import { PersonOption } from '../../models/PersonOption';
 
 interface HeaderProps {
   onSearch: (searchTerm: string) => void;
@@ -83,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
             <h1
               className={`text-xl font-bold text-gray-900 dark:text-white ${logoMargin} cursor-pointer`}
             >
-              <span className="text-red-500">EDMS</span> Media
+              Smart <span className="text-red-500">EDMS</span>
             </h1>
           </a>
           <button

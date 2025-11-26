@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { UploadFileItem } from './UploadFileItem';
 import ExifReader from 'exifreader';
 import { UploadStatus, UploadableFile } from '../../interfaces';
@@ -76,6 +76,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileIdCounter = useRef(0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const extractExifDate = async (file: File): Promise<Date | null> => {
     try {

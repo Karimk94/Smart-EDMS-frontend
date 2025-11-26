@@ -90,6 +90,16 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
     setIsEditingDate(false);
   }, [doc.title, doc.date]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleDateChange = (date: Date | null) => {
     setDocumentDate(date);
   };

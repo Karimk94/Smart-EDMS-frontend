@@ -142,6 +142,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
           alt="Thumbnail"
           className="w-full h-full object-cover rounded-lg bg-gray-200 dark:bg-gray-800 group-hover:opacity-80 transition"
           onError={(e) => { (e.target as HTMLImageElement).src = '/no-image.svg'; }}
+          draggable={false}
         />
         {doc.media_type === 'video' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-40 transition rounded-lg">

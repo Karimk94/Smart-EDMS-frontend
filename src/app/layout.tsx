@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { GlobalSecurity } from './components/GlobalSecurity';
 
 export const metadata: Metadata = {
-  title: "EDMS Media",
+  title: "Smart EDMS",
   description: "Browse documents and analyze images from the EDMS.",
 };
 
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <GlobalSecurity />
+        {children}
+      </body>
     </html>
   );
 }

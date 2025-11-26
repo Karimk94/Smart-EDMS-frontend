@@ -119,6 +119,15 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
     setIsEditingDate(false);
   }, [doc.title, doc.date]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleAnalyze = async () => {
     if (!originalImageBlob.current) return;
@@ -261,7 +270,10 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
           {view === 'image' && imageSrc && !error && (
             <div>
               <div className={`text-center ${imageContainerBg} rounded-lg flex items-center justify-center min-h-[40vh]`}>
-                <img src={imageSrc} alt={doc.docname.replace(/\.[^/.]+$/, "")} className="max-w-full max-h-[60vh] mx-auto rounded-lg object-contain" />
+                <img src={imageSrc}
+                  alt={doc.docname.replace(/\.[^/.]+$/, "")}
+                  className="max-w-full max-h-[60vh] mx-auto rounded-lg object-contain"
+                  draggable={false} />
               </div>
               <div className="mt-4">
                 <CollapsibleSection title={t('details')} theme={theme}>

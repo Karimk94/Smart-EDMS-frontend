@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Document } from '../../models/Document';
 import { TagEditor } from './TagEditor';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -75,6 +75,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -169,14 +170,32 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
     }
   };
 
-  const handleToggleFavorite = () => {
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
     onToggleFavorite(doc.doc_id, newFavoriteStatus);
   };
 
+  const handleFullScreen = () => {
+    if (videoRef.current) {
+      if (!document.fullscreenElement) {
+        videoRef.current.requestFullscreen().catch(err => {
+          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    }
+  };
+
   const handleDownload = () => {
-    window.open(`${apiURL}/download_watermarked/${doc.doc_id}`, '_blank');
+    const link = document.createElement('a');
+    link.href = `${apiURL}/video/${doc.doc_id}`;
+    link.download = doc.docname || 'video.mp4';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';
@@ -189,48 +208,58 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
   const buttonBg = theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200';
   const buttonHoverBg = theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-300';
   const buttonText = theme === 'dark' ? 'text-white' : 'text-gray-900';
+  const closeButtonColor = theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden`} onClick={e => e.stopPropagation()}>
+      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
 
-        {/* --- Header --- */}
-        <div className="flex flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-inherit z-10 flex-shrink-0">
-          <div className="flex flex-row items-center gap-3 min-w-0 overflow-hidden">
+        {/* Header */}
+        <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
+
+          {/* Left: Favorite & Title */}
+          <div className="flex items-start gap-3 flex-grow min-w-0">
             {/* Favorite Button */}
             <button
               onClick={handleToggleFavorite}
-              className="flex-shrink-0 p-1.5 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className={`p-2 rounded-full transition-colors ${isFavorite ? 'bg-black bg-opacity-10' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} flex-shrink-0 mt-0.5`}
               title={isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
-              <svg className={`w-5 h-5 ${isFavorite ? 'text-yellow-400 fill-current' : 'text-gray-400 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isFavorite ? 0 : 2} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z" />
+              <svg className={`w-6 h-6 ${isFavorite ? 'text-yellow-400' : 'text-gray-300'}`} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={isFavorite ? 1 : 2}
+                  d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z"
+                />
               </svg>
             </button>
-            {/* Title */}
-            <h2 className={`text-lg md:text-xl font-bold ${textHeader} m-0`} title={doc.docname.replace(/\.[^/.]+$/, "")}>{doc.docname.replace(/\.[^/.]+$/, "")}</h2>
+            <h2 className={`text-xl font-bold ${textHeader} break-words pt-1 mt-0.5`}>
+              {doc.docname.replace(/\.[^/.]+$/, "")}
+            </h2>
           </div>
 
-          {/* Actions Group */}
-          <div className="flex flex-row items-center gap-2 flex-shrink-0 ml-4">
-            <button
-              onClick={handleDownload}
-              className="flex items-center justify-center p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-              title="Download"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M12 12.75l-3-3m3 3 3-3m-3 3V3" />
-              </svg>
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+            {/* Download Button */}
+            <button onClick={handleDownload} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Download">
+              <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
             </button>
-            <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors text-2xl leading-none rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-              &times;
+
+            {/* Full Screen Button */}
+            <button onClick={handleFullScreen} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Full Screen">
+              <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
+            </button>
+
+            {/* Close Button */}
+            <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2`}>
+              <span className={`text-3xl leading-none ${closeButtonColor}`}>&times;</span>
             </button>
           </div>
         </div>
-        {/* --- End Header --- */}
 
-        <div className="p-6 overflow-y-auto flex-grow">
-          <video controls autoPlay className="w-full max-h-[70vh] rounded-lg bg-black">
+        <div className="p-6">
+          <video ref={videoRef} controls autoPlay className="w-full max-h-[70vh] rounded-lg bg-black">
             <source src={`${apiURL}/video/${doc.doc_id}`} type="video/mp4" />
             Your browser does not support the video tag.
           </video>

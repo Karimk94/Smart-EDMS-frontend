@@ -64,6 +64,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -173,13 +174,25 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
     setIsFullScreen(!isFullScreen);
   };
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = `${apiURL}/download_watermarked/${doc.doc_id}`;
-    link.setAttribute('download', doc.docname || 'download');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true);
+      const response = await fetch(`${apiURL}/download_watermarked/${doc.doc_id}`);
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', doc.docname || 'download');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -210,8 +223,12 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
           {/* Right: Actions */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {/* Download Button */}
-            <button onClick={handleDownload} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
-              <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
+            <button onClick={handleDownload} disabled={isDownloading} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
+              {isDownloading ? (
+                <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
+              )}
             </button>
 
             {/* Full Screen Button */}

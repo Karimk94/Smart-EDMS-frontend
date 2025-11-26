@@ -75,6 +75,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -94,12 +95,16 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (isFullScreen) {
+          setIsFullScreen(false);
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isFullScreen]);
 
   const handleDateChange = (date: Date | null) => {
     setDocumentDate(date);
@@ -178,15 +183,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
   };
 
   const handleFullScreen = () => {
-    if (videoRef.current) {
-      if (!document.fullscreenElement) {
-        videoRef.current.requestFullscreen().catch(err => {
-          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-        });
-      } else {
-        document.exitFullscreen();
-      }
-    }
+    setIsFullScreen(!isFullScreen);
   };
 
   const handleDownload = () => {
@@ -259,10 +256,22 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
         </div>
 
         <div className="p-6">
-          <video ref={videoRef} controls autoPlay className="w-full max-h-[70vh] rounded-lg bg-black">
-            <source src={`${apiURL}/video/${doc.doc_id}`} type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
+          <div className={`relative ${isFullScreen ? 'fixed inset-0 z-[60] bg-black flex items-center justify-center' : ''}`}>
+            <video ref={videoRef} controls autoPlay className={isFullScreen ? 'w-full h-full' : 'w-full max-h-[70vh] rounded-lg bg-black'}>
+              <source src={`${apiURL}/video/${doc.doc_id}`} type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+            {isFullScreen && (
+              <button
+                onClick={handleFullScreen}
+                className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
           <div className="mt-4 mb-6">
             <CollapsibleSection title={t('details')} theme={theme}>
               {/* Abstract Section */}

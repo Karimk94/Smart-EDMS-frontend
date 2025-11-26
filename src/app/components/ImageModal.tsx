@@ -73,6 +73,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
     const fetchImage = async () => {
@@ -123,12 +124,16 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (isFullScreen) {
+          setIsFullScreen(false);
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isFullScreen]);
 
   const handleAnalyze = async () => {
     if (!originalImageBlob.current) return;
@@ -226,15 +231,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   };
 
   const handleFullScreen = () => {
-    if (imageContainerRef.current) {
-      if (!document.fullscreenElement) {
-        imageContainerRef.current.requestFullscreen().catch(err => {
-          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-        });
-      } else {
-        document.exitFullscreen();
-      }
-    }
+    setIsFullScreen(!isFullScreen);
   };
 
   const handleDownload = () => {
@@ -324,11 +321,32 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
 
           {view === 'image' && imageSrc && !error && (
             <div>
-              <div ref={imageContainerRef} className={`text-center ${imageContainerBg} rounded-lg flex items-center justify-center min-h-[40vh] relative group`}>
+              <div
+                ref={imageContainerRef}
+                className={
+                  isFullScreen
+                    ? `fixed inset-0 z-[60] bg-black flex items-center justify-center h-full w-full`
+                    : `text-center ${imageContainerBg} rounded-lg flex items-center justify-center min-h-[40vh] relative group`
+                }
+              >
                 <img src={imageSrc}
                   alt={doc.docname.replace(/\.[^/.]+$/, "")}
-                  className="max-w-full max-h-[60vh] mx-auto rounded-lg object-contain"
+                  className={
+                    isFullScreen
+                      ? "max-w-full max-h-full object-contain"
+                      : "max-w-full max-h-[60vh] mx-auto rounded-lg object-contain"
+                  }
                   draggable={false} />
+                {isFullScreen && (
+                  <button
+                    onClick={handleFullScreen}
+                    className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
               <div className="mt-4">
                 <CollapsibleSection title={t('details')} theme={theme}>

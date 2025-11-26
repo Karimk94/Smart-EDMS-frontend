@@ -63,6 +63,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,12 +83,16 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (isFullScreen) {
+          setIsFullScreen(false);
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isFullScreen]);
 
   const handleDateChange = (date: Date | null) => {
     setDocumentDate(date);
@@ -165,15 +170,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
   };
 
   const handleFullScreen = () => {
-    if (pdfContainerRef.current) {
-      if (!document.fullscreenElement) {
-        pdfContainerRef.current.requestFullscreen().catch(err => {
-          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-        });
-      } else {
-        document.exitFullscreen();
-      }
-    }
+    setIsFullScreen(!isFullScreen);
   };
 
   const handleDownload = () => {
@@ -241,12 +238,22 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
           {/* PDF Viewer */}
-          <div ref={pdfContainerRef} className={`${isDetailsVisible ? 'md:col-span-2' : 'col-span-1'} h-full bg-white rounded-lg`}>
+          <div ref={pdfContainerRef} className={`${isFullScreen ? 'fixed inset-0 z-[60]' : (isDetailsVisible ? 'md:col-span-2' : 'col-span-1')} h-full bg-white rounded-lg`}>
             <iframe
               src={`${apiURL}/pdf/${doc.doc_id}`}
               className="w-full h-full border-0 rounded-lg"
               title={doc.docname.replace(/\.[^/.]+$/, "")}
             />
+            {isFullScreen && (
+              <button
+                onClick={handleFullScreen}
+                className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Details Panel */}

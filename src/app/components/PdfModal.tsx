@@ -174,12 +174,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
   };
 
   const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = `${apiURL}/pdf/${doc.doc_id}`;
-    link.download = doc.docname || 'document.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.open(`${apiURL}/download_watermarked/${doc.doc_id}`, '_blank');
   };
 
   return (

@@ -235,16 +235,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   };
 
   const handleDownload = () => {
-    if (originalImageBlob.current) {
-      const url = URL.createObjectURL(originalImageBlob.current);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = doc.docname; // Use the original filename
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
+    window.open(`${apiURL}/download_watermarked/${doc.doc_id}`, '_blank');
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';

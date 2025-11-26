@@ -187,12 +187,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
   };
 
   const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = `${apiURL}/video/${doc.doc_id}`;
-    link.download = doc.docname || 'video.mp4';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.open(`${apiURL}/download_watermarked/${doc.doc_id}`, '_blank');
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';

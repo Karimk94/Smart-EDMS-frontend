@@ -146,7 +146,6 @@ export default function HomePage() {
         params.append('years', selectedYears.join(','));
       }
 
-      // Add media_type filter if in a specific folder
       if (activeSection === 'folders' && activeFolder) {
         if (activeFolder === 'images') params.append('media_type', 'image');
         else if (activeFolder === 'videos') params.append('media_type', 'video');

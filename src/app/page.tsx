@@ -624,7 +624,7 @@ export default function HomePage() {
 
 
             {/* --- Pagination (conditonal) --- */}
-            {activeSection !== 'folders' && !isLoading && totalPages > 1 && (
+            {((activeSection !== 'folders') || activeFolder) && !isLoading && totalPages > 1 && (
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}

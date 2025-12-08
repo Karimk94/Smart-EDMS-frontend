@@ -1,0 +1,118 @@
+import React, { useState, useEffect } from 'react';
+
+interface CreateFolderModalProps {
+  onClose: () => void;
+  apiURL: string;
+  onFolderCreated: () => void;
+  t: (key: string) => string;
+  initialParentId?: string; 
+}
+
+export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, apiURL, onFolderCreated, t, initialParentId = '' }) => {
+  const [folderName, setFolderName] = useState('');
+  const [description, setDescription] = useState('');
+  // Parent ID is now purely handled by context, not user input
+  const parentId = initialParentId; 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!folderName.trim()) return;
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${apiURL}/folders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: folderName,
+          description: description,
+          parent_id: parentId.trim() || null, 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        onFolderCreated();
+        onClose();
+      } else {
+        setError(data.error || t('errorCreatingFolder'));
+      }
+    } catch (err) {
+      console.error(err);
+      setError(t('errorCreatingFolder'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-[#282828] rounded-xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t('createFolder')}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('folderName')}</label>
+            <input
+              type="text"
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+              placeholder={t('enterFolderName')}
+              autoFocus
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('folderDescription')}</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors min-h-[80px] resize-none"
+              placeholder={t('enterFolderDescription')}
+            />
+          </div>
+
+          {error && <div className="text-red-500 text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-800">{error}</div>}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition"
+              disabled={isSubmitting}
+            >
+              {t('cancel')}
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? t('processing') : t('create')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

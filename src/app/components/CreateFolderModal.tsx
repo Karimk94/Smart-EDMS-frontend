@@ -4,14 +4,13 @@ interface CreateFolderModalProps {
   onClose: () => void;
   apiURL: string;
   onFolderCreated: () => void;
-  t: (key: string) => string;
+  t: Function;
   initialParentId?: string; 
 }
 
 export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, apiURL, onFolderCreated, t, initialParentId = '' }) => {
   const [folderName, setFolderName] = useState('');
   const [description, setDescription] = useState('');
-  // Parent ID is now purely handled by context, not user input
   const parentId = initialParentId; 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

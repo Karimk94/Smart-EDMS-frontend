@@ -471,7 +471,14 @@ export default function HomePage() {
     }
 
     if (activeSection === 'folders' && !activeFolder) {
-      return <Folders onFolderClick={handleFolderClick} t={t} apiURL={API_PROXY_URL} />;
+      return (
+        <Folders 
+            onFolderClick={handleFolderClick} 
+            onDocumentClick={handleDocumentClick} 
+            t={t} 
+            apiURL={API_PROXY_URL} 
+        />
+      );
     }
 
     const backButton = activeSection === 'folders' && activeFolder && (

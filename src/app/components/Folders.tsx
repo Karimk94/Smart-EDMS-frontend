@@ -1,17 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CreateFolderModal } from './CreateFolderModal';
+import { Document } from '../../models/Document';
 
 interface FolderItem {
   id: string;
   name: string;
-  type: 'folder' | 'item'; 
+  type: 'folder' | 'item' | 'file'; 
   node_type?: string;
+  media_type?: 'image' | 'video' | 'pdf' | 'folder';
   is_standard?: boolean;
   count?: number;
 }
 
 interface FoldersProps {
   onFolderClick: (folderId: 'images' | 'videos' | 'files') => void;
+  onDocumentClick?: (doc: Document) => void;
   t: (key: string) => string;
   apiURL: string;
 }
@@ -23,7 +26,7 @@ interface ContextMenuState {
   item: FolderItem | null;
 }
 
-export const Folders: React.FC<FoldersProps> = ({ onFolderClick, t, apiURL }) => {
+export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, t, apiURL }) => {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
     { id: null, name: t('home') || 'Home' }
@@ -72,7 +75,35 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, t, apiURL }) =>
       return;
     }
 
-    if (folder.type !== 'folder' && folder.node_type !== 'N') return; 
+    // Logic to handle file opening
+    if (folder.type === 'file' || (folder.type !== 'folder' && folder.node_type !== 'N' && folder.node_type !== 'F')) {
+        if (onDocumentClick) {
+            let mediaType: 'image' | 'video' | 'pdf' = 'image';
+            
+            // Prioritize backend provided media_type
+            if (folder.media_type && folder.media_type !== 'folder' && folder.media_type !== 'image') {
+                // @ts-ignore
+                mediaType = folder.media_type;
+            } else {
+                // Fallback detection logic if backend provides no media_type
+                const ext = folder.name.split('.').pop()?.toLowerCase();
+                if (['mp4', 'mov', 'avi'].includes(ext || '')) mediaType = 'video';
+                else if (['pdf', 'doc', 'docx', 'txt'].includes(ext || '')) mediaType = 'pdf';
+                else mediaType = 'pdf'; // Default to PDF for unknown extensions
+            }
+
+            const doc = new Document({
+                doc_id: parseInt(folder.id),
+                docname: folder.name,
+                title: folder.name,
+                media_type: mediaType,
+                date: new Date().toISOString(),
+                thumbnail_url: `cache/${folder.id}.jpg`
+            });
+            onDocumentClick(doc);
+        }
+        return;
+    }
 
     setCurrentFolderId(folder.id);
     setBreadcrumbs(prev => [...prev, { id: folder.id, name: folder.name }]);
@@ -148,23 +179,21 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, t, apiURL }) =>
                     refreshCurrentView();
                 } else {
                     const err = await res.json();
-                    // Detect the "Referenced" error by checking the error string
                     const errMsg = (err.error || "").toLowerCase();
                     if (errMsg.includes("referenced") || errMsg.includes("folder")) {
                          if (confirm(t('folderReferencedWarning'))) {
-                             // Force Delete call
-                             setIsLoading(true); // Ensure loading state is kept
+                             setIsLoading(true); 
                              const forceRes = await fetch(`${apiURL}/folders/${targetItem.id}?force=true`, {
                                 method: 'DELETE'
-                            });
-                            
-                            if (forceRes.ok) {
-                                refreshCurrentView();
-                            } else {
-                                const forceErr = await forceRes.json();
-                                alert(t('errorDeleting') || `Error: ${forceErr.error}`);
-                            }
-                         }
+                             });
+                             
+                             if (forceRes.ok) {
+                                 refreshCurrentView();
+                             } else {
+                                 const forceErr = await forceRes.json();
+                                 alert(t('errorDeleting') || `Error: ${forceErr.error}`);
+                             }
+                          }
                     } else {
                         alert(t('errorDeleting') || `Error: ${err.error}`);
                     }
@@ -282,14 +311,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, t, apiURL }) =>
                   onContextMenu={(e) => handleRightClick(e, item)}
                   className="group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700"
                 >
-                  <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200 text-gray-400 group-hover:text-blue-500">
-                    {(item.node_type === 'N' || item.type === 'folder') ? (
+                  <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${item.type === 'file' ? 'text-yellow-500' : 'text-gray-400 group-hover:text-blue-500'}`}>
+                    {(item.type === 'file') ? (
+                       <svg className="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 011.414.586l5.414 5.414a1 1 0 01.586 1.414V19a2 2 0 01-2 2z" />
+                       </svg>
+                    ) : (
                       <svg className="h-14 w-14" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                      </svg>
-                    ) : (
-                      <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     )}
                   </div>

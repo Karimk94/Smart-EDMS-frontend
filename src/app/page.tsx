@@ -75,6 +75,9 @@ export default function HomePage() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  
+  // New state to force Folders component to remount on reload
+  const [refreshFoldersKey, setRefreshFoldersKey] = useState(0);
 
   const API_PROXY_URL = '/api';
 
@@ -351,7 +354,16 @@ export default function HomePage() {
   };
 
   const handleSectionChange = (section: ActiveSection) => {
-    if (section !== activeSection) {
+    if (section === activeSection) {
+      // Reload logic:
+      // If we are in folders root, remount to reset navigation.
+      if (section === 'folders' && !activeFolder) {
+        setRefreshFoldersKey(prev => prev + 1);
+      } else {
+        // Otherwise (Recent, Favorites, or Inside a Folder), just refetch data.
+        fetchSectionData();
+      }
+    } else {
       setActiveSection(section);
       setActiveFolder(null);
       setCurrentPage(1);
@@ -473,6 +485,7 @@ export default function HomePage() {
     if (activeSection === 'folders' && !activeFolder) {
       return (
         <Folders 
+            key={refreshFoldersKey}
             onFolderClick={handleFolderClick} 
             onDocumentClick={handleDocumentClick} 
             t={t} 
@@ -565,7 +578,7 @@ export default function HomePage() {
 
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-w-0">
 
-            {(
+            {(activeSection !== 'folders' || activeFolder) && (
               <div className={`flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700 justify-end ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>
                 <TagFilter
                   apiURL={API_PROXY_URL}

@@ -89,7 +89,6 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ dateFrom, setDateFrom
   );
 };
 
-// Function to generate styles based on theme
 const getSelectStyles = (theme: 'light' | 'dark') => ({
   control: (base: any) => ({
     ...base,
@@ -130,21 +129,24 @@ interface AdvancedFiltersProps {
   setSelectedPerson: (person: PersonOption[] | null) => void;
   personCondition: 'any' | 'all';
   setPersonCondition: (condition: 'any' | 'all') => void;
+  mediaType: 'image' | 'video' | 'pdf' | null;
+  setMediaType: (type: 'image' | 'video' | 'pdf' | null) => void;
   apiURL: string;
   t: Function;
   lang: 'en' | 'ar';
-  theme: 'light' | 'dark'; // Add theme prop
+  theme: 'light' | 'dark';
 }
 
 export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   dateFrom, setDateFrom, dateTo, setDateTo,
   selectedPerson, setSelectedPerson,
   personCondition, setPersonCondition,
+  mediaType, setMediaType,
   apiURL, t, lang, theme
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const selectStyles = getSelectStyles(theme); // Get styles based on theme
+  const selectStyles = getSelectStyles(theme);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -158,7 +160,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     };
   }, [wrapperRef]);
 
-  const activeFilterCount = [dateFrom, dateTo, selectedPerson && selectedPerson.length > 0].filter(Boolean).length;
+  const activeFilterCount = [dateFrom, dateTo, selectedPerson && selectedPerson.length > 0, mediaType].filter(Boolean).length;
 
   const loadPersonOptions = async (
     search: string,
@@ -206,6 +208,43 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('advancedFilters')}</h3>
 
           <div className="space-y-4">
+            {/* Media Type Buttons */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Media Type</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMediaType(mediaType === 'image' ? null : 'image')}
+                  className={`flex-1 flex items-center justify-center p-2 rounded-md border transition-colors ${mediaType === 'image'
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  title="Images"
+                >
+                  <img src="/file-image.svg" alt="Images" className={`w-5 h-5 ${mediaType === 'image' ? 'brightness-0 invert' : 'dark:invert'}`} />
+                </button>
+                <button
+                  onClick={() => setMediaType(mediaType === 'video' ? null : 'video')}
+                  className={`flex-1 flex items-center justify-center p-2 rounded-md border transition-colors ${mediaType === 'video'
+                      ? 'bg-red-600 border-red-600 text-white'
+                      : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  title="Videos"
+                >
+                  <img src="/file-video.svg" alt="Videos" className={`w-5 h-5 ${mediaType === 'video' ? 'brightness-0 invert' : 'dark:invert'}`} />
+                </button>
+                <button
+                  onClick={() => setMediaType(mediaType === 'pdf' ? null : 'pdf')}
+                  className={`flex-1 flex items-center justify-center p-2 rounded-md border transition-colors ${mediaType === 'pdf'
+                      ? 'bg-yellow-500 border-yellow-500 text-white'
+                      : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  title="Files"
+                >
+                  <img src="/file-document.svg" alt="Files" className={`w-5 h-5 ${mediaType === 'pdf' ? 'brightness-0 invert' : 'dark:invert'}`} />
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('dateRange')}</label>
               <DateRangePicker

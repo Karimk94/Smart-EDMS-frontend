@@ -75,9 +75,9 @@ export default function HomePage() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  
-  // New state to force Folders component to remount on reload
+
   const [refreshFoldersKey, setRefreshFoldersKey] = useState(0);
+  const [filterMediaType, setFilterMediaType] = useState<'image' | 'video' | 'pdf' | null>(null);
 
   const API_PROXY_URL = '/api';
 
@@ -116,7 +116,7 @@ export default function HomePage() {
     }
   };
 
-  const fetchSectionData = useCallback(
+const fetchSectionData = useCallback(
     async () => {
       setIsLoading(true);
       setError(null);
@@ -153,6 +153,10 @@ export default function HomePage() {
         if (activeFolder === 'images') params.append('media_type', 'image');
         else if (activeFolder === 'videos') params.append('media_type', 'video');
         else if (activeFolder === 'files') params.append('media_type', 'pdf');
+        
+        params.append('scope', 'root');
+      } else if (filterMediaType) {
+        params.append('media_type', filterMediaType);
       }
 
       try {
@@ -238,7 +242,8 @@ export default function HomePage() {
       selectedTags,
       selectedYears,
       initialLoadDone,
-      lang
+      lang,
+      filterMediaType
     ]
   );
 
@@ -326,6 +331,7 @@ export default function HomePage() {
     setSelectedPerson(null);
     setSelectedTags([]);
     setSelectedYears([]);
+    setFilterMediaType(null);
     setCurrentPage(1);
   };
 
@@ -355,12 +361,9 @@ export default function HomePage() {
 
   const handleSectionChange = (section: ActiveSection) => {
     if (section === activeSection) {
-      // Reload logic:
-      // If we are in folders root, remount to reset navigation.
       if (section === 'folders' && !activeFolder) {
         setRefreshFoldersKey(prev => prev + 1);
       } else {
-        // Otherwise (Recent, Favorites, or Inside a Folder), just refetch data.
         fetchSectionData();
       }
     } else {
@@ -484,12 +487,12 @@ export default function HomePage() {
 
     if (activeSection === 'folders' && !activeFolder) {
       return (
-        <Folders 
-            key={refreshFoldersKey}
-            onFolderClick={handleFolderClick} 
-            onDocumentClick={handleDocumentClick} 
-            t={t} 
-            apiURL={API_PROXY_URL} 
+        <Folders
+          key={refreshFoldersKey}
+          onFolderClick={handleFolderClick}
+          onDocumentClick={handleDocumentClick}
+          t={t}
+          apiURL={API_PROXY_URL}
         />
       );
     }
@@ -617,6 +620,11 @@ export default function HomePage() {
                   personCondition={personCondition}
                   setPersonCondition={(condition) => {
                     setPersonCondition(condition);
+                    setCurrentPage(1);
+                  }}
+                  mediaType={filterMediaType}
+                  setMediaType={(type) => {
+                    setFilterMediaType(type);
                     setCurrentPage(1);
                   }}
                   apiURL={API_PROXY_URL}

@@ -15,7 +15,7 @@ interface FolderItem {
 interface FoldersProps {
   onFolderClick: (folderId: 'images' | 'videos' | 'files') => void;
   onDocumentClick?: (doc: Document) => void;
-  t: (key: string) => string;
+  t: Function;
   apiURL: string;
 }
 
@@ -55,8 +55,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const fetchContents = async (parentId: string | null) => {
     setIsLoading(true);
     try {
-      const query = parentId ? `?parent_id=${parentId}` : '';
-      const response = await fetch(`${apiURL}/folders${query}`);
+      const params = new URLSearchParams();
+      if (parentId) params.append('parent_id', parentId);
+
+      params.append('scope', 'root');
+
+      const response = await fetch(`${apiURL}/folders?${params.toString()}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -208,40 +212,40 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   };
 
   const renderIcon = (type: 'image' | 'video' | 'file' | 'folder', isStandard = false) => {
-    let iconSrc = '/folder-icon.svg'; 
+    let iconSrc = '/folder-icon.svg';
     let altText = 'Folder';
-    
-    let className = "h-14 w-14"; 
-    let invertClass = ""; 
+
+    let className = "h-14 w-14";
+    let invertClass = "";
 
     if (isStandard) {
-        className = "h-6 w-6";
-        invertClass = "dark:invert";
-        
-        if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
-        else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
-        else { iconSrc = '/file-document.svg'; altText = 'Files'; }
+      className = "h-6 w-6";
+      invertClass = "dark:invert";
+
+      if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
+      else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
+      else { iconSrc = '/file-document.svg'; altText = 'Files'; }
     } else {
-        if (type === 'image') { 
-            iconSrc = '/file-image.svg'; 
-            altText = 'Image'; 
-            invertClass = "dark:invert";
-        }
-        else if (type === 'video') { 
-            iconSrc = '/file-video.svg'; 
-            altText = 'Video'; 
-            invertClass = "dark:invert";
-        }
-        else if (type === 'file') { 
-            iconSrc = '/file-document.svg'; 
-            altText = 'File'; 
-            invertClass = "dark:invert";
-        }
-        else {
-            iconSrc = '/folder-icon.svg';
-            altText = 'Folder';
-            invertClass = ""; 
-        }
+      if (type === 'image') {
+        iconSrc = '/file-image.svg';
+        altText = 'Image';
+        invertClass = "dark:invert";
+      }
+      else if (type === 'video') {
+        iconSrc = '/file-video.svg';
+        altText = 'Video';
+        invertClass = "dark:invert";
+      }
+      else if (type === 'file') {
+        iconSrc = '/file-document.svg';
+        altText = 'File';
+        invertClass = "dark:invert";
+      }
+      else {
+        iconSrc = '/folder-icon.svg';
+        altText = 'Folder';
+        invertClass = "";
+      }
     }
 
     return <img src={iconSrc} alt={altText} className={`${className} ${invertClass}`} />;
@@ -259,7 +263,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   };
 
   const standardItems = items.filter(item => item.is_standard);
-  
+
   const userItems = items
     .filter(item => !item.is_standard)
     .sort((a, b) => {
@@ -314,7 +318,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           </div>
         ) : (
           <div className="flex flex-col gap-8">
-            
+
             {/* --- Standard Folders --- */}
             {standardItems.length > 0 && (
               <div className="animate-fade-in">
@@ -341,7 +345,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} items` : ''}</p>
                         </div>
                         <div className="text-gray-300 dark:text-gray-600">
-                            <svg className="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                          <svg className="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </div>
                       </div>
                     );
@@ -352,45 +356,45 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
             {/* --- User Folders & Files --- */}
             <div className="flex-1">
-               {standardItems.length > 0 && userItems.length > 0 && (
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
-               )}
-               
-               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                 {userItems.map((item) => {
-                    const isFile = item.type === 'file';
-                    let fileType: 'image' | 'video' | 'file' | 'folder' = 'folder';
-                    
-                    if (isFile) {
-                       const mediaType = getMediaType(item);
-                       if (mediaType === 'image') fileType = 'image';
-                       else if (mediaType === 'video') fileType = 'video';
-                       else fileType = 'file';
-                    }
+              {standardItems.length > 0 && userItems.length > 0 && (
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
+              )}
 
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => handleNavigate(item)}
-                        onContextMenu={(e) => handleRightClick(e, item)}
-                        className="group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700"
-                      >
-                        <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
-                          {renderIcon(fileType, false)}
-                        </div>
-                        <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
-                          {item.name}
-                        </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {userItems.map((item) => {
+                  const isFile = item.type === 'file';
+                  let fileType: 'image' | 'video' | 'file' | 'folder' = 'folder';
+
+                  if (isFile) {
+                    const mediaType = getMediaType(item);
+                    if (mediaType === 'image') fileType = 'image';
+                    else if (mediaType === 'video') fileType = 'video';
+                    else fileType = 'file';
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleNavigate(item)}
+                      onContextMenu={(e) => handleRightClick(e, item)}
+                      className="group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700"
+                    >
+                      <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
+                        {renderIcon(fileType, false)}
                       </div>
-                    );
-                 })}
-               </div>
+                      <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
+                        {item.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
 
-               {items.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                      <p>{t('emptyFolder') || "This folder is empty."}</p>
-                  </div>
-               )}
+              {items.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                  <p>{t('emptyFolder') || "This folder is empty."}</p>
+                </div>
+              )}
             </div>
 
           </div>

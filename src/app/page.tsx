@@ -154,7 +154,7 @@ const fetchSectionData = useCallback(
         else if (activeFolder === 'videos') params.append('media_type', 'video');
         else if (activeFolder === 'files') params.append('media_type', 'pdf');
         
-        params.append('scope', 'root');
+        params.append('scope', 'folders'); 
       } else if (filterMediaType) {
         params.append('media_type', filterMediaType);
       }

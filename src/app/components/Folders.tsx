@@ -10,6 +10,7 @@ interface FolderItem {
   media_type?: 'image' | 'video' | 'pdf' | 'folder';
   is_standard?: boolean;
   count?: number;
+  thumbnail_url?: string;
 }
 
 interface FoldersProps {
@@ -57,8 +58,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     try {
       const params = new URLSearchParams();
       if (parentId) params.append('parent_id', parentId);
+      
+      params.append('scope', 'folders');
 
-      params.append('scope', 'root');
+      if (parentId === 'images') params.append('media_type', 'image');
+      else if (parentId === 'videos') params.append('media_type', 'video');
+      else if (parentId === 'files') params.append('media_type', 'pdf');
 
       const response = await fetch(`${apiURL}/folders?${params.toString()}`);
 
@@ -83,8 +88,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   };
 
   const handleNavigate = (folder: FolderItem) => {
+    const isStandardView = ['images', 'videos', 'files'].includes(currentFolderId || '');
+
     if (folder.is_standard) {
-      onFolderClick(folder.id as 'images' | 'videos' | 'files');
+       if (isStandardView && folder.id === currentFolderId) return;
+      setCurrentFolderId(folder.id);
+      setBreadcrumbs(prev => [...prev, { id: folder.id, name: t(folder.id) }]);
       return;
     }
 
@@ -101,7 +110,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           title: folder.name,
           media_type: mediaType,
           date: new Date().toISOString(),
-          thumbnail_url: `cache/${folder.id}.jpg`
+          thumbnail_url: folder.thumbnail_url || `cache/${folder.id}.jpg`
         });
         onDocumentClick(doc);
       }
@@ -211,12 +220,25 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
   };
 
-  const renderIcon = (type: 'image' | 'video' | 'file' | 'folder', isStandard = false) => {
+  const renderIcon = (item: FolderItem, isStandard = false) => {
     let iconSrc = '/folder-icon.svg';
     let altText = 'Folder';
-
     let className = "h-14 w-14";
     let invertClass = "";
+
+    let type: 'image' | 'video' | 'file' | 'folder' = 'folder';
+    if (isStandard) {
+        if (item.id === 'images') type = 'image';
+        else if (item.id === 'videos') type = 'video';
+        else type = 'file';
+    } else {
+        if (item.type === 'file') {
+             const mType = getMediaType(item);
+             if (mType === 'image') type = 'image';
+             else if (mType === 'video') type = 'video';
+             else type = 'file';
+        }
+    }
 
     if (isStandard) {
       className = "h-6 w-6";
@@ -262,7 +284,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     return 'text-yellow-500 dark:text-yellow-400';
   };
 
-  const standardItems = items.filter(item => item.is_standard);
+  const isInsideStandardFolder = ['images', 'videos', 'files'].includes(currentFolderId || '');
+
+  const standardItems = items.filter(item => item.is_standard && !isInsideStandardFolder);
 
   const userItems = items
     .filter(item => !item.is_standard)
@@ -338,7 +362,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                         className={`group flex items-center p-4 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${getStandardFolderColor(item.id)}`}
                       >
                         <div className="flex-shrink-0 p-2 bg-white dark:bg-[#333] rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                          {renderIcon(type, true)}
+                          {renderIcon(item, true)}
                         </div>
                         <div className="ml-4 flex-1 min-w-0">
                           <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{t(item.id)}</p>
@@ -363,24 +387,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {userItems.map((item) => {
                   const isFile = item.type === 'file';
-                  let fileType: 'image' | 'video' | 'file' | 'folder' = 'folder';
-
-                  if (isFile) {
-                    const mediaType = getMediaType(item);
-                    if (mediaType === 'image') fileType = 'image';
-                    else if (mediaType === 'video') fileType = 'video';
-                    else fileType = 'file';
-                  }
+                  // Ignore thumbnails for display, force icon view
+                  const hasThumbnail = false; 
 
                   return (
                     <div
                       key={item.id}
                       onClick={() => handleNavigate(item)}
                       onContextMenu={(e) => handleRightClick(e, item)}
-                      className="group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700"
+                      className={`group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700`}
                     >
                       <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
-                        {renderIcon(fileType, false)}
+                        {renderIcon(item, false)}
                       </div>
                       <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
                         {item.name}
@@ -400,7 +418,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           </div>
         )}
       </div>
-
+      
+      {/* ... Context Menu and Modals remain unchanged ... */}
       {contextMenu.visible && (
         <div
           ref={contextMenuRef}

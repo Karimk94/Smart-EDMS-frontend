@@ -35,6 +35,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [items, setItems] = useState<FolderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null });
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -42,6 +43,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   useEffect(() => {
     fetchContents(currentFolderId);
   }, [currentFolderId]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchContents(currentFolderId);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -64,6 +73,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       if (parentId === 'images') params.append('media_type', 'image');
       else if (parentId === 'videos') params.append('media_type', 'video');
       else if (parentId === 'files') params.append('media_type', 'pdf');
+
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`${apiURL}/folders?${params.toString()}`);
 
@@ -94,6 +105,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
        if (isStandardView && folder.id === currentFolderId) return;
       setCurrentFolderId(folder.id);
       setBreadcrumbs(prev => [...prev, { id: folder.id, name: t(folder.id) }]);
+      setSearchTerm('');
       return;
     }
 
@@ -119,6 +131,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     setCurrentFolderId(folder.id);
     setBreadcrumbs(prev => [...prev, { id: folder.id, name: folder.name }]);
+    setSearchTerm('');
   };
 
   const handleBreadcrumbClick = (index: number) => {
@@ -126,6 +139,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
     setBreadcrumbs(newBreadcrumbs);
     setCurrentFolderId(target.id);
+    setSearchTerm('');
   };
 
   const refreshCurrentView = () => {
@@ -304,7 +318,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     <div className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
 
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
-        <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar">
+        <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
           {breadcrumbs.map((crumb, index) => (
             <div key={index} className="flex items-center whitespace-nowrap">
               {index > 0 && <span className="mx-2 text-gray-400">/</span>}
@@ -319,7 +333,21 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           ))}
         </nav>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 ml-4">
+           {/* Folder Search Bar */}
+           <div className="relative">
+            <input
+              type="text"
+              placeholder={t('search') || "Search in folder..."}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-48 transition-all focus:w-64"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+
           <button onClick={refreshCurrentView} className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition" title={t('refresh')}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -344,7 +372,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           <div className="flex flex-col gap-8">
 
             {/* --- Standard Folders --- */}
-            {standardItems.length > 0 && (
+            {standardItems.length > 0 && !searchTerm && (
               <div className="animate-fade-in">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">
                   {t('libraries') || 'Quick Access'}
@@ -380,15 +408,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
             {/* --- User Folders & Files --- */}
             <div className="flex-1">
-              {standardItems.length > 0 && userItems.length > 0 && (
+              {(standardItems.length > 0 && userItems.length > 0 && !searchTerm) && (
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
               )}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {userItems.map((item) => {
                   const isFile = item.type === 'file';
-                  // Ignore thumbnails for display, force icon view
-                  const hasThumbnail = false; 
 
                   return (
                     <div
@@ -410,7 +436,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
               {items.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                  <p>{t('emptyFolder') || "This folder is empty."}</p>
+                  <p>{searchTerm ? t('noDocumentsFound') : (t('emptyFolder') || "This folder is empty.")}</p>
                 </div>
               )}
             </div>

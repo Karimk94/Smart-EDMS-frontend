@@ -86,6 +86,30 @@ export interface PdfModalProps {
     theme: 'light' | 'dark';
 }
 
+export interface TextModalProps {
+    doc: any;
+    onClose: () => void;
+    apiURL: string;
+    onUpdateAbstractSuccess: () => void;
+    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+    isEditor: boolean;
+    t: Function;
+    lang: 'en' | 'ar';
+    theme: 'light' | 'dark';
+}
+
+export interface FileModalProps {
+    doc: any;
+    onClose: () => void;
+    apiURL: string;
+    onUpdateAbstractSuccess: () => void;
+    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+    isEditor: boolean;
+    t: Function;
+    lang: 'en' | 'ar';
+    theme: 'light' | 'dark';
+}
+
 export interface GalleryModalProps {
     title: string;
     images: string[];

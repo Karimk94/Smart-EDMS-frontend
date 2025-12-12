@@ -8,6 +8,8 @@ import { Pagination } from './components/Pagination';
 import { ImageModal } from './components/ImageModal';
 import { VideoModal } from './components/VideoModal';
 import { PdfModal } from './components/PdfModal';
+import { FileModal } from './components/FileModal';
+import { TxtModal } from './components/TxtModal';
 import { Document } from '../models/Document';
 import { UploadModal } from './components/UploadModal';
 import { FolderUploadModal } from './components/FolderUploadModal';
@@ -67,6 +69,8 @@ export default function HomePage() {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Document | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<Document | null>(null);
+  const [selectedFile, setSelectedFile] = useState<Document | null>(null);
+  const [selectedTxt, setSelectedTxt] = useState<Document | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isFolderUploadModalOpen, setIsFolderUploadModalOpen] = useState(false);
   const [uploadParentId, setUploadParentId] = useState<string | null>(null);
@@ -396,9 +400,25 @@ const fetchSectionData = useCallback(
   };
 
   const handleDocumentClick = (doc: Document) => {
-    if (doc.media_type === 'video') setSelectedVideo(doc);
-    else if (doc.media_type === 'pdf') setSelectedPdf(doc);
-    else setSelectedDoc(doc);
+    if (doc.media_type === 'video') {
+        setSelectedVideo(doc);
+    } else if (doc.media_type === 'image') {
+        setSelectedDoc(doc);
+    } else if (doc.media_type === 'pdf') {
+        setSelectedPdf(doc);
+    } else if (doc.media_type === 'text') {
+        setSelectedTxt(doc);
+    } else {
+        // Fallback for types that might be misclassified as 'file' but have text extensions
+        const ext = doc.docname.split('.').pop()?.toLowerCase();
+        const textExtensions = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
+
+        if ((ext && textExtensions.includes(ext)) || !ext) {
+            setSelectedTxt(doc);
+        } else {
+            setSelectedFile(doc);
+        }
+    }
   };
 
   const handleTagSelect = (tag: string) => {
@@ -420,6 +440,8 @@ const fetchSectionData = useCallback(
     setSelectedDoc(null);
     setSelectedVideo(null);
     setSelectedPdf(null);
+    setSelectedFile(null);
+    setSelectedTxt(null);
   };
 
   const handleAnalyze = (uploadedFiles: UploadableFile[]) => {
@@ -686,6 +708,8 @@ const fetchSectionData = useCallback(
         {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+        {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+        {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         
         {isUploadModalOpen && user?.security_level === 'Editor' && (
             <UploadModal

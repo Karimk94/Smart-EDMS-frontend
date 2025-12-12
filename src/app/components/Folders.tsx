@@ -7,7 +7,7 @@ interface FolderItem {
   name: string;
   type: 'folder' | 'item' | 'file';
   node_type?: string;
-  media_type?: 'image' | 'video' | 'pdf' | 'folder';
+  media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder';
   is_standard?: boolean;
   count?: number;
   thumbnail_url?: string;
@@ -68,7 +68,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     try {
       const params = new URLSearchParams();
       if (parentId) params.append('parent_id', parentId);
-      
+
       params.append('scope', 'folders');
 
       if (parentId === 'images') params.append('media_type', 'image');
@@ -95,15 +95,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const ext = item.name.split('.').pop()?.toLowerCase();
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '')) return 'image';
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '')) return 'video';
-    if (['pdf', 'doc', 'docx', 'txt'].includes(ext || '')) return 'pdf';
-    return 'unknown';
+    if (['pdf', 'doc', 'docx'].includes(ext || '')) return 'pdf';
+    if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext || '')) return 'text';
+    return 'file';
   };
 
   const handleNavigate = (folder: FolderItem) => {
     const isStandardView = ['images', 'videos', 'files'].includes(currentFolderId || '');
 
     if (folder.is_standard) {
-       if (isStandardView && folder.id === currentFolderId) return;
+      if (isStandardView && folder.id === currentFolderId) return;
       setCurrentFolderId(folder.id);
       setBreadcrumbs(prev => [...prev, { id: folder.id, name: t(folder.id) }]);
       setSearchTerm('');
@@ -112,10 +113,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     if (folder.type === 'file' || (folder.type !== 'folder' && folder.node_type !== 'N' && folder.node_type !== 'F')) {
       if (onDocumentClick) {
-        let mediaType: 'image' | 'video' | 'pdf' = 'image';
+        let mediaType: any = 'file';
         const detectedType = getMediaType(folder);
-        if (detectedType === 'video') mediaType = 'video';
+
+        if (detectedType === 'image') mediaType = 'image';
+        else if (detectedType === 'video') mediaType = 'video';
         else if (detectedType === 'pdf') mediaType = 'pdf';
+        else if (detectedType === 'text') mediaType = 'text';
+        else mediaType = 'file';
 
         const doc = new Document({
           doc_id: parseInt(folder.id),
@@ -180,9 +185,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const handleContextMenuAction = async (action: string) => {
     if (action === 'upload' && !contextMenu.item) {
-        setContextMenu({ ...contextMenu, visible: false });
-        onUploadClick(currentFolderId, getCurrentFolderName());
-        return;
+      setContextMenu({ ...contextMenu, visible: false });
+      onUploadClick(currentFolderId, getCurrentFolderName());
+      return;
     }
 
     if (!contextMenu.item) return;
@@ -233,7 +238,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             const err = await res.json();
             const errMsg = (err.error || "").toLowerCase();
             if (errMsg.includes("referenced") || errMsg.includes("folder")) {
-              if (confirm(t('folderReferencedWarning'))) {
+              const warningMsg = targetItem.type === 'folder'
+                ? t('folderReferencedWarning')
+                : "This item is referenced by other items. Do you want to force delete it (unlink and delete)?";
+
+              if (confirm(warningMsg)) {
                 setIsLoading(true);
                 const forceRes = await fetch(`${apiURL}/folders/${targetItem.id}?force=true`, {
                   method: 'DELETE'
@@ -266,18 +275,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     let className = "h-14 w-14";
     let invertClass = "";
 
-    let type: 'image' | 'video' | 'file' | 'folder' = 'folder';
+    let type: string = 'folder';
     if (isStandard) {
-        if (item.id === 'images') type = 'image';
-        else if (item.id === 'videos') type = 'video';
-        else type = 'file';
+      if (item.id === 'images') type = 'image';
+      else if (item.id === 'videos') type = 'video';
+      else type = 'file';
     } else {
-        if (item.type === 'file') {
-             const mType = getMediaType(item);
-             if (mType === 'image') type = 'image';
-             else if (mType === 'video') type = 'video';
-             else type = 'file';
-        }
+      if (item.type === 'file') {
+        const mType = getMediaType(item);
+        type = mType;
+      }
     }
 
     if (isStandard) {
@@ -298,7 +305,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         altText = 'Video';
         invertClass = "dark:invert";
       }
-      else if (type === 'file') {
+      else if (type === 'pdf' || type === 'text' || type === 'file') {
         iconSrc = '/file-document.svg';
         altText = 'File';
         invertClass = "dark:invert";
@@ -360,7 +367,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         </nav>
 
         <div className="flex items-center space-x-3 ml-4">
-           <div className="relative">
+          <div className="relative">
             <input
               type="text"
               placeholder={t('search') || "Search in folder..."}
@@ -379,8 +386,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             </svg>
           </button>
 
-          <button 
-            onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())} 
+          <button
+            onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())}
             className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -477,7 +484,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           </div>
         )}
       </div>
-      
+
       {contextMenu.visible && (
         <div
           ref={contextMenuRef}

@@ -10,6 +10,7 @@ import { VideoModal } from './components/VideoModal';
 import { PdfModal } from './components/PdfModal';
 import { Document } from '../models/Document';
 import { UploadModal } from './components/UploadModal';
+import { FolderUploadModal } from './components/FolderUploadModal';
 import { UploadableFile } from '../interfaces';
 import { DocumentItemSkeleton } from './components/DocumentItemSkeleton';
 import { Folders } from './components/Folders';
@@ -67,6 +68,9 @@ export default function HomePage() {
   const [selectedVideo, setSelectedVideo] = useState<Document | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<Document | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isFolderUploadModalOpen, setIsFolderUploadModalOpen] = useState(false);
+  const [uploadParentId, setUploadParentId] = useState<string | null>(null);
+  const [uploadParentName, setUploadParentName] = useState<string>('');
   const [processingDocs, setProcessingDocs] = useState<number[]>([]);
 
   const [lang, setLang] = useState<'en' | 'ar'>('en');
@@ -301,6 +305,9 @@ const fetchSectionData = useCallback(
               if (activeSection === 'recent' || (activeSection === 'folders' && activeFolder)) {
                 fetchSectionData();
               }
+              if (activeSection === 'folders' && !activeFolder) {
+                setRefreshFoldersKey(prev => prev + 1);
+              }
             }
           } else if (stillProcessing.length === 0) {
             clearInterval(interval);
@@ -352,6 +359,16 @@ const fetchSectionData = useCallback(
     }
   };
 
+  const handleFolderUploadClick = (parentId: string | null, parentName: string) => {
+    setUploadParentId(parentId);
+    setUploadParentName(parentName);
+    setIsFolderUploadModalOpen(true);
+  };
+
+  const handleFolderUploadComplete = () => {
+    setIsFolderUploadModalOpen(false);
+    setRefreshFoldersKey(prev => prev + 1);
+  };
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -410,8 +427,14 @@ const fetchSectionData = useCallback(
     setIsUploadModalOpen(false);
     const newProcessingDocs = Array.from(new Set([...processingDocs, ...docnumbers]));
     setProcessingDocs(newProcessingDocs);
-    setActiveSection('recent');
-    setCurrentPage(1);
+    
+    if (activeSection === 'folders' && !activeFolder) {
+        setRefreshFoldersKey(prev => prev + 1);
+    } else if (activeSection === 'recent') {
+        setCurrentPage(1);
+        fetchSectionData();
+    }
+
     fetch(`${API_PROXY_URL}/process_uploaded_documents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -465,7 +488,6 @@ const fetchSectionData = useCallback(
     dateFrom || dateTo || selectedPerson?.length || selectedTags.length || selectedYears.length
   );
 
-  // --- renderContent ---
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -491,6 +513,7 @@ const fetchSectionData = useCallback(
           key={refreshFoldersKey}
           onFolderClick={handleFolderClick}
           onDocumentClick={handleDocumentClick}
+          onUploadClick={handleFolderUploadClick}
           t={t}
           apiURL={API_PROXY_URL}
         />
@@ -647,11 +670,8 @@ const fetchSectionData = useCallback(
               </div>
             )}
 
-            {/* --- Main Content --- */}
             {renderContent()}
 
-
-            {/* --- Pagination (conditonal) --- */}
             {((activeSection !== 'folders') || activeFolder) && !isLoading && totalPages > 1 && (
               <Pagination
                 currentPage={currentPage}
@@ -663,11 +683,29 @@ const fetchSectionData = useCallback(
           </main>
         </div>
 
-        {/* Modals */}
         {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-        {isUploadModalOpen && user?.security_level === 'Editor' && <UploadModal onClose={() => setIsUploadModalOpen(false)} apiURL={API_PROXY_URL} onAnalyze={handleAnalyze} theme={theme} />}
+        
+        {isUploadModalOpen && user?.security_level === 'Editor' && (
+            <UploadModal
+                onClose={() => setIsUploadModalOpen(false)}
+                apiURL={API_PROXY_URL}
+                onAnalyze={handleAnalyze}
+                theme={theme}
+            />
+        )}
+
+        {isFolderUploadModalOpen && user?.security_level === 'Editor' && (
+            <FolderUploadModal
+                onClose={() => setIsFolderUploadModalOpen(false)}
+                apiURL={API_PROXY_URL}
+                theme={theme}
+                parentId={uploadParentId}
+                parentName={uploadParentName}
+                onUploadComplete={handleFolderUploadComplete}
+            />
+        )}
       </div>
     </>
   );

@@ -57,28 +57,32 @@ const removeExtension = (filename: string) => {
   return filename.replace(/\.[^/.]+$/, "");
 };
 
-export interface UploadModalProps {
+export interface FolderUploadModalProps {
   onClose: () => void;
   apiURL: string;
-  onAnalyze: (uploadedFiles: UploadableFile[]) => void;
   theme: 'light' | 'dark';
+  parentId: string | null;
+  parentName: string;
+  onUploadComplete: () => void;
 }
 
-export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme }) => {
+export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [hasUploaded, setHasUploaded] = useState(false);
   const fileIdCounter = useRef(0);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (hasUploaded) onUploadComplete();
+        else onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, hasUploaded, onUploadComplete]);
 
   const extractExifDate = async (file: File): Promise<Date | null> => {
     try {
@@ -177,6 +181,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
+    setHasUploaded(true);
 
     const uploadPromises = pendingFiles.map(uploadableFile => {
       return new Promise<void>((resolve) => {
@@ -187,6 +192,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
         formData.append('file', file);
         formData.append('docname', (editedFileName && editedFileName.trim()) ? editedFileName.trim() : removeExtension(file.name));
         formData.append('abstract', ``);
+
+        if (parentId) {
+            formData.append('parent_id', parentId);
+        }
 
         const formattedDate = formatDateTimeForAPI(editedDateTaken);
         if (formattedDate) {
@@ -240,21 +249,32 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     setIsUploading(false);
   };
 
-  const handleAnalyze = () => {
-    const successfulUploads = files.filter(f => f.status === 'success' && f.docnumber);
-    if (successfulUploads.length > 0) {
-      onAnalyze(successfulUploads);
-    }
+  const handleClose = () => {
+      if (hasUploaded) {
+          onUploadComplete();
+      } else {
+          onClose();
+      }
   };
 
   const pendingFilesCount = files.filter(f => f.status === 'pending').length;
-  const successfulUploadsCount = files.filter(f => f.status === 'success' && f.docnumber != null).length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8">
-      <div className="flex-shrink-0 flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white">Upload Documents</h2>
-        <button onClick={onClose} disabled={isUploading} className="text-gray-400 hover:text-white text-3xl disabled:opacity-50">&times;</button>
+      {/* Distinct Header for Folder Upload */}
+      <div className="flex-shrink-0 flex justify-between items-center mb-6 bg-blue-900/30 p-4 rounded-lg border border-blue-800">
+        <div className="flex flex-col">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              Upload to Folder
+            </h2>
+            <p className="text-sm text-gray-300 mt-1">
+                Target Directory: <span className="text-blue-300 font-bold underline">{parentName || 'Home'}</span>
+            </p>
+        </div>
+        <button onClick={handleClose} disabled={isUploading} className="text-gray-400 hover:text-white text-3xl disabled:opacity-50">&times;</button>
       </div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 overflow-hidden">
@@ -263,19 +283,22 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
-            className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-red-500 bg-[#222]' : 'border-gray-600'}`}>
+            className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-blue-500 bg-[#222]' : 'border-gray-600'}`}>
             <img src="/upload.svg" alt="Upload Icon" className="h-10 w-10 text-gray-400 mb-2" />
             <p className="mt-2 text-lg text-gray-300">Drag & Drop files here</p>
             <p className="text-sm text-gray-500">or</p>
-            <label htmlFor="file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-600 transition">
+            <label htmlFor="folder-file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
               Browse Files
             </label>
-            <input id="file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
+            <input id="folder-file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
           </div>
         </div>
 
-        <div className="w-full md:w-2/3 flex flex-col bg-[#282828] rounded-xl p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Upload Queue ({files.length})</h3>
+        <div className="w-full md:w-2/3 flex flex-col bg-[#282828] rounded-xl p-4 md:p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <span className="bg-blue-600 w-2 h-2 rounded-full"></span>
+            File Queue ({files.length})
+          </h3>
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 mb-4">
             {files.length > 0 ? (
               files.map(f => (
@@ -288,8 +311,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
                 />
               ))
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
-                Select files to begin.
+              <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                <p>No files selected.</p>
+                <p className="text-xs text-gray-600 mt-1">Files will be added to {parentName}</p>
               </div>
             )}
           </div>
@@ -297,23 +321,26 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
             <button
               onClick={handleUpload}
               disabled={pendingFilesCount === 0 || isUploading}
-              className="px-4 py-2 md:px-6 md:py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
+              className="px-4 py-2 md:px-6 md:py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {isUploading ? 'Uploading...' : `Upload Pending (${pendingFilesCount})`}
+              {isUploading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Uploading...
+                  </>
+              ) : (
+                  `Upload ${pendingFilesCount} Items`
+              )}
             </button>
             <button
-              onClick={handleAnalyze}
-              disabled={successfulUploadsCount === 0 || isUploading}
-              className="px-4 py-2 md:px-6 md:py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
-            >
-              Analyze with AI ({successfulUploadsCount})
-            </button>
-            <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isUploading}
               className="px-4 py-2 md:px-6 md:py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition disabled:bg-gray-500 disabled:cursor-not-allowed"
             >
-              Close
+              {hasUploaded ? 'Finish' : 'Cancel'}
             </button>
           </div>
         </div>

@@ -1,12 +1,17 @@
-// Component Props Interfaces
-// This file contains all React component prop interfaces used throughout the application
-
-// Upload-related Props
 export interface UploadModalProps {
     onClose: () => void;
     apiURL: string;
     onAnalyze: (uploadedFiles: any[]) => void;
     theme: 'light' | 'dark';
+}
+
+export interface FolderUploadModalProps {
+    onClose: () => void;
+    apiURL: string;
+    theme: 'light' | 'dark';
+    parentId: string | null;
+    parentName: string;
+    onUploadComplete: () => void;
 }
 
 export interface UploadFileItemProps {
@@ -16,7 +21,6 @@ export interface UploadFileItemProps {
     onUpdateDateTaken: (id: string, newDate: Date | null) => void;
 }
 
-// Event-related Props
 export interface EventStackProps {
     event: any;
     apiURL: string;
@@ -46,7 +50,6 @@ export interface ReadOnlyEventDisplayProps {
     t: Function;
 }
 
-// Modal Props
 export interface ImageModalProps {
     doc: any;
     onClose: () => void;
@@ -90,7 +93,6 @@ export interface GalleryModalProps {
     onClose: () => void;
 }
 
-// Tag-related Props
 export interface TagEditorProps {
     docId: number;
     apiURL: string;
@@ -114,7 +116,6 @@ export interface ReadOnlyTagDisplayProps {
     t: Function;
 }
 
-// Filter Props
 export interface YearFilterProps {
     selectedYears: number[];
     setSelectedYears: (years: number[]) => void;
@@ -145,7 +146,6 @@ export interface AdvancedFiltersProps {
     theme: 'light' | 'dark';
 }
 
-// Document-related Props
 export interface DocumentListProps {
     documents: any[];
     onDocumentClick: (doc: any) => void;
@@ -167,13 +167,11 @@ export interface DocumentItemProps {
     lang: 'en' | 'ar';
 }
 
-// Journey Props
 export interface JourneyProps {
     apiURL: string;
     t: Function;
 }
 
-// Pagination Props
 export interface PaginationProps {
     currentPage: number;
     totalPages: number;
@@ -181,7 +179,6 @@ export interface PaginationProps {
     t: Function;
 }
 
-// Person Selector Props
 export interface PersonSelectorProps {
     apiURL: string;
     value: string | null;
@@ -190,7 +187,6 @@ export interface PersonSelectorProps {
     theme: 'light' | 'dark';
 }
 
-// Header and Sidebar Props
 export interface HeaderProps {
     onSearch: (searchTerm: string) => void;
     onClearCache: () => void;
@@ -210,21 +206,19 @@ export interface HeaderProps {
 
 export interface SidebarProps {
     isSidebarOpen: boolean;
-    activeSection: 'recent' | 'favorites' | 'events' | 'memories' | 'journey';
-    handleSectionChange: (section: 'recent' | 'favorites' | 'events' | 'memories' | 'journey') => void;
+    activeSection: 'recent' | 'favorites' | 'folders';
+    handleSectionChange: (section: 'recent' | 'favorites' | 'folders') => void;
     isShowingFullMemories: boolean;
     t: Function;
     lang: 'en' | 'ar';
 }
 
-// Search Props
 export interface SearchBarProps {
     onSearch: (searchTerm: string) => void;
     t: Function;
     lang: 'en' | 'ar';
 }
 
-// Utility Props
 export interface CollapsibleSectionProps {
     title: string;
     children: React.ReactNode;

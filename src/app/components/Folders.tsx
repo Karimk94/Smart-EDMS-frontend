@@ -16,6 +16,7 @@ interface FolderItem {
 interface FoldersProps {
   onFolderClick: (folderId: 'images' | 'videos' | 'files') => void;
   onDocumentClick?: (doc: Document) => void;
+  onUploadClick: (parentId: string | null, parentName: string) => void;
   t: Function;
   apiURL: string;
 }
@@ -27,7 +28,7 @@ interface ContextMenuState {
   item: FolderItem | null;
 }
 
-export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, t, apiURL }) => {
+export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL }) => {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
     { id: null, name: t('home') || 'Home' }
@@ -158,7 +159,32 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     });
   };
 
+  const handleBackgroundContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (e.target !== e.currentTarget) return;
+
+    setContextMenu({
+      visible: true,
+      x: e.pageX,
+      y: e.pageY,
+      item: null
+    });
+  };
+
+  const getCurrentFolderName = () => {
+    if (breadcrumbs.length > 0) {
+      return breadcrumbs[breadcrumbs.length - 1].name;
+    }
+    return t('home') || 'Home';
+  };
+
   const handleContextMenuAction = async (action: string) => {
+    if (action === 'upload' && !contextMenu.item) {
+        setContextMenu({ ...contextMenu, visible: false });
+        onUploadClick(currentFolderId, getCurrentFolderName());
+        return;
+    }
+
     if (!contextMenu.item) return;
     const targetItem = contextMenu.item;
 
@@ -334,7 +360,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         </nav>
 
         <div className="flex items-center space-x-3 ml-4">
-           {/* Folder Search Bar */}
            <div className="relative">
             <input
               type="text"
@@ -354,6 +379,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             </svg>
           </button>
 
+          <button 
+            onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())} 
+            className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            {t('upload')}
+          </button>
+
           <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -363,7 +398,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6" onContextMenu={(e) => e.preventDefault()}>
+      <div className="flex-1 overflow-y-auto p-6" onContextMenu={handleBackgroundContextMenu}>
         {isLoading ? (
           <div className="flex justify-center items-center h-full">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -371,7 +406,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         ) : (
           <div className="flex flex-col gap-8">
 
-            {/* --- Standard Folders --- */}
             {standardItems.length > 0 && !searchTerm && (
               <div className="animate-fade-in">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">
@@ -406,7 +440,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               </div>
             )}
 
-            {/* --- User Folders & Files --- */}
             <div className="flex-1">
               {(standardItems.length > 0 && userItems.length > 0 && !searchTerm) && (
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
@@ -445,16 +478,31 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         )}
       </div>
       
-      {/* ... Context Menu and Modals remain unchanged ... */}
       {contextMenu.visible && (
         <div
           ref={contextMenuRef}
           className="absolute z-50 bg-white dark:bg-[#333] border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl w-48 py-1"
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px`, position: 'fixed' }}
         >
-          <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            {contextMenu.item?.name}
-          </div>
+          {contextMenu.item ? (
+            <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              {contextMenu.item.name}
+            </div>
+          ) : (
+            <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              {t('folderActions') || 'Folder Actions'}
+            </div>
+          )}
+
+          {!contextMenu.item && (
+            <button
+              onClick={() => handleContextMenuAction('upload')}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+              {t('upload')}
+            </button>
+          )}
 
           {contextMenu.item?.type === 'folder' && (
             <button
@@ -466,21 +514,25 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             </button>
           )}
 
-          <button
-            onClick={() => handleContextMenuAction('rename')}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-            {t('rename') || 'Rename'}
-          </button>
+          {contextMenu.item && (
+            <>
+              <button
+                onClick={() => handleContextMenuAction('rename')}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                {t('rename') || 'Rename'}
+              </button>
 
-          <button
-            onClick={() => handleContextMenuAction('delete')}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            {t('delete') || 'Delete'}
-          </button>
+              <button
+                onClick={() => handleContextMenuAction('delete')}
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                {t('delete') || 'Delete'}
+              </button>
+            </>
+          )}
         </div>
       )}
 

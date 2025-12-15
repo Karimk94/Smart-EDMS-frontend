@@ -93,6 +93,7 @@
   "confirmDelete": "Are you sure you want to delete",
   "errorRenaming": "Failed to rename item",
   "errorDeleting": "Failed to delete item",
-  "folderReferencedWarning": "This folder is referenced by other items. Do you want to force delete it (unlink and delete)?"
+  "folderReferencedWarning": "This folder is referenced by other items. Do you want to force delete it (unlink and delete)?",
+  "folderActions": "Actions"
 
 }

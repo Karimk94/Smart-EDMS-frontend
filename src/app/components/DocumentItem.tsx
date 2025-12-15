@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
 import { Document } from '../../models/Document';
 
 interface DocumentItemProps {
@@ -14,6 +13,7 @@ interface DocumentItemProps {
 
 export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, onToggleFavorite, lang }) => {
   const [isPopupVisible, setIsPopupVisible] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -120,11 +120,25 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
     }
   };
 
+  const getFileTypeIcon = () => {
+    switch (doc.media_type) {
+      case 'pdf':
+        return '/file-pdf.svg';
+      case 'excel':
+        return '/file-excel.svg';
+      case 'powerpoint':
+        return '/file-powerpoint.svg';
+      case 'text':
+        return '/file-document.svg';
+      default:
+        return null;
+    }
+  };
+
   const displayDate = formatDateOnly(doc.date);
-
   const thumbnailUrl = `${apiURL}/${doc.thumbnail_url.startsWith('cache') ? '' : 'api/'}${doc.thumbnail_url}`;
-
   const cleanDocName = doc.docname ? doc.docname.replace(/\.[^/.]+$/, "") : "";
+  const typeIcon = getFileTypeIcon();
 
   return (
     <div
@@ -137,33 +151,48 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
         </div>
       )}
       <div className="relative aspect-w-16 aspect-h-9 mb-2">
-        <img
-          src={thumbnailUrl}
-          alt="Thumbnail"
-          className="w-full h-full object-cover rounded-lg bg-gray-200 dark:bg-gray-800 transition"
-          onError={(e) => { (e.target as HTMLImageElement).src = '/no-image.svg'; }}
-          draggable={false}
-        />
-        {doc.media_type === 'video' && (
+        {!imageError ? (
+          <img
+            src={thumbnailUrl}
+            alt="Thumbnail"
+            className="w-full h-full object-cover rounded-lg bg-gray-200 dark:bg-gray-800 transition"
+            onError={() => setImageError(true)}
+            draggable={false}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <img 
+              src={typeIcon || '/file.svg'} 
+              alt="File Type" 
+              className="w-16 h-16 opacity-40 dark:opacity-60" 
+            />
+          </div>
+        )}
+        
+        {doc.media_type === 'video' && !imageError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-40 transition rounded-lg">
             <img src="/play-icon.svg" alt="Play Video" className="w-12 h-12 opacity-80 group-hover:opacity-100 transition-transform group-hover:scale-110" />
           </div>
         )}
-        {doc.media_type === 'pdf' && (
-          <div className="absolute top-2 right-2 pointer-events-none">
-            <img src="/file.svg" alt="PDF Icon" className="w-6 h-6 drop-shadow-md" />
+
+        {typeIcon && !imageError && (
+          <div className="pointer-events-none z-10">
+            <img src={typeIcon} alt={`${doc.media_type} Icon`} className="absolute bottom-2 right-2 w-8 h-8 drop-shadow-md" />
           </div>
         )}
+
         <button
           onClick={handleFavoriteClick}
           className="absolute top-2 left-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black bg-opacity-30 text-white hover:text-yellow-400"
         >
-          <svg className={`w-6 h-6 ${isFavorite ? 'text-yellow-400' : 'text-gray-300'}`} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">            <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={isFavorite ? 1 : 2}
-            d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z"
-          />          </svg>
+          <svg className={`w-6 h-6 ${isFavorite ? 'text-yellow-400' : 'text-gray-300'}`} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={isFavorite ? 1 : 2}
+              d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z"
+            />
+          </svg>
         </button>
       </div>
 

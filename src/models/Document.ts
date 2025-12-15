@@ -6,7 +6,7 @@ export class Document {
     docname: string;
     date: string;
     thumbnail_url: string;
-    media_type: 'image' | 'video' | 'pdf' | 'text' | 'file';
+    media_type: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'excel' | 'powerpoint';
     tags?: string[];
     is_favorite?: boolean;
 

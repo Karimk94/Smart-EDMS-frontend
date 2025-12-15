@@ -7,7 +7,7 @@ interface FolderItem {
   name: string;
   type: 'folder' | 'item' | 'file';
   node_type?: string;
-  media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder';
+  media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder' | 'excel' | 'powerpoint';
   is_standard?: boolean;
   count?: number;
   thumbnail_url?: string;
@@ -97,6 +97,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '')) return 'video';
     if (['pdf', 'doc', 'docx'].includes(ext || '')) return 'pdf';
     if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext || '')) return 'text';
+    if (['xls', 'xlsx', 'ods', 'xlsm'].includes(ext || '')) return 'excel';
+    if (['ppt', 'pptx', 'odp', 'pps', 'ppsx'].includes(ext || '')) return 'powerpoint';
     return 'file';
   };
 
@@ -120,6 +122,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         else if (detectedType === 'video') mediaType = 'video';
         else if (detectedType === 'pdf') mediaType = 'pdf';
         else if (detectedType === 'text') mediaType = 'text';
+        else if (detectedType === 'excel') mediaType = 'excel';
+        else if (detectedType === 'powerpoint') mediaType = 'powerpoint';
         else mediaType = 'file';
 
         const doc = new Document({
@@ -305,7 +309,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         altText = 'Video';
         invertClass = "dark:invert";
       }
-      else if (type === 'pdf' || type === 'text' || type === 'file') {
+      else if (type === 'pdf' || type === 'text' || type === 'file' || type === 'excel' || type === 'powerpoint') {
         iconSrc = '/file-document.svg';
         altText = 'File';
         invertClass = "dark:invert";
@@ -328,6 +332,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const type = getMediaType(item);
     if (type === 'image') return 'text-blue-500 dark:text-blue-400';
     if (type === 'video') return 'text-red-500 dark:text-red-400';
+    if (type === 'excel') return 'text-green-500 dark:text-green-400';
+    if (type === 'powerpoint') return 'text-orange-500 dark:text-orange-400';
     return 'text-yellow-500 dark:text-yellow-400';
   };
 

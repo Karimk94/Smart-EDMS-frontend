@@ -11,12 +11,14 @@
   },
   "dependencies": {
     "exifreader": "^4.32.0",
+    "jszip": "^3.10.1",
     "next": "14.2.4",
     "react": "^18",
     "react-datepicker": "^8.7.0",
     "react-dom": "^18",
     "react-select": "^5.10.2",
-    "react-select-async-paginate": "^0.7.11"
+    "react-select-async-paginate": "^0.7.11",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/aspect-ratio": "^0.4.2",

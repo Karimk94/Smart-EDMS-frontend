@@ -1,3 +1,5 @@
+import { Document } from "../models/Document";
+
 export interface UploadModalProps {
     onClose: () => void;
     apiURL: string;
@@ -115,6 +117,30 @@ export interface GalleryModalProps {
     images: string[];
     startIndex: number;
     onClose: () => void;
+}
+
+export interface ExcelModalProps {
+  doc: Document;
+  onClose: () => void;
+  apiURL: string;
+  onUpdateAbstractSuccess: () => void;
+  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+  isEditor: boolean;
+  t: Function;
+  lang: 'en' | 'ar';
+  theme: 'light' | 'dark';
+}
+
+export interface PowerPointModalProps {
+  doc: Document;
+  onClose: () => void;
+  apiURL: string;
+  onUpdateAbstractSuccess: () => void;
+  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+  isEditor: boolean;
+  t: Function;
+  lang: 'en' | 'ar';
+  theme: 'light' | 'dark';
 }
 
 export interface TagEditorProps {

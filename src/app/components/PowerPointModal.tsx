@@ -1,11 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Document } from '../../models/Document';
 import { TagEditor } from './TagEditor';
 import { CollapsibleSection } from './CollapsibleSection';
 import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
-import { FileModalProps } from '@/interfaces/PropsInterfaces';
+import JSZip from 'jszip';
 
+interface PowerPointModalProps {
+  doc: Document;
+  onClose: () => void;
+  apiURL: string;
+  onUpdateAbstractSuccess: () => void;
+  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+  isEditor: boolean;
+  t: Function;
+  lang: 'en' | 'ar';
+  theme: 'light' | 'dark';
+}
+
+interface SlideData {
+  id: number;
+  title: string;
+  content: string[];
+}
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -42,12 +59,16 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
-  const [textContent, setTextContent] = useState<string | null>(null);
-  const [loadingContent, setLoadingContent] = useState(false);
-  const [isTextFile, setIsTextFile] = useState(false);
+  
+  // Content State
+  const [slides, setSlides] = useState<SlideData[]>([]);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
+  // Metadata State
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [documentDate, setDocumentDate] = useState<Date | null>(safeParseDate(doc.date));
   const [initialDate, setInitialDate] = useState<Date | null>(safeParseDate(doc.date));
@@ -57,7 +78,6 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
-  const [isFullScreen, setIsFullScreen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
@@ -72,46 +92,102 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
     setInitialDate(newDate);
     setIsEditingAbstract(false);
     setIsEditingDate(false);
+    setSlides([]);
+    setThumbnailUrl(null);
+    setParseError(null);
 
-    const ext = doc.docname.split('.').pop()?.toLowerCase();
-    const textExtensions = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
-    const hasExtension = doc.docname.includes('.');
-    
-    if ((ext && textExtensions.includes(ext)) || !hasExtension) {
-        setIsTextFile(true);
-        setLoadingContent(true);
-        fetch(`${apiURL}/document/${doc.doc_id}`)
-            .then(res => {
-                if (res.ok) return res.text();
-                throw new Error("Failed to load text content");
-            })
-            .then(text => setTextContent(text))
-            .catch(err => {
-                console.error(err);
-                setTextContent(null);
-                setIsTextFile(false);
-            })
-            .finally(() => setLoadingContent(false));
-    } else {
-        setIsTextFile(false);
-        setTextContent(null);
-    }
+    // Fetch and Parse PPTX
+    const fetchPPTX = async () => {
+      setIsLoadingContent(true);
+      try {
+        const response = await fetch(`${apiURL}/document/${doc.doc_id}`);
+        if (!response.ok) throw new Error("Failed to fetch document content");
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        
+        // 1. Try to find a thumbnail
+        // PowerPoint often stores a preview in docProps/thumbnail.jpeg
+        const thumbFile = zip.file("docProps/thumbnail.jpeg");
+        if (thumbFile) {
+            const thumbBlob = await thumbFile.async("blob");
+            const thumbUrl = URL.createObjectURL(thumbBlob);
+            setThumbnailUrl(thumbUrl);
+        }
+
+        // 2. Extract Slides Text
+        const slideFiles = Object.keys(zip.files).filter(fileName => 
+            fileName.startsWith("ppt/slides/slide") && fileName.endsWith(".xml")
+        );
+
+        // Sort slides naturally (slide1, slide2, slide10...)
+        slideFiles.sort((a, b) => {
+            const numA = parseInt(a.replace(/\D/g, ''));
+            const numB = parseInt(b.replace(/\D/g, ''));
+            return numA - numB;
+        });
+
+        const extractedSlides: SlideData[] = [];
+
+        for (let i = 0; i < slideFiles.length; i++) {
+            const fileName = slideFiles[i];
+            const xmlString = await zip.file(fileName)?.async("string");
+            
+            if (xmlString) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+                
+                // Extract text from <a:t> tags (PowerPoint text runs)
+                const textNodes = xmlDoc.getElementsByTagName("a:t");
+                const slideContent: string[] = [];
+                
+                for (let j = 0; j < textNodes.length; j++) {
+                    const text = textNodes[j].textContent;
+                    if (text && text.trim().length > 0) {
+                        slideContent.push(text);
+                    }
+                }
+
+                if (slideContent.length > 0) {
+                    extractedSlides.push({
+                        id: i + 1,
+                        title: `Slide ${i + 1}`,
+                        content: slideContent
+                    });
+                }
+            }
+        }
+        
+        setSlides(extractedSlides);
+        if (extractedSlides.length === 0) {
+            setParseError("No text content found in presentation.");
+        }
+
+      } catch (error) {
+        console.error("Error parsing PPTX file:", error);
+        setParseError("Could not preview this PowerPoint file. Please download to view.");
+      } finally {
+        setIsLoadingContent(false);
+      }
+    };
+
+    fetchPPTX();
+
+    return () => {
+        if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
+    };
 
   }, [doc.title, doc.date, doc.docname, doc.doc_id, apiURL]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isFullScreen) {
-          setIsFullScreen(false);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isFullScreen]);
+  }, [onClose]);
 
   const handleDateChange = (date: Date | null) => {
     setDocumentDate(date);
@@ -188,10 +264,6 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
     onToggleFavorite(doc.doc_id, newFavoriteStatus);
   };
 
-  const handleFullScreen = () => {
-    setIsFullScreen(!isFullScreen);
-  };
-
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
@@ -215,16 +287,7 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';
   const textPrimary = theme === 'dark' ? 'text-gray-200' : 'text-gray-900';
-  const textSecondary = theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
-  const textMuted = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
   const closeButtonColor = theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900';
-
-  const getFileIcon = () => {
-      const ext = doc.docname.split('.').pop()?.toLowerCase();
-      if (['xls', 'xlsx', 'csv'].includes(ext || '')) return '/file-document.svg'; 
-      if (['ppt', 'pptx'].includes(ext || '')) return '/file-document.svg';
-      return '/file.svg';
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" onClick={onClose}>
@@ -256,12 +319,6 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
               )}
             </button>
 
-            {isTextFile && (
-                <button onClick={handleFullScreen} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Full Screen">
-                <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
-                </button>
-            )}
-
             <button
               onClick={() => setIsDetailsVisible(!isDetailsVisible)}
               className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
@@ -281,43 +338,63 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
           
-          {/* Main Viewer (Text or Placeholder) */}
-          <div className={`${isFullScreen ? 'fixed inset-0 z-[60]' : (isDetailsVisible ? 'md:col-span-2' : 'col-span-1')} h-full bg-gray-100 dark:bg-[#1a1a1a] rounded-lg flex flex-col items-center justify-center relative overflow-hidden`}>
-            {loadingContent ? (
-                 <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mb-3"></div>
-                    <span className="text-gray-500">Loading content...</span>
+          {/* Main Viewer (PowerPoint Text) */}
+          <div className={`md:col-span-2 col-span-1 h-full bg-white dark:bg-[#1a1a1a] rounded-lg flex flex-col relative overflow-hidden border border-gray-200 dark:border-gray-700`}>
+             
+             {isLoadingContent ? (
+                 <div className="flex flex-col items-center justify-center h-full">
+                    <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <span className="text-gray-500">Parsing presentation...</span>
                  </div>
-            ) : isTextFile && textContent !== null ? (
-                <div className="w-full h-full p-6 overflow-auto">
-                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 dark:text-gray-200">
-                        {textContent}
-                    </pre>
-                    {isFullScreen && (
-                    <button
-                        onClick={handleFullScreen}
-                        className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                    )}
-                </div>
-            ) : (
-                <div className="text-center p-8">
-                    <img src={getFileIcon()} alt="File" className="w-24 h-24 mb-4 mx-auto opacity-50 dark:invert" />
-                    <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Preview not available</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">This file type cannot be previewed directly.</p>
-                    <button 
-                        onClick={handleDownload}
-                        className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center gap-2 mx-auto"
-                    >
-                        <img src="/download.svg" className="w-5 h-5 brightness-0 invert" alt="" />
-                        Download File
-                    </button>
-                </div>
-            )}
+             ) : (
+                 <div className="flex flex-col h-full">
+                    {/* Header with thumbnail if available */}
+                    <div className="bg-orange-50 dark:bg-orange-900/10 p-4 border-b border-orange-100 dark:border-orange-900/30 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                             <div className="p-2 bg-white dark:bg-[#252525] rounded-lg shadow-sm">
+                                <img src="/file-document.svg" className="w-6 h-6" style={{ filter: 'invert(52%) sepia(87%) saturate(2336%) hue-rotate(349deg) brightness(98%) contrast(96%)' }} alt="" />
+                             </div>
+                             <div>
+                                <h3 className="font-bold text-gray-800 dark:text-gray-200">Presentation Content</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{slides.length} slides detected</p>
+                             </div>
+                        </div>
+                        {thumbnailUrl && (
+                            <div className="h-16 w-24 bg-gray-200 rounded overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
+                                <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Slides Scroll Area */}
+                    <div className="flex-grow overflow-y-auto p-6 space-y-8 bg-gray-50 dark:bg-[#121212]">
+                        {parseError ? (
+                             <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                                <p className="text-gray-500 mb-4">{parseError}</p>
+                                <button onClick={handleDownload} className="text-blue-600 hover:underline text-sm">Download File to View</button>
+                             </div>
+                        ) : (
+                            slides.map((slide) => (
+                                <div key={slide.id} className="bg-white dark:bg-[#1e1e1e] p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
+                                        <h4 className="font-bold text-lg text-orange-600 dark:text-orange-400">Slide {slide.id}</h4>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {slide.content.map((text, idx) => (
+                                            <p key={idx} className="text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
+                                                {text}
+                                            </p>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                        {slides.length === 0 && !parseError && (
+                             <div className="text-center text-gray-400 py-10">Empty Presentation</div>
+                        )}
+                    </div>
+                 </div>
+             )}
           </div>
 
           {/* Details Panel */}

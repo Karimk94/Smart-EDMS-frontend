@@ -10,6 +10,8 @@ import { VideoModal } from './components/VideoModal';
 import { PdfModal } from './components/PdfModal';
 import { FileModal } from './components/FileModal';
 import { TxtModal } from './components/TxtModal';
+import { ExcelModal } from './components/ExcelModal';
+import { PowerPointModal } from './components/PowerPointModal';
 import { Document } from '../models/Document';
 import { UploadModal } from './components/UploadModal';
 import { FolderUploadModal } from './components/FolderUploadModal';
@@ -71,6 +73,9 @@ export default function HomePage() {
   const [selectedPdf, setSelectedPdf] = useState<Document | null>(null);
   const [selectedFile, setSelectedFile] = useState<Document | null>(null);
   const [selectedTxt, setSelectedTxt] = useState<Document | null>(null);
+  const [selectedExcel, setSelectedExcel] = useState<Document | null>(null);
+  const [selectedPPT, setSelectedPPT] = useState<Document | null>(null);
+
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isFolderUploadModalOpen, setIsFolderUploadModalOpen] = useState(false);
   const [uploadParentId, setUploadParentId] = useState<string | null>(null);
@@ -408,8 +413,11 @@ const fetchSectionData = useCallback(
         setSelectedPdf(doc);
     } else if (doc.media_type === 'text') {
         setSelectedTxt(doc);
+    } else if (doc.media_type === 'excel') {
+        setSelectedExcel(doc);
+    } else if (doc.media_type === 'powerpoint') {
+        setSelectedPPT(doc);
     } else {
-        // Fallback for types that might be misclassified as 'file' but have text extensions
         const ext = doc.docname.split('.').pop()?.toLowerCase();
         const textExtensions = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
 
@@ -442,6 +450,8 @@ const fetchSectionData = useCallback(
     setSelectedPdf(null);
     setSelectedFile(null);
     setSelectedTxt(null);
+    setSelectedExcel(null);
+    setSelectedPPT(null);
   };
 
   const handleAnalyze = (uploadedFiles: UploadableFile[]) => {
@@ -711,6 +721,34 @@ const fetchSectionData = useCallback(
         {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
         
+        {selectedExcel && (
+            <ExcelModal
+                doc={selectedExcel}
+                onClose={() => setSelectedExcel(null)}
+                apiURL={API_PROXY_URL}
+                onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
+                onToggleFavorite={handleToggleFavorite}
+                isEditor={user?.security_level === 'Editor'}
+                t={t}
+                lang={lang}
+                theme={theme}
+            />
+        )}
+
+        {selectedPPT && (
+            <PowerPointModal
+                doc={selectedPPT}
+                onClose={() => setSelectedPPT(null)}
+                apiURL={API_PROXY_URL}
+                onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
+                onToggleFavorite={handleToggleFavorite}
+                isEditor={user?.security_level === 'Editor'}
+                t={t}
+                lang={lang}
+                theme={theme}
+            />
+        )}
+
         {isUploadModalOpen && user?.security_level === 'Editor' && (
             <UploadModal
                 onClose={() => setIsUploadModalOpen(false)}

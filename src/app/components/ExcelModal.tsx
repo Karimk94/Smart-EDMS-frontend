@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Document } from '../../models/Document';
-import { TagEditor } from './TagEditor';
-import { CollapsibleSection } from './CollapsibleSection';
+import { ExcelModalProps } from '@/interfaces/PropsInterfaces';
+import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
+import * as XLSX from 'xlsx';
+import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
-import { FileModalProps } from '@/interfaces/PropsInterfaces';
+import { TagEditor } from './TagEditor';
 
 
 const safeParseDate = (dateString: string): Date | null => {
@@ -42,11 +42,12 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
-  const [textContent, setTextContent] = useState<string | null>(null);
-  const [loadingContent, setLoadingContent] = useState(false);
-  const [isTextFile, setIsTextFile] = useState(false);
+  const [excelData, setExcelData] = useState<any[][]>([]);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [activeSheet, setActiveSheet] = useState<string>('');
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
 
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [documentDate, setDocumentDate] = useState<Date | null>(safeParseDate(doc.date));
@@ -57,8 +58,8 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
-  const [isFullScreen, setIsFullScreen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const workbookRef = useRef<XLSX.WorkBook | null>(null);
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -73,45 +74,55 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
     setIsEditingAbstract(false);
     setIsEditingDate(false);
 
-    const ext = doc.docname.split('.').pop()?.toLowerCase();
-    const textExtensions = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
-    const hasExtension = doc.docname.includes('.');
-    
-    if ((ext && textExtensions.includes(ext)) || !hasExtension) {
-        setIsTextFile(true);
-        setLoadingContent(true);
-        fetch(`${apiURL}/document/${doc.doc_id}`)
-            .then(res => {
-                if (res.ok) return res.text();
-                throw new Error("Failed to load text content");
-            })
-            .then(text => setTextContent(text))
-            .catch(err => {
-                console.error(err);
-                setTextContent(null);
-                setIsTextFile(false);
-            })
-            .finally(() => setLoadingContent(false));
-    } else {
-        setIsTextFile(false);
-        setTextContent(null);
-    }
+    // Fetch and Parse Excel
+    const fetchExcel = async () => {
+      setIsLoadingContent(true);
+      try {
+        // Use the document endpoint to get the raw file bytes
+        const response = await fetch(`${apiURL}/document/${doc.doc_id}`);
+        if (!response.ok) throw new Error("Failed to fetch document content");
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        workbookRef.current = workbook;
+        
+        setSheetNames(workbook.SheetNames);
+        if (workbook.SheetNames.length > 0) {
+          const firstSheet = workbook.SheetNames[0];
+          setActiveSheet(firstSheet);
+          const worksheet = workbook.Sheets[firstSheet];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          setExcelData(jsonData as any[][]);
+        }
+      } catch (error) {
+        console.error("Error parsing Excel file:", error);
+      } finally {
+        setIsLoadingContent(false);
+      }
+    };
+
+    fetchExcel();
 
   }, [doc.title, doc.date, doc.docname, doc.doc_id, apiURL]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isFullScreen) {
-          setIsFullScreen(false);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isFullScreen]);
+  }, [onClose]);
+
+  const handleSheetChange = (sheetName: string) => {
+    if (workbookRef.current) {
+      setActiveSheet(sheetName);
+      const worksheet = workbookRef.current.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      setExcelData(jsonData as any[][]);
+    }
+  };
 
   const handleDateChange = (date: Date | null) => {
     setDocumentDate(date);
@@ -188,10 +199,6 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
     onToggleFavorite(doc.doc_id, newFavoriteStatus);
   };
 
-  const handleFullScreen = () => {
-    setIsFullScreen(!isFullScreen);
-  };
-
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
@@ -217,18 +224,16 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
   const textPrimary = theme === 'dark' ? 'text-gray-200' : 'text-gray-900';
   const textSecondary = theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
   const textMuted = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
+  const inputBg = theme === 'dark' ? 'bg-[#121212]' : 'bg-white';
+  const borderSecondary = theme === 'dark' ? 'border-gray-600' : 'border-gray-300';
+  const buttonBg = theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200';
+  const buttonHoverBg = theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-300';
+  const buttonText = theme === 'dark' ? 'text-white' : 'text-gray-900';
   const closeButtonColor = theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900';
-
-  const getFileIcon = () => {
-      const ext = doc.docname.split('.').pop()?.toLowerCase();
-      if (['xls', 'xlsx', 'csv'].includes(ext || '')) return '/file-document.svg'; 
-      if (['ppt', 'pptx'].includes(ext || '')) return '/file-document.svg';
-      return '/file.svg';
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" onClick={onClose}>
-      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-6xl h-[90vh] flex flex-col`} onClick={e => e.stopPropagation()}>
+      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-7xl h-[90vh] flex flex-col`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
 
@@ -256,12 +261,6 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
               )}
             </button>
 
-            {isTextFile && (
-                <button onClick={handleFullScreen} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Full Screen">
-                <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
-                </button>
-            )}
-
             <button
               onClick={() => setIsDetailsVisible(!isDetailsVisible)}
               className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
@@ -281,43 +280,61 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
           
-          {/* Main Viewer (Text or Placeholder) */}
-          <div className={`${isFullScreen ? 'fixed inset-0 z-[60]' : (isDetailsVisible ? 'md:col-span-2' : 'col-span-1')} h-full bg-gray-100 dark:bg-[#1a1a1a] rounded-lg flex flex-col items-center justify-center relative overflow-hidden`}>
-            {loadingContent ? (
-                 <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mb-3"></div>
-                    <span className="text-gray-500">Loading content...</span>
+          {/* Main Viewer (Excel Grid) */}
+          <div className={`md:col-span-2 col-span-1 h-full bg-white dark:bg-[#1a1a1a] rounded-lg flex flex-col relative overflow-hidden border border-gray-200 dark:border-gray-700`}>
+             
+             {isLoadingContent ? (
+                 <div className="flex flex-col items-center justify-center h-full">
+                    <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <span className="text-gray-500">Loading spreadsheet...</span>
                  </div>
-            ) : isTextFile && textContent !== null ? (
-                <div className="w-full h-full p-6 overflow-auto">
-                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 dark:text-gray-200">
-                        {textContent}
-                    </pre>
-                    {isFullScreen && (
-                    <button
-                        onClick={handleFullScreen}
-                        className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+             ) : (
+                 <>
+                    {/* Sheet Tabs */}
+                    {sheetNames.length > 0 && (
+                        <div className="flex bg-gray-100 dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                            {sheetNames.map((sheet) => (
+                                <button
+                                    key={sheet}
+                                    onClick={() => handleSheetChange(sheet)}
+                                    className={`px-4 py-2 text-sm font-medium border-r border-gray-200 dark:border-gray-700 whitespace-nowrap
+                                        ${activeSheet === sheet 
+                                            ? 'bg-white dark:bg-[#1a1a1a] text-green-600 dark:text-green-400 border-b-2 border-b-green-500' 
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#333]'}`}
+                                >
+                                    {sheet}
+                                </button>
+                            ))}
+                        </div>
                     )}
-                </div>
-            ) : (
-                <div className="text-center p-8">
-                    <img src={getFileIcon()} alt="File" className="w-24 h-24 mb-4 mx-auto opacity-50 dark:invert" />
-                    <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Preview not available</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">This file type cannot be previewed directly.</p>
-                    <button 
-                        onClick={handleDownload}
-                        className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center gap-2 mx-auto"
-                    >
-                        <img src="/download.svg" className="w-5 h-5 brightness-0 invert" alt="" />
-                        Download File
-                    </button>
-                </div>
-            )}
+
+                    {/* Data Table */}
+                    <div className="flex-grow overflow-auto">
+                        <table className="w-full text-left border-collapse text-sm">
+                            <tbody>
+                                {excelData.map((row, rowIndex) => (
+                                    <tr key={rowIndex} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#222]">
+                                        {/* Row Number Header */}
+                                        <td className="bg-gray-50 dark:bg-[#252525] text-gray-500 dark:text-gray-400 font-mono text-xs px-2 border-r border-gray-200 dark:border-gray-700 w-10 text-center select-none sticky left-0">
+                                            {rowIndex + 1}
+                                        </td>
+                                        {row.map((cell: any, cellIndex: number) => (
+                                            <td key={cellIndex} className="px-3 py-1.5 border-r border-gray-100 dark:border-gray-800 text-gray-900 dark:text-gray-200 whitespace-nowrap">
+                                                {cell !== null && cell !== undefined ? String(cell) : ''}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {excelData.length === 0 && (
+                            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                                <p>Empty Sheet</p>
+                            </div>
+                        )}
+                    </div>
+                 </>
+             )}
           </div>
 
           {/* Details Panel */}

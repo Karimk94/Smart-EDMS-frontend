@@ -293,7 +293,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     if (isStandard) {
       className = "h-6 w-6";
-      invertClass = "dark:invert";
+      invertClass = "";
 
       if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
       else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
@@ -302,17 +302,32 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       if (type === 'image') {
         iconSrc = '/file-image.svg';
         altText = 'Image';
-        invertClass = "dark:invert";
+        invertClass = "";
       }
       else if (type === 'video') {
         iconSrc = '/file-video.svg';
         altText = 'Video';
-        invertClass = "dark:invert";
+        invertClass = "";
       }
-      else if (type === 'pdf' || type === 'text' || type === 'file' || type === 'excel' || type === 'powerpoint') {
+      else if (type === 'excel') {
+        iconSrc = '/file-excel.svg';
+        altText = 'Excel';
+        invertClass = "";
+      }
+      else if (type === 'pdf') {
+        iconSrc = '/file-pdf.svg';
+        altText = 'PDF';
+        invertClass = "";
+      }
+      else if (type === 'powerpoint') {
+        iconSrc = '/file-powerpoint.svg';
+        altText = 'PowerPoint';
+        invertClass = "";
+      }
+      else if (type === 'text' || type === 'file') {
         iconSrc = '/file-document.svg';
         altText = 'File';
-        invertClass = "dark:invert";
+        invertClass = "";
       }
       else {
         iconSrc = '/folder-icon.svg';

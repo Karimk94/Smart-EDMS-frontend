@@ -220,7 +220,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     }`}
                   title="Images"
                 >
-                  <img src="/file-image.svg" alt="Images" className={`w-5 h-5 ${mediaType === 'image' ? 'brightness-0 invert' : 'dark:invert'}`} />
+                  <img src="/file-image.svg" alt="Images" className={`w-5 h-5 `} />
                 </button>
                 <button
                   onClick={() => setMediaType(mediaType === 'video' ? null : 'video')}
@@ -230,7 +230,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     }`}
                   title="Videos"
                 >
-                  <img src="/file-video.svg" alt="Videos" className={`w-5 h-5 ${mediaType === 'video' ? 'brightness-0 invert' : 'dark:invert'}`} />
+                  <img src="/file-video.svg" alt="Videos" className={`w-5 h-5`} />
                 </button>
                 <button
                   onClick={() => setMediaType(mediaType === 'pdf' ? null : 'pdf')}
@@ -240,7 +240,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     }`}
                   title="Files"
                 >
-                  <img src="/file-document.svg" alt="Files" className={`w-5 h-5 ${mediaType === 'pdf' ? 'brightness-0 invert' : 'dark:invert'}`} />
+                  <img src="/file-document.svg" alt="Files" className={`w-5 h-5`} />
                 </button>
               </div>
             </div>

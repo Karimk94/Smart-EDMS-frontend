@@ -37,8 +37,27 @@ async function proxyHandler(req: NextRequest): Promise<NextResponse> {
       duplex: 'half',
     });
 
+    const contentType = response.headers.get("content-type");
+    const isJson = contentType && contentType.includes("application/json");
+
+    let responseBody = response.body;
+
+    if (isJson && !response.ok) {
+        const json = await response.json();
+        
+        if (json.detail && !json.error) {
+            const errorMsg = typeof json.detail === 'string' 
+                ? json.detail 
+                : Array.isArray(json.detail) 
+                    ? json.detail.map((e: any) => e.msg).join(", ") 
+                    : JSON.stringify(json.detail);
+            json.error = errorMsg;
+        }
+        responseBody = JSON.stringify(json) as any;
+    }
+
     const newHeaders = new Headers(response.headers);
-    return new NextResponse(response.body, {
+    return new NextResponse(responseBody, {
       status: response.status,
       statusText: response.statusText,
       headers: newHeaders,

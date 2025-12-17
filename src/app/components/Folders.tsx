@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CreateFolderModal } from './CreateFolderModal';
 import { Document } from '../../models/Document';
+import SecurityModal from './SecurityModal';
 
 interface FolderItem {
   id: string;
@@ -40,6 +41,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null });
   const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Security Modal State
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [selectedSecurityItem, setSelectedSecurityItem] = useState<FolderItem | null>(null);
 
   useEffect(() => {
     fetchContents(currentFolderId);
@@ -270,6 +275,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           setIsLoading(false);
         }
       }
+    }
+    else if (action === 'security') {
+        setSelectedSecurityItem(targetItem);
+        setIsSecurityModalOpen(true);
     }
   };
 
@@ -553,6 +562,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               </button>
 
               <button
+                onClick={() => handleContextMenuAction('security')}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                {t('permissions') || 'Permissions'}
+              </button>
+
+              <button
                 onClick={() => handleContextMenuAction('delete')}
                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
               >
@@ -571,6 +588,17 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           t={t}
           initialParentId={currentFolderId || ''}
           onFolderCreated={refreshCurrentView}
+        />
+      )}
+
+      {isSecurityModalOpen && selectedSecurityItem && (
+        <SecurityModal 
+            isOpen={isSecurityModalOpen} 
+            onClose={() => setIsSecurityModalOpen(false)} 
+            docId={selectedSecurityItem.id} 
+            library="RTA_MAIN"
+            itemName={selectedSecurityItem.name}
+            t={t}
         />
       )}
     </div>

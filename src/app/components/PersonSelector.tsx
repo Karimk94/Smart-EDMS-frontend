@@ -12,6 +12,9 @@ interface PersonSelectorProps {
   onChange: (name: string) => void;
   lang: 'en' | 'ar';
   theme: 'light' | 'dark';
+  fetchUrl?: string; 
+  headers?: Record<string, string>;
+  onSelect?: (person: { USER_ID: string; FULL_NAME: string }) => void;
 }
 
 const getSelectStyles = (theme: 'light' | 'dark') => ({
@@ -46,7 +49,7 @@ const getSelectStyles = (theme: 'light' | 'dark') => ({
   placeholder: (base: any) => ({ ...base, color: 'var(--color-text-muted)' }),
 });
 
-export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, onChange, lang, theme }) => {
+export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, onChange, lang, theme, fetchUrl, headers, onSelect }) => {
 
   const selectStyles = getSelectStyles(theme);
 
@@ -54,10 +57,16 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
     search: string,
     loadedOptions: OptionsOrGroups<PersonOption, GroupBase<PersonOption>>,
     additional: { page: number } | undefined
-  ): Promise<{ options: PersonOption[]; hasMore: boolean; additional?: { page: number } }> => {
+  ): Promise<{ options: any[]; hasMore: boolean; additional?: { page: number } }> => {
     const page = additional?.page || 1;
+    const url = fetchUrl 
+        ? `${fetchUrl}?page=${page}&search=${encodeURIComponent(search)}` 
+        : `${apiURL}/persons?page=${page}&search=${encodeURIComponent(search)}&lang=${lang}`;
+
     try {
-      const response = await fetch(`${apiURL}/persons?page=${page}&search=${encodeURIComponent(search)}&lang=${lang}`);
+      const response = await fetch(url, {
+          headers: headers || (fetchUrl ? { 'X-Session-ID': localStorage.getItem('dms_session') || '' } : {})
+      });
       if (!response.ok) throw new Error('Failed to fetch persons');
       const data = await response.json();
 
@@ -66,9 +75,13 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
           ? `${person.name_arabic} - ${person.name_english}`
           : `${person.name_english}${person.name_arabic ? ` - ${person.name_arabic}` : ''}`;
 
-        const value = (lang === 'ar' && person.name_arabic) ? person.name_arabic : person.name_english;
+        const val = (lang === 'ar' && person.name_arabic) ? person.name_arabic : person.name_english;
 
-        return { value: value, label };
+        return { 
+            value: val, 
+            label,
+            fullData: { USER_ID: person.user_id || person.name_english, FULL_NAME: person.name_english } 
+        };
       });
 
       return {
@@ -82,8 +95,15 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
     }
   };
 
-  const handleChange = (newValue: PersonOption | null) => {
-    onChange(newValue ? newValue.value : '');
+  const handleChange = (newValue: any | null) => {
+    if (newValue) {
+        onChange(newValue.value);
+        if (onSelect && newValue.fullData) {
+            onSelect(newValue.fullData);
+        }
+    } else {
+        onChange('');
+    }
   };
 
   const handleCreate = (inputValue: string) => {
@@ -93,13 +113,13 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
     }
   };
 
-  const currentOption: PersonOption | null = value ? { value: value, label: value } : null;
+  const currentOption = value ? { value: value, label: value } : null;
 
   return (
     <AnyAsyncPaginate
       SelectComponent={Creatable}
       isClearable
-      key={lang + theme}
+      key={lang + theme + (fetchUrl || 'default')}
       value={currentOption}
       loadOptions={loadPersonOptions}
       onChange={handleChange}
@@ -113,7 +133,7 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
       }}
       styles={selectStyles}
       menuPlacement="auto"
-      menuPortalTarget={document.body}
+      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
     />
   );
 };

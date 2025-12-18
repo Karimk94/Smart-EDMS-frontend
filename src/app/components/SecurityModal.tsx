@@ -20,9 +20,29 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   const PersonSelectorAny = PersonSelector as any;
 
   const [trustees, setTrustees] = useState<Trustee[]>([]);
-  const [loading, setLoading] = useState(false); // Added loading state
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isPersonSelectorOpen, setIsPersonSelectorOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isPersonSelectorOpen) {
+          setIsPersonSelectorOpen(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isPersonSelectorOpen, onClose]);
 
   useEffect(() => {
     if (isOpen && docId) {
@@ -33,7 +53,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   }, [isOpen, docId]);
 
   const fetchTrustees = async () => {
-    setLoading(true); // Set loading true
+    setLoading(true);
     try {
       const res = await fetch(`/api/document/${docId}/trustees`);
       if (res.ok) {
@@ -43,14 +63,21 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     } catch (err) {
       console.error('Failed to fetch trustees', err);
     } finally {
-      setLoading(false); // Set loading false
+      setLoading(false);
     }
   };
 
   const handleAddPerson = (person: any) => {
-    if (!trustees.find(t => t.username === person.USER_ID)) {
+    const userId = person.user_id || person.USER_ID; 
+    
+    if (!userId) {
+        console.error("Invalid person object selected:", person);
+        return;
+    }
+
+    if (!trustees.find(t => t.username === userId)) {
       setTrustees([...trustees, { 
-        username: person.USER_ID, 
+        username: userId, 
         rights: 63, 
         flag: 2 
       }]);
@@ -96,7 +123,15 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
+      onClick={(e) => {
+        // Close if clicking the backdrop
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -221,7 +256,14 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       </div>
 
       {isPersonSelectorOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4"
+          onClick={(e) => {
+             if (e.target === e.currentTarget) {
+               setIsPersonSelectorOpen(false);
+             }
+          }}
+        >
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
              <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <h3 className="font-medium dark:text-white">{t('select_person')}</h3>

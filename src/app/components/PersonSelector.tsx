@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AsyncPaginate } from 'react-select-async-paginate';
 import Creatable from 'react-select/creatable';
 import { GroupBase, OptionsOrGroups } from 'react-select';
@@ -52,16 +52,42 @@ const getSelectStyles = (theme: 'light' | 'dark') => ({
 export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, onChange, lang, theme, fetchUrl, headers, onSelect }) => {
 
   const selectStyles = getSelectStyles(theme);
+  const [selectedGroup, setSelectedGroup] = useState<{id: string, name: string} | null>(null);
 
   const loadPersonOptions = async (
     search: string,
     loadedOptions: OptionsOrGroups<PersonOption, GroupBase<PersonOption>>,
     additional: { page: number } | undefined
   ): Promise<{ options: any[]; hasMore: boolean; additional?: { page: number } }> => {
+    
+    if (!selectedGroup) {
+        try {
+            const response = await fetch(`${apiURL}/groups`, {
+                headers: headers || { 'X-Session-ID': localStorage.getItem('dms_session') || '' }
+            });
+            if (!response.ok) throw new Error('Failed to fetch groups');
+            const groups = await response.json();
+            
+            const filtered = groups.filter((g: any) => 
+                g.group_name.toLowerCase().includes(search.toLowerCase())
+            );
+
+            const groupOptions = filtered.map((g: any) => ({
+                value: g.group_id,
+                label: `📁 ${g.group_name}`,
+                type: 'group',
+                fullData: g
+            }));
+
+            return { options: groupOptions, hasMore: false, additional: undefined };
+        } catch (error) {
+            console.error("Error loading groups:", error);
+            return { options: [], hasMore: false };
+        }
+    }
+
     const page = additional?.page || 1;
-    const url = fetchUrl 
-        ? `${fetchUrl}?page=${page}&search=${encodeURIComponent(search)}` 
-        : `${apiURL}/persons?page=${page}&search=${encodeURIComponent(search)}&lang=${lang}`;
+    const url = `${apiURL}/groups/search_members?page=${page}&search=${encodeURIComponent(search)}&group_id=${selectedGroup.id}`;
 
     try {
       const response = await fetch(url, {
@@ -80,6 +106,7 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
         return { 
             value: val, 
             label,
+            type: 'person',
             fullData: { USER_ID: person.user_id || person.name_english, FULL_NAME: person.name_english } 
         };
       });
@@ -97,6 +124,11 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
 
   const handleChange = (newValue: any | null) => {
     if (newValue) {
+        if (newValue.type === 'group') {
+            setSelectedGroup({ id: newValue.value, name: newValue.label });
+            return;
+        }
+
         onChange(newValue.value);
         if (onSelect && newValue.fullData) {
             onSelect(newValue.fullData);
@@ -116,24 +148,36 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
   const currentOption = value ? { value: value, label: value } : null;
 
   return (
-    <AnyAsyncPaginate
-      SelectComponent={Creatable}
-      isClearable
-      key={lang + theme + (fetchUrl || 'default')}
-      value={currentOption}
-      loadOptions={loadPersonOptions}
-      onChange={handleChange}
-      onCreateOption={handleCreate}
-      getNewOptionData={(inputValue: string) => ({ value: inputValue, label: inputValue })}
-      formatCreateLabel={(inputValue: string) => `Create "${inputValue}"`}
-      placeholder="Search or create person..."
-      debounceTimeout={300}
-      additional={{
-        page: 1,
-      }}
-      styles={selectStyles}
-      menuPlacement="auto"
-      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-    />
+    <div>
+        {selectedGroup && (
+            <div 
+                className="flex items-center gap-2 mb-1 px-1 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
+                onClick={() => setSelectedGroup(null)}
+            >
+                <span>← Back to Groups</span>
+                <span className="text-gray-500 dark:text-gray-400">/ {selectedGroup.name.replace('📁 ', '')}</span>
+            </div>
+        )}
+
+        <AnyAsyncPaginate
+            SelectComponent={Creatable}
+            isClearable
+            key={selectedGroup ? `members-${selectedGroup.id}` : 'groups'}
+            value={!selectedGroup ? null : currentOption}
+            loadOptions={loadPersonOptions}
+            onChange={handleChange}
+            onCreateOption={handleCreate}
+            getNewOptionData={(inputValue: string) => ({ value: inputValue, label: inputValue })}
+            formatCreateLabel={(inputValue: string) => `Create "${inputValue}"`}
+            placeholder={selectedGroup ? "Search person..." : "Select a group..."}
+            debounceTimeout={300}
+            additional={{
+                page: 1,
+            }}
+            styles={selectStyles}
+            menuPlacement="auto"
+            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+        />
+    </div>
   );
 };

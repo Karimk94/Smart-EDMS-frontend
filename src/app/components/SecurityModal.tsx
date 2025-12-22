@@ -434,7 +434,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                         >
                           <option value="255">{t('full_control')}</option>
                           <option value="63">{t('read_write')}</option>
-                          <option value="1">{t('read_only')}</option>
+                          <option value="45">{t('read_only')}</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-right">

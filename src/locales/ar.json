@@ -94,5 +94,20 @@
   "errorRenaming": "فشل إعادة التسمية",
   "errorDeleting": "فشل في الحذف",
   "folderReferencedWarning": "هذا المجلد مرتبط بعناصر أخرى. هل تريد حذفه قسرًا (إلغاء الارتباط والحذف)؟",
-  "folderActions": "الإجراءات"
+  "folderActions": "الإجراءات",
+  "permissions": "الصلاحيات",
+  "securityPermissions": "صلاحيات الأمان",
+  "addUserGroup": "إضافة مستخدم من مجموعة",
+  "selectGroup": "اختر المجموعة...",
+  "selectUser": "اختر المستخدم...",
+  "trusteesList": "قائمة الأمناء",
+  "accessLevel": "مستوى الوصول",
+  "noTrusteesAssigned": "لم يتم تعيين أمناء",
+  "fullControl": "تحكم كامل",
+  "readWrite": "قراءة/كتابة",
+  "readOnly": "قراءة فقط",
+  "savePermissions": "حفظ الصلاحيات",
+  "add": "إضافة",
+  "user": "المستخدم",
+  "remove": "إزالة"
 }

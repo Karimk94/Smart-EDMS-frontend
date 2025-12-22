@@ -326,7 +326,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
             <h2 className="text-lg font-semibold dark:text-white">
-              {t('security_permissions')} - {itemName}
+              {t('securityPermissions')} - {itemName}
             </h2>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
@@ -341,7 +341,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
           
           <div className="mb-6 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              {t('add_user_group') || "Add User from Group"}
+              {t('addUserGroup') || "Add User from Group"}
             </h3>
             <div className="flex flex-col sm:flex-row gap-3">
               {/* Group Selector */}
@@ -353,7 +353,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                     }))}
                     value={selectedGroupId}
                     onChange={setSelectedGroupId}
-                    placeholder={t('select_group') || "Select Group..."}
+                    placeholder={t('selectGroup') || "Select Group..."}
                 />
               </div>
 
@@ -370,7 +370,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                         ? "Select Group First" 
                         : groupMembers.length === 0 
                             ? "No members found" 
-                            : (t('select_user') || "Select User...")}
+                            : (t('selectUser') || "Select User...")}
                     isLoading={isLoadingMembers}
                     onLoadMore={loadMoreMembers}
                     disabled={!selectedGroupId}
@@ -391,7 +391,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
           {/* Trustees List */}
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('trustees_list')}
+              {t('trusteesList')}
             </h3>
           </div>
 
@@ -400,7 +400,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
               <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400">
                 <tr>
                   <th className="px-4 py-3 font-medium">{t('user')}</th>
-                  <th className="px-4 py-3 font-medium">{t('access_level')}</th>
+                  <th className="px-4 py-3 font-medium">{t('accessLevel')}</th>
                   <th className="px-4 py-3 font-medium w-16"></th>
                 </tr>
               </thead>
@@ -417,7 +417,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                 ) : trustees.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                      {t('no_trustees_assigned')}
+                      {t('noTrusteesAssigned')}
                     </td>
                   </tr>
                 ) : (
@@ -432,9 +432,9 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                           onChange={(e) => handleRightsChange(trustee.username, e.target.value)}
                           className="w-full bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-300 text-sm"
                         >
-                          <option value="255">{t('full_control')}</option>
-                          <option value="63">{t('read_write')}</option>
-                          <option value="45">{t('read_only')}</option>
+                          <option value="255">{t('fullControl')}</option>
+                          <option value="63">{t('readWrite')}</option>
+                          <option value="45">{t('readOnly')}</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -477,7 +477,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             )}
-            {t('save_permissions')}
+            {t('savePermissions')}
           </button>
         </div>
       </div>

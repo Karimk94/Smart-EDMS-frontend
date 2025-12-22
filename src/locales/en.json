@@ -94,6 +94,20 @@
   "errorRenaming": "Failed to rename item",
   "errorDeleting": "Failed to delete item",
   "folderReferencedWarning": "This folder is referenced by other items. Do you want to force delete it (unlink and delete)?",
-  "folderActions": "Actions"
-
+  "folderActions": "Actions",
+  "permissions": "Permissions",
+  "securityPermissions": "Security Permissions",
+  "addUserGroup": "Add User from Group",
+  "selectGroup": "Select Group...",
+  "selectUser": "Select User...",
+  "trusteesList": "Trustees List",
+  "accessLevel": "Access Level",
+  "noTrusteesAssigned": "No trustees assigned",
+  "fullControl": "Full Control",
+  "readWrite": "Read/Write",
+  "readOnly": "Read Only",
+  "savePermissions": "Save Permissions",
+  "add": "Add",
+  "user": "User",
+  "remove": "Remove"
 }

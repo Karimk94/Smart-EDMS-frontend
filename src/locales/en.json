@@ -109,5 +109,9 @@
   "savePermissions": "Save Permissions",
   "add": "Add",
   "user": "User",
-  "remove": "Remove"
+  "remove": "Remove",
+  "referencedItemError": "This item cannot be deleted because it is currently linked to other records in the system. Deleting it may cause data inconsistency.",
+  "confirmForceDelete": "Do you want to delete it anyway? This will remove all contents and references.",
+  "yesDelete": "Yes, Delete",
+  "warning": "Warning"
 }

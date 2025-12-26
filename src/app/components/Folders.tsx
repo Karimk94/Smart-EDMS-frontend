@@ -46,6 +46,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [selectedSecurityItem, setSelectedSecurityItem] = useState<FolderItem | null>(null);
 
+  // Confirmation Modal State (For Delete/Referenced items)
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<FolderItem | null>(null);
+  const [confirmMessage, setConfirmMessage] = useState('');
+
   useEffect(() => {
     fetchContents(currentFolderId);
   }, [currentFolderId]);
@@ -223,7 +228,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             refreshCurrentView();
           } else {
             const err = await res.json();
-            alert(t('errorRenaming') || `Error: ${err.error}`);
+            alert(t('errorRenaming') || `Error: ${err.error || err.detail}`);
           }
         } catch (e) {
           console.error("Rename error:", e);
@@ -244,28 +249,33 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           if (res.ok) {
             refreshCurrentView();
           } else {
-            const err = await res.json();
-            const errMsg = (err.error || "").toLowerCase();
-            if (errMsg.includes("referenced") || errMsg.includes("folder")) {
-              const warningMsg = targetItem.type === 'folder'
-                ? t('folderReferencedWarning')
-                : "This item is referenced by other items. Do you want to force delete it (unlink and delete)?";
+            // Safely handle response parsing
+            let err: any = {};
+            let errMsg = "";
 
-              if (confirm(warningMsg)) {
-                setIsLoading(true);
-                const forceRes = await fetch(`${apiURL}/folders/${targetItem.id}?force=true`, {
-                  method: 'DELETE'
-                });
-
-                if (forceRes.ok) {
-                  refreshCurrentView();
-                } else {
-                  const forceErr = await forceRes.json();
-                  alert(t('errorDeleting') || `Error: ${forceErr.error}`);
-                }
+            try {
+              // Read text first to avoid crashing on malformed JSON
+              const text = await res.text();
+              try {
+                err = JSON.parse(text);
+                errMsg = (err.detail || err.error || "").toLowerCase();
+              } catch (parseError) {
+                // If JSON fails, treat body as a string message
+                console.warn("Delete response was not valid JSON:", text);
+                errMsg = text.toLowerCase();
+                err = { detail: text };
               }
+            } catch (readError) {
+              console.error("Failed to read response body", readError);
+            }
+
+            // Trigger confirmation if status is 409 OR message indicates reference issue
+            if (res.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate")) {
+              setItemToDelete(targetItem);
+              setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records.");
+              setConfirmModalOpen(true);
             } else {
-              alert(t('errorDeleting') || `Error: ${err.error}`);
+              alert(t('errorDeleting') || `Error: ${err.detail || err.error || res.statusText}`);
             }
           }
         } catch (e) {
@@ -277,8 +287,34 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       }
     }
     else if (action === 'security') {
-        setSelectedSecurityItem(targetItem);
-        setIsSecurityModalOpen(true);
+      setSelectedSecurityItem(targetItem);
+      setIsSecurityModalOpen(true);
+    }
+  };
+
+  const handleForceDelete = async () => {
+    if (!itemToDelete) return;
+
+    setIsLoading(true);
+    setConfirmModalOpen(false);
+
+    try {
+      const res = await fetch(`${apiURL}/folders/${itemToDelete.id}?force=true`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        refreshCurrentView();
+        setItemToDelete(null);
+      } else {
+        const err = await res.json();
+        alert(t('errorDeleting') || `Error: ${err.detail || err.error}`);
+      }
+    } catch (e) {
+      console.error("Force delete error:", e);
+      alert(t('errorDeleting') || "Error deleting folder.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -592,14 +628,54 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       )}
 
       {isSecurityModalOpen && selectedSecurityItem && (
-        <SecurityModal 
-            isOpen={isSecurityModalOpen} 
-            onClose={() => setIsSecurityModalOpen(false)} 
-            docId={selectedSecurityItem.id} 
-            library="RTA_MAIN"
-            itemName={selectedSecurityItem.name}
-            t={t}
+        <SecurityModal
+          isOpen={isSecurityModalOpen}
+          onClose={() => setIsSecurityModalOpen(false)}
+          docId={selectedSecurityItem.id}
+          library="RTA_MAIN"
+          itemName={selectedSecurityItem.name}
+          t={t}
         />
+      )}
+
+      {/* Confirmation Modal for Forced Deletion */}
+      {confirmModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-3 mb-4 text-amber-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-lg font-bold dark:text-white">{t('warning') || 'Warning'}</h3>
+            </div>
+
+            <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm whitespace-pre-wrap">
+              {confirmMessage || (itemToDelete?.type === 'folder'
+                ? "This folder is not empty or is referenced by other items."
+                : "This item is referenced by other items.")}
+              <br /><br />
+              {t('confirmForceDelete') || "Do you want to delete it anyway? This will remove all contents and references."}
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setConfirmModalOpen(false);
+                  setItemToDelete(null);
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                {t('cancel') || 'Cancel'}
+              </button>
+              <button
+                onClick={handleForceDelete}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-sm"
+              >
+                {t('yesDelete') || 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { UploadFileItem } from './UploadFileItem';
 import ExifReader from 'exifreader';
 import { UploadStatus, UploadableFile } from '../../interfaces';
+import { useToast } from '../context/ToastContext';
 
 const formatDateTimeForAPI = (date: Date | null): string | null => {
   if (!date) return null;
@@ -69,6 +70,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileIdCounter = useRef(0);
+  const { showToast } = useToast();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -177,6 +179,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
 
     const uploadPromises = pendingFiles.map(uploadableFile => {
       return new Promise<void>((resolve) => {
@@ -209,11 +213,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
               const response = JSON.parse(xhr.responseText);
               if (response.success) {
                 updateFileStatus(id, 'success', { progress: 100, docnumber: response.docnumber });
+                successCount++;
               } else {
-                updateFileStatus(id, 'error', { error: response.error || 'Upload failed.' });
+                const errorMsg = response.error || 'Upload failed.';
+                updateFileStatus(id, 'error', { error: errorMsg });
+                errorCount++;
               }
             } catch (e) {
               updateFileStatus(id, 'error', { error: 'Failed to parse server response.' });
+              errorCount++;
             }
           } else {
             let errorMsg = `Server error: ${xhr.status}`;
@@ -223,12 +231,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
             } catch (e) {
             }
             updateFileStatus(id, 'error', { error: errorMsg });
+            errorCount++;
           }
           resolve();
         };
 
         xhr.onerror = () => {
           updateFileStatus(id, 'error', { error: 'Network error during upload.' });
+          errorCount++;
           resolve();
         };
 
@@ -238,6 +248,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
 
     await Promise.all(uploadPromises);
     setIsUploading(false);
+
+    if (errorCount === 0 && successCount > 0) {
+      showToast(`Successfully uploaded ${successCount} file(s)`, 'success');
+    } else if (errorCount > 0 && successCount > 0) {
+      showToast(`Upload completed with ${errorCount} error(s)`, 'warning');
+    } else if (errorCount > 0 && successCount === 0) {
+      showToast('All uploads failed. Please check errors.', 'error');
+    }
   };
 
   const handleAnalyze = () => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../context/ToastContext';
 
 interface CreateFolderModalProps {
   onClose: () => void;
@@ -13,7 +14,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
   const [description, setDescription] = useState('');
   const parentId = initialParentId; 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -28,7 +29,6 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
     if (!folderName.trim()) return;
 
     setIsSubmitting(true);
-    setError(null);
 
     try {
       const response = await fetch(`${apiURL}/folders`, {
@@ -46,14 +46,15 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
       const data = await response.json();
 
       if (response.ok) {
+        showToast('Folder created successfully', 'success');
         onFolderCreated();
         onClose();
       } else {
-        setError(data.error || t('errorCreatingFolder'));
+        showToast(data.error || t('errorCreatingFolder'), 'error');
       }
     } catch (err) {
       console.error(err);
-      setError(t('errorCreatingFolder'));
+      showToast(t('errorCreatingFolder'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -90,8 +91,6 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
               placeholder={t('enterFolderDescription')}
             />
           </div>
-
-          {error && <div className="text-red-500 text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-800">{error}</div>}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button

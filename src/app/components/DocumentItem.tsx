@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document } from '../../models/Document';
+import { useToast } from '../context/ToastContext';
 
 interface DocumentItemProps {
   doc: Document;
@@ -21,6 +22,8 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
   const [itemTags, setItemTags] = useState<string[]>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
+  
+  const { showToast } = useToast();
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -31,6 +34,12 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
     onToggleFavorite(doc.doc_id, newFavoriteStatus);
+    
+    if (newFavoriteStatus) {
+      showToast('Added to favorites', 'success');
+    } else {
+      showToast('Removed from favorites', 'info');
+    }
   };
 
   useEffect(() => {

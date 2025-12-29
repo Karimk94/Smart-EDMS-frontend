@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from '../hooks/useTranslations';
 import HtmlLangUpdater from '../components/HtmlLangUpdater';
+import { useToast } from '../context/ToastContext';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const t = useTranslations(lang);
   
   const router = useRouter();
+  const { showToast } = useToast();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -37,7 +38,6 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError('');
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -52,10 +52,10 @@ export default function LoginPage() {
         router.push('/');
       } else {
         const data = await response.json();
-        setError(data.error || 'Login failed');
+        showToast(data.error || 'Login failed', 'error');
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      showToast('An error occurred. Please try again.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +120,6 @@ export default function LoginPage() {
                 className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-red-500 focus:outline-none"
               />
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
               disabled={isLoading}

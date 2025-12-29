@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useToast } from '../context/ToastContext';
 
 interface Trustee {
   username: string;
@@ -137,6 +138,8 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   const [memberPage, setMemberPage] = useState(1);
   const [hasMoreMembers, setHasMoreMembers] = useState(true);
 
+  const { showToast } = useToast();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -218,7 +221,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
         const newMembers = (data && Array.isArray(data.options)) ? data.options : [];
         
         if (newMembers.length === 0) {
-            setHasMoreMembers(false);
+           setHasMoreMembers(false);
         }
 
         if (page === 1) {
@@ -299,10 +302,11 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       });
 
       if (!response.ok) throw new Error('Failed to update security');
+      showToast('Permissions updated successfully', 'success');
       onClose();
     } catch (error) {
       console.error(error);
-      alert('Failed to update permissions');
+      showToast('Failed to update permissions', 'error');
     } finally {
       setSaving(false);
     }

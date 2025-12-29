@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useToast } from '../context/ToastContext';
 
 const getSelectStyles = (theme: 'light' | 'dark') => ({
   control: (base: any) => ({ 
@@ -49,6 +50,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const selectStyles = getSelectStyles(theme);
+  const { showToast } = useToast();
 
   useEffect(() => {
       const fetchInitialData = async () => {
@@ -139,7 +141,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
       }
     } catch (error: any) {
       console.error('Failed to add tag:', error);
-      alert(`Error adding tag: ${error.message}`);
+      showToast(`Error adding tag: ${error.message}`, 'error');
       setTags(tags);
     }
   };
@@ -157,7 +159,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
         }
     } catch (error: any) {
       console.error('Failed to delete tag:', error);
-       alert(`Error deleting tag: ${error.message}`);
+       showToast(`Error deleting tag: ${error.message}`, 'error');
        setTags(originalTags);
     }
   };
@@ -187,7 +189,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
     } catch (error) {
         console.error('Error toggling shortlist:', error);
         setTags(tags);
-        alert("Failed to update shortlist status.");
+        showToast("Failed to update shortlist status.", 'error');
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { CreateFolderModal } from './CreateFolderModal';
 import { Document } from '../../models/Document';
 import SecurityModal from './SecurityModal';
+import { useToast } from '../context/ToastContext';
 
 interface FolderItem {
   id: string;
@@ -43,14 +44,20 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null });
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  // Security Modal State
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [selectedSecurityItem, setSelectedSecurityItem] = useState<FolderItem | null>(null);
 
-  // Confirmation Modal State (For Delete/Referenced items)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<FolderItem | null>(null);
   const [confirmMessage, setConfirmMessage] = useState('');
+  const [deleteMode, setDeleteMode] = useState<'standard' | 'force'>('standard');
+
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [itemToRename, setItemToRename] = useState<FolderItem | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
+
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchContents(currentFolderId);
@@ -74,6 +81,26 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     return () => document.removeEventListener('click', handleClick);
   }, [contextMenu]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmModalOpen) {
+            setConfirmModalOpen(false);
+            setItemToDelete(null);
+        }
+        if (isRenameModalOpen) {
+            setIsRenameModalOpen(false);
+        }
+      }
+    };
+
+    if (confirmModalOpen || isRenameModalOpen) {
+        document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [confirmModalOpen, isRenameModalOpen]);
+
+
   const fetchContents = async (parentId: string | null) => {
     setIsLoading(true);
     try {
@@ -96,6 +123,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       }
     } catch (error) {
       console.error('Failed to fetch folder contents:', error);
+      showToast('Failed to load folder contents', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -215,77 +243,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       setShowCreateModal(true);
     }
     else if (action === 'rename') {
-      const newName = prompt(t('enterNewName') || "Enter new name:", targetItem.name);
-      if (newName && newName !== targetItem.name) {
-        setIsLoading(true);
-        try {
-          const res = await fetch(`${apiURL}/folders/${targetItem.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newName, system_id: targetItem.system_id })
-          });
-
-          if (res.ok) {
-            refreshCurrentView();
-          } else {
-            const err = await res.json();
-            alert(t('errorRenaming') || `Error: ${err.error || err.detail}`);
-          }
-        } catch (e) {
-          console.error("Rename error:", e);
-          alert(t('errorRenaming') || "Error renaming folder.");
-        } finally {
-          setIsLoading(false);
-        }
-      }
+      setItemToRename(targetItem);
+      setRenameValue(targetItem.name);
+      setIsRenameModalOpen(true);
     }
     else if (action === 'delete') {
-      if (confirm(`${t('confirmDelete') || "Are you sure you want to delete"} "${targetItem.name}"?`)) {
-        setIsLoading(true);
-        try {
-          const res = await fetch(`${apiURL}/folders/${targetItem.id}`, {
-            method: 'DELETE'
-          });
-
-          if (res.ok) {
-            refreshCurrentView();
-          } else {
-            // Safely handle response parsing
-            let err: any = {};
-            let errMsg = "";
-
-            try {
-              // Read text first to avoid crashing on malformed JSON
-              const text = await res.text();
-              try {
-                err = JSON.parse(text);
-                errMsg = (err.detail || err.error || "").toLowerCase();
-              } catch (parseError) {
-                // If JSON fails, treat body as a string message
-                console.warn("Delete response was not valid JSON:", text);
-                errMsg = text.toLowerCase();
-                err = { detail: text };
-              }
-            } catch (readError) {
-              console.error("Failed to read response body", readError);
-            }
-
-            // Trigger confirmation if status is 409 OR message indicates reference issue
-            if (res.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate")) {
-              setItemToDelete(targetItem);
-              setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records.");
-              setConfirmModalOpen(true);
-            } else {
-              alert(t('errorDeleting') || `Error: ${err.detail || err.error || res.statusText}`);
-            }
-          }
-        } catch (e) {
-          console.error("Delete error:", e);
-          alert(t('errorDeleting') || "Error deleting folder.");
-        } finally {
-          setIsLoading(false);
-        }
-      }
+      setItemToDelete(targetItem);
+      setDeleteMode('standard');
+      setConfirmMessage(`${t('confirmDelete') || "Are you sure you want to delete"} "${targetItem.name}"?`);
+      setConfirmModalOpen(true);
     }
     else if (action === 'security') {
       setSelectedSecurityItem(targetItem);
@@ -293,27 +259,90 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
   };
 
-  const handleForceDelete = async () => {
-    if (!itemToDelete) return;
+  const handleRenameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemToRename || !renameValue || renameValue === itemToRename.name) {
+      setIsRenameModalOpen(false);
+      return;
+    }
 
-    setIsLoading(true);
-    setConfirmModalOpen(false);
-
+    setIsRenaming(true);
     try {
-      const res = await fetch(`${apiURL}/folders/${itemToDelete.id}?force=true`, {
-        method: 'DELETE'
+      const res = await fetch(`${apiURL}/folders/${itemToRename.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: renameValue, system_id: itemToRename.system_id })
       });
 
       if (res.ok) {
         refreshCurrentView();
-        setItemToDelete(null);
+        showToast('Renamed successfully', 'success');
+        setIsRenameModalOpen(false);
+        setItemToRename(null);
       } else {
         const err = await res.json();
-        alert(t('errorDeleting') || `Error: ${err.detail || err.error}`);
+        showToast(t('errorRenaming') || `Error: ${err.error || err.detail}`, 'error');
       }
     } catch (e) {
-      console.error("Force delete error:", e);
-      alert(t('errorDeleting') || "Error deleting folder.");
+      console.error("Rename error:", e);
+      showToast(t('errorRenaming') || "Error renaming folder.", 'error');
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  const processDelete = async () => {
+    if (!itemToDelete) return;
+
+    const url = deleteMode === 'force' 
+      ? `${apiURL}/folders/${itemToDelete.id}?force=true`
+      : `${apiURL}/folders/${itemToDelete.id}`;
+
+    setIsLoading(true);
+    
+    if (deleteMode === 'standard') {
+      setConfirmModalOpen(false);
+    }
+
+    try {
+      const res = await fetch(url, { method: 'DELETE' });
+
+      if (res.ok) {
+        refreshCurrentView();
+        setItemToDelete(null);
+        setConfirmModalOpen(false);
+        showToast('Item deleted successfully', 'success');
+      } else {
+        let err: any = {};
+        let errMsg = "";
+        try {
+          const text = await res.text();
+          try {
+            err = JSON.parse(text);
+            errMsg = (err.detail || err.error || "").toLowerCase();
+          } catch (parseError) {
+            errMsg = text.toLowerCase();
+            err = { detail: text };
+          }
+        } catch (readError) {
+          console.error("Failed to read response body", readError);
+        }
+
+        if (deleteMode === 'standard' && (res.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate"))) {
+           setDeleteMode('force');
+           setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records or is not empty.");
+           setConfirmModalOpen(true);
+        } else {
+           showToast(t('errorDeleting') || `Error: ${err.detail || err.error || res.statusText}`, 'error');
+           if (deleteMode === 'force') {
+             setConfirmModalOpen(false);
+           }
+        }
+      }
+    } catch (e) {
+      console.error("Delete error:", e);
+      showToast(t('errorDeleting') || "Error deleting folder.", 'error');
+      setConfirmModalOpen(false);
     } finally {
       setIsLoading(false);
     }
@@ -639,23 +668,39 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         />
       )}
 
-      {/* Confirmation Modal for Forced Deletion */}
+      {/* Confirmation Modal for Deletion (Standard & Force) */}
       {confirmModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    setConfirmModalOpen(false);
+                    setItemToDelete(null);
+                }
+            }}
+        >
           <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-600">
-            <div className="flex items-center gap-3 mb-4 text-amber-500">
+            <div className={`flex items-center gap-3 mb-4 ${deleteMode === 'force' ? 'text-amber-500' : 'text-red-500'}`}>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                {deleteMode === 'force' ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                )}
               </svg>
-              <h3 className="text-lg font-bold dark:text-white">{t('warning') || 'Warning'}</h3>
+              <h3 className="text-lg font-bold dark:text-white">
+                {deleteMode === 'force' ? (t('warning') || 'Warning') : (t('delete') || 'Delete Item')}
+              </h3>
             </div>
 
             <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm whitespace-pre-wrap">
-              {confirmMessage || (itemToDelete?.type === 'folder'
-                ? "This folder is not empty or is referenced by other items."
-                : "This item is referenced by other items.")}
-              <br /><br />
-              {t('confirmForceDelete') || "Do you want to delete it anyway? This will remove all contents and references."}
+              {confirmMessage}
+              {deleteMode === 'force' && (
+                <>
+                  <br /><br />
+                  {t('confirmForceDelete') || "Do you want to delete it anyway? This will remove all contents and references."}
+                </>
+              )}
             </p>
 
             <div className="flex justify-end gap-3">
@@ -669,12 +714,55 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 {t('cancel') || 'Cancel'}
               </button>
               <button
-                onClick={handleForceDelete}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-sm"
+                onClick={processDelete}
+                className={`px-4 py-2 text-sm text-white rounded transition-colors shadow-sm flex items-center gap-2 ${deleteMode === 'force' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
+                disabled={isLoading}
               >
-                {t('yesDelete') || 'Yes, Delete'}
+                {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
+                {deleteMode === 'force' ? (t('yesDelete') || 'Yes, Delete') : (t('delete') || 'Delete')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Modal */}
+      {isRenameModalOpen && (
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) setIsRenameModalOpen(false);
+            }}
+        >
+          <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-600">
+            <h3 className="text-lg font-bold dark:text-white mb-4">{t('rename') || 'Rename'}</h3>
+            <form onSubmit={handleRenameSubmit}>
+              <div className="mb-4">
+                <input 
+                  type="text" 
+                  value={renameValue} 
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsRenameModalOpen(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  {t('cancel') || 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRenaming || !renameValue.trim()}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                >
+                   {isRenaming ? 'Saving...' : (t('save') || 'Save')}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import SecurityModal from './SecurityModal';
 
 interface FolderItem {
   id: string;
+  system_id: string
   name: string;
   type: 'folder' | 'item' | 'file';
   node_type?: string;
@@ -221,7 +222,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           const res = await fetch(`${apiURL}/folders/${targetItem.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newName })
+            body: JSON.stringify({ name: newName, system_id: targetItem.system_id })
           });
 
           if (res.ok) {

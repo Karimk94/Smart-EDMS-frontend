@@ -531,7 +531,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                         </div>
                         <div className="ml-4 flex-1 min-w-0">
                           <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{t(item.id)}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} items` : ''}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} ${t('items')}` : ''}</p>
                         </div>
                         <div className="text-gray-300 dark:text-gray-600">
                           <svg className="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>

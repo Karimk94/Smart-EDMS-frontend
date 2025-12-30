@@ -140,5 +140,6 @@
   "uploadCompletedWith" : "Upload completed with",
   "error(s)" : "error(s)",
   "uploadsFailed" : "All uploads failed. Please check errors",
-  "loginFailed" : "Login failed"
+  "loginFailed" : "Login failed",
+  "items": "Items"
 }

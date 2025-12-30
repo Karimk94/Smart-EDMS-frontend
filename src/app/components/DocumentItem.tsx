@@ -23,7 +23,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
   const [itemTags, setItemTags] = useState<string[]>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
-  
+
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
     onToggleFavorite(doc.doc_id, newFavoriteStatus);
-    
+
     if (newFavoriteStatus) {
       showToast(t('AddedToFavorites'), 'success');
     } else {
@@ -146,7 +146,8 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
   };
 
   const displayDate = formatDateOnly(doc.date);
-  const thumbnailUrl = `${apiURL}/${doc.thumbnail_url.startsWith('cache') ? '' : 'api/'}${doc.thumbnail_url}`;
+  const thumbnailUrl = doc.thumbnail_url && doc.thumbnail_url.trim() ? (doc.thumbnail_url.startsWith('http') ? doc.thumbnail_url : `${apiURL}/${doc.thumbnail_url}`)
+    : null;
   const cleanDocName = doc.docname ? doc.docname.replace(/\.[^/.]+$/, "") : "";
   const typeIcon = getFileTypeIcon();
 
@@ -161,7 +162,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
         </div>
       )}
       <div className="relative aspect-w-16 aspect-h-9 mb-2">
-        {!imageError ? (
+        {thumbnailUrl && !imageError ? (
           <img
             src={thumbnailUrl}
             alt="Thumbnail"
@@ -171,14 +172,14 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <img 
-              src={typeIcon || '/file.svg'} 
-              alt="File Type" 
-              className="w-16 h-16 opacity-40 dark:opacity-60" 
+            <img
+              src={typeIcon || '/file.svg'}
+              alt="File Type"
+              className="w-16 h-16 opacity-40 dark:opacity-60"
             />
           </div>
         )}
-        
+
         {doc.media_type === 'video' && !imageError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-40 transition rounded-lg">
             <img src="/play-icon.svg" alt="Play Video" className="w-12 h-12 opacity-80 group-hover:opacity-100 transition-transform group-hover:scale-110" />

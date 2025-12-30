@@ -367,11 +367,11 @@ const fetchSectionData = useCallback(
       });
       if (!response.ok)
         throw new Error(`Cache clear failed: ${response.statusText}`);
-      showToast('Thumbnail cache cleared.', 'success');
+      showToast(t('ThumbnailCacheCleared'), 'success');
       fetchSectionData();
     } catch (err: any) {
       console.error('Cache clear error:', err);
-      showToast(`Failed to clear cache: ${err.message}`, 'error');
+      showToast(`${t('FailedToClearCache')}: ${err.message}`, 'error');
     }
   };
 
@@ -504,7 +504,7 @@ const fetchSectionData = useCallback(
       }
     } catch (error) {
       console.error(error);
-      showToast('Failed to update favorite status', 'error');
+      showToast(t('FailedToUpdateFavoriteStatus'), 'error');
     }
   };
 
@@ -516,11 +516,11 @@ const fetchSectionData = useCallback(
         router.push('/login');
       } else {
         console.error('Logout failed');
-        showToast('Logout failed. Please try again.', 'error');
+        showToast(t('LogoutFailed'), 'error');
       }
     } catch (error) {
       console.error('Error during logout:', error);
-      showToast('An error occurred during logout.', 'error');
+      showToast(t('ErrorLogout'), 'error');
     }
   };
 
@@ -595,6 +595,7 @@ const fetchSectionData = useCallback(
           processingDocs={processingDocs}
           onToggleFavorite={handleToggleFavorite}
           lang={lang}
+          t={t}
         />
       </>
     );
@@ -763,6 +764,7 @@ const fetchSectionData = useCallback(
                 apiURL={API_PROXY_URL}
                 onAnalyze={handleAnalyze}
                 theme={theme}
+                t={t}
             />
         )}
 

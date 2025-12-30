@@ -52,10 +52,10 @@ export default function LoginPage() {
         router.push('/');
       } else {
         const data = await response.json();
-        showToast(data.error || 'Login failed', 'error');
+        showToast(data.error || t('loginFailed'), 'error');
       }
     } catch (err) {
-      showToast('An error occurred. Please try again.', 'error');
+      showToast(t('errorOccurred'), 'error');
     } finally {
       setIsLoading(false);
     }

@@ -302,11 +302,11 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       });
 
       if (!response.ok) throw new Error('Failed to update security');
-      showToast('Permissions updated successfully', 'success');
+      showToast(t('permissionsUpdated'), 'success');
       onClose();
     } catch (error) {
       console.error(error);
-      showToast('Failed to update permissions', 'error');
+      showToast(t('failedToUpdatePermissions'), 'error');
     } finally {
       setSaving(false);
     }

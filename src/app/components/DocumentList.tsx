@@ -12,6 +12,7 @@ interface DocumentListProps {
   processingDocs: number[];
   onToggleFavorite: (docId: number, isFavorite: boolean) => void;
   lang: 'en' | 'ar';
+  t: Function;
 }
 
 export const DocumentList: React.FC<DocumentListProps> = ({
@@ -22,7 +23,8 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   isLoading,
   processingDocs,
   onToggleFavorite,
-  lang
+  lang,
+  t
 }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
     {isLoading
@@ -37,6 +39,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
           isProcessing={processingDocs.includes(doc.doc_id)}
           onToggleFavorite={onToggleFavorite}
           lang={lang}
+          t={t}
         />
       ))}
   </div>

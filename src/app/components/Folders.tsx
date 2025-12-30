@@ -123,7 +123,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       }
     } catch (error) {
       console.error('Failed to fetch folder contents:', error);
-      showToast('Failed to load folder contents', 'error');
+      showToast(t('FailLoadingFolders'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -276,7 +276,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
       if (res.ok) {
         refreshCurrentView();
-        showToast('Renamed successfully', 'success');
+        showToast(t('successRenaming'), 'success');
         setIsRenameModalOpen(false);
         setItemToRename(null);
       } else {
@@ -311,7 +311,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         refreshCurrentView();
         setItemToDelete(null);
         setConfirmModalOpen(false);
-        showToast('Item deleted successfully', 'success');
+        showToast(t('successDeleting'), 'success');
       } else {
         let err: any = {};
         let errMsg = "";

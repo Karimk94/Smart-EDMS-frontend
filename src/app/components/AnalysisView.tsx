@@ -9,9 +9,10 @@ interface AnalysisViewProps {
   onUpdateAbstractSuccess: () => void;
   lang: 'en' | 'ar';
   theme: 'light' | 'dark';
+  t: Function;
 }
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiURL, onUpdateAbstractSuccess, lang, theme }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiURL, onUpdateAbstractSuccess, lang, theme, t }) => {
   const [faceNames, setFaceNames] = useState<{ [key: number]: string }>({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [savingFaceIndex, setSavingFaceIndex] = useState<number | null>(null);
@@ -46,7 +47,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
   const handleSaveFace = async (face: any) => {
     const name = faceNames[face.index];
     if (!name || name.trim() === '') {
-      showToast('Please enter a name for this face first.', 'warning');
+      showToast(t('NameForFace'), 'warning');
       return;
     }
     setSavingFaceIndex(face.index);
@@ -60,7 +61,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
           original_image_b64: result.original_image_b64,
         }),
       });
-      showToast(`Successfully saved "${name.trim()}" to the known faces database.`, 'success');
+      showToast(`${t('SuccessfullySaved')} "${name.trim()}" ${t('toTheKnownFacesDatabase')}`, 'success');
 
       await fetch(`${apiURL}/add_person`, {
         method: 'POST',
@@ -69,7 +70,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
       });
 
     } catch (error: any) {
-      showToast(`Error: ${error.message}`, 'error');
+      showToast(`${t('error')}: ${error.message}`, 'error');
     } finally {
       setSavingFaceIndex(null);
     }
@@ -80,7 +81,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
   const handleUpdateAbstractClick = () => {
     const namesToSave = confirmedNames.map(([_, name]) => name.trim());
     if (namesToSave.length === 0) {
-        showToast("No confirmed names to update.", 'warning');
+        showToast(t('noConfirmedNames'), 'warning');
         return;
     }
     setIsConfirmOpen(true);
@@ -99,10 +100,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
       });
       if (!response.ok) throw new Error((await response.json()).error);
       
-      showToast('Title updated successfully', 'success');
+      showToast(t('titleUpdatedSuccessfully'), 'success');
       onUpdateAbstractSuccess();
     } catch (err: any) {
-      showToast(`Error: ${err.message}`, 'error');
+      showToast(`${t('error')}: ${err.message}`, 'error');
     } finally {
       setIsUpdating(false);
     }

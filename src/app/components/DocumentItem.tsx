@@ -10,9 +10,10 @@ interface DocumentItemProps {
   isProcessing: boolean;
   onToggleFavorite: (docId: number, isFavorite: boolean) => void;
   lang: 'en' | 'ar';
+  t: Function;
 }
 
-export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, onToggleFavorite, lang }) => {
+export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, onToggleFavorite, lang, t }) => {
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [imageError, setImageError] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -36,7 +37,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
     onToggleFavorite(doc.doc_id, newFavoriteStatus);
     
     if (newFavoriteStatus) {
-      showToast('Added to favorites', 'success');
+      showToast(t('AddedToFavorites'), 'success');
     } else {
       showToast('Removed from favorites', 'info');
     }

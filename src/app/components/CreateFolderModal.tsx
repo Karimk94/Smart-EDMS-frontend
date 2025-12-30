@@ -46,7 +46,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
       const data = await response.json();
 
       if (response.ok) {
-        showToast('Folder created successfully', 'success');
+        showToast(t('folderCreated'), 'success');
         onFolderCreated();
         onClose();
       } else {

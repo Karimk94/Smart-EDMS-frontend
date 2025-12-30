@@ -468,6 +468,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
               }}
               lang={lang}
               theme={theme}
+              t={t}
             />
           )}
         </div>

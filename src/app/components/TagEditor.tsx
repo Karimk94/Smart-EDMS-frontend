@@ -141,7 +141,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
       }
     } catch (error: any) {
       console.error('Failed to add tag:', error);
-      showToast(`Error adding tag: ${error.message}`, 'error');
+      showToast(`${t('errorAddingTag')}: ${error.message}`, 'error');
       setTags(tags);
     }
   };
@@ -159,7 +159,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
         }
     } catch (error: any) {
       console.error('Failed to delete tag:', error);
-       showToast(`Error deleting tag: ${error.message}`, 'error');
+       showToast(`${t('errorDeletingTag')}: ${error.message}`, 'error');
        setTags(originalTags);
     }
   };
@@ -189,7 +189,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
     } catch (error) {
         console.error('Error toggling shortlist:', error);
         setTags(tags);
-        showToast("Failed to update shortlist status.", 'error');
+        showToast(t("failedUpdateShortlist"), 'error');
     }
   };
 

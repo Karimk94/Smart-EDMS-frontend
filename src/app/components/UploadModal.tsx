@@ -63,9 +63,10 @@ export interface UploadModalProps {
   apiURL: string;
   onAnalyze: (uploadedFiles: UploadableFile[]) => void;
   theme: 'light' | 'dark';
+  t: Function
 }
 
-export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme }) => {
+export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme, t }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -250,11 +251,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     setIsUploading(false);
 
     if (errorCount === 0 && successCount > 0) {
-      showToast(`Successfully uploaded ${successCount} file(s)`, 'success');
+      showToast(`${t('SuccessfullyUploaded')} ${successCount} ${t('file(s)')}`, 'success');
     } else if (errorCount > 0 && successCount > 0) {
-      showToast(`Upload completed with ${errorCount} error(s)`, 'warning');
+      showToast(`${t('uploadCompletedWith')} ${errorCount} ${t('error(s)')} `, 'warning');
     } else if (errorCount > 0 && successCount === 0) {
-      showToast('All uploads failed. Please check errors.', 'error');
+      showToast(t('AllUploadsFailed'), 'error');
     }
   };
 

@@ -23,7 +23,9 @@ const InfiniteSelect = ({
   placeholder, 
   onLoadMore, 
   isLoading, 
-  disabled 
+  disabled,
+  onSearch,
+  searchValue
 }: {
   options: { label: string; value: string }[];
   value: string;
@@ -32,6 +34,8 @@ const InfiniteSelect = ({
   onLoadMore?: () => void;
   isLoading?: boolean;
   disabled?: boolean;
+  onSearch?: (val: string) => void;
+  searchValue?: string;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,6 +82,20 @@ const InfiniteSelect = ({
           className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm dark:bg-gray-700 custom-scrollbar"
           onScroll={handleScroll}
         >
+          {onSearch && (
+            <div className="sticky top-0 z-20 bg-white dark:bg-gray-700 p-2 border-b border-gray-100 dark:border-gray-600">
+              <input
+                type="text"
+                value={searchValue || ''}
+                onChange={(e) => onSearch(e.target.value)}
+                placeholder="Search..."
+                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200"
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+            </div>
+          )}
+
           {options.length === 0 && !isLoading ? (
              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-400 italic">
                No options found
@@ -134,6 +152,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
   
   const [memberPage, setMemberPage] = useState(1);
   const [hasMoreMembers, setHasMoreMembers] = useState(true);
@@ -167,20 +186,25 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       setSelectedGroupId('');
       setSelectedMemberId('');
       setMemberPage(1);
+      setMemberSearch('');
       setHasMoreMembers(true);
     }
   }, [isOpen, docId]);
 
   useEffect(() => {
     if (selectedGroupId) {
-      setMemberPage(1);
-      setHasMoreMembers(true);
-      fetchGroupMembers(selectedGroupId, 1);
+      const delayDebounceFn = setTimeout(() => {
+        setMemberPage(1);
+        setHasMoreMembers(true);
+        fetchGroupMembers(selectedGroupId, 1, memberSearch);
+      }, 300);
+
+      return () => clearTimeout(delayDebounceFn);
     } else {
       setGroupMembers([]);
+      setSelectedMemberId('');
     }
-    setSelectedMemberId('');
-  }, [selectedGroupId]);
+  }, [selectedGroupId, memberSearch]);
 
   const fetchTrustees = async () => {
     setLoading(true);
@@ -212,10 +236,10 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     }
   };
 
-  const fetchGroupMembers = async (groupId: string, page: number) => {
+  const fetchGroupMembers = async (groupId: string, page: number, search: string = '') => {
     setIsLoadingMembers(true);
     try {
-      const res = await fetch(`/api/groups/search_members?page=${page}&search=&group_id=${groupId}`);
+      const res = await fetch(`/api/groups/search_members?page=${page}&search=${encodeURIComponent(search)}&group_id=${groupId}`);
       if (res.ok) {
         const data = await res.json();
         const newMembers = (data && Array.isArray(data.options)) ? data.options : [];
@@ -244,7 +268,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     if (hasMoreMembers && !isLoadingMembers && selectedGroupId) {
         const nextPage = memberPage + 1;
         setMemberPage(nextPage);
-        fetchGroupMembers(selectedGroupId, nextPage);
+        fetchGroupMembers(selectedGroupId, nextPage, memberSearch);
     }
   };
 
@@ -356,7 +380,10 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                         value: g.group_id || g.id
                     }))}
                     value={selectedGroupId}
-                    onChange={setSelectedGroupId}
+                    onChange={(val) => {
+                      setSelectedGroupId(val);
+                      setMemberSearch('');
+                    }}
                     placeholder={t('selectGroup') || "Select Group..."}
                 />
               </div>
@@ -378,6 +405,8 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                     isLoading={isLoadingMembers}
                     onLoadMore={loadMoreMembers}
                     disabled={!selectedGroupId}
+                    onSearch={setMemberSearch}
+                    searchValue={memberSearch}
                 />
               </div>
 

@@ -141,5 +141,6 @@
   "error(s)" : "error(s)",
   "uploadsFailed" : "All uploads failed. Please check errors",
   "loginFailed" : "Login failed",
-  "items": "Items"
+  "items": "Items",
+  "share": "Share"
 }

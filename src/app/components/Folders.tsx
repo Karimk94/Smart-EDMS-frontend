@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { CreateFolderModal } from './CreateFolderModal';
 import { Document } from '../../models/Document';
 import SecurityModal from './SecurityModal';
+import ShareModal from './ShareModal';
 import { useToast } from '../context/ToastContext';
 
 interface FolderItem {
@@ -47,6 +48,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [selectedSecurityItem, setSelectedSecurityItem] = useState<FolderItem | null>(null);
 
+  // Share Modal State
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [itemToShare, setItemToShare] = useState<FolderItem | null>(null);
+
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<FolderItem | null>(null);
   const [confirmMessage, setConfirmMessage] = useState('');
@@ -73,6 +78,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
+      // Close Context Menu
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
         setContextMenu({ ...contextMenu, visible: false });
       }
@@ -91,14 +97,17 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         if (isRenameModalOpen) {
             setIsRenameModalOpen(false);
         }
+        if (isShareModalOpen) {
+            setIsShareModalOpen(false);
+        }
       }
     };
 
-    if (confirmModalOpen || isRenameModalOpen) {
+    if (confirmModalOpen || isRenameModalOpen || isShareModalOpen) {
         document.addEventListener('keydown', handleKeyDown);
     }
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [confirmModalOpen, isRenameModalOpen]);
+  }, [confirmModalOpen, isRenameModalOpen, isShareModalOpen]);
 
 
   const fetchContents = async (parentId: string | null) => {
@@ -256,6 +265,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     else if (action === 'security') {
       setSelectedSecurityItem(targetItem);
       setIsSecurityModalOpen(true);
+    }
+    else if (action === 'share') {
+      setItemToShare(targetItem);
+      setIsShareModalOpen(true);
     }
   };
 
@@ -557,7 +570,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                       key={item.id}
                       onClick={() => handleNavigate(item)}
                       onContextMenu={(e) => handleRightClick(e, item)}
-                      className={`group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700`}
+                      className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700`}
                     >
                       <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
                         {renderIcon(item, false)}
@@ -619,6 +632,19 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
           {contextMenu.item && (
             <>
+              {/* Share Button (Files only) - Context Menu */}
+              {contextMenu.item.type !== 'folder' && (
+                <button
+                  onClick={() => handleContextMenuAction('share')}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  {t('share') || 'Share'}
+                </button>
+              )}
+
               <button
                 onClick={() => handleContextMenuAction('rename')}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
@@ -665,6 +691,19 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           library="RTA_MAIN"
           itemName={selectedSecurityItem.name}
           t={t}
+        />
+      )}
+
+      {/* Share Modal */}
+      {isShareModalOpen && itemToShare && (
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => {
+            setIsShareModalOpen(false);
+            setItemToShare(null);
+          }}
+          documentId={itemToShare.id}
+          documentName={itemToShare.name}
         />
       )}
 

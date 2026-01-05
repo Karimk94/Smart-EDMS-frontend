@@ -704,6 +704,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           }}
           documentId={itemToShare.id}
           documentName={itemToShare.name}
+          t={t}
         />
       )}
 

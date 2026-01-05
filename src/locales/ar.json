@@ -142,5 +142,22 @@
   "AllUploadsFailed": "فشل جميع التحميلات. يرجى التحقق من الأخطاء.",
   "loginFailed": "فشل تسجيل الدخول",
   "items": "ملفًا",
-  "share": "مشاركة"
+  "share": "مشاركة",
+  "SecureDocAccess": "الوصول الآمن للمستند",
+  "OtpSentMessage": "الرجاء إدخال رمز التحقق المرسل إلى",
+  "VerifyIdentityMessage": "تحتاج إلى تأكيد هويتك لعرض هذا المستند.",
+  "LoginEdms": "تسجيل الدخول بحساب EDMS",
+  "OrVerifyEmail": "أو تحقق من البريد الإلكتروني",
+  "OrgEmail": "البريد الإلكتروني للمؤسسة",
+  "SendVerificationCode": "إرسال رمز التحقق",
+  "EnterOtp": "أدخل رمز OTP",
+  "VerifyAccess": "تحقق واعرض المستند",
+  "ChangeEmail": "تغيير البريد الإلكتروني",
+  "VerifiedAccessFor": "تم التحقق من الوصول لـ",
+  "AccessLoggedAt": "تم تسجيل الوصول في",
+  "Download": "تحميل",
+  "DownloadFunctionality": "سيتم ربط خاصية التحميل بتدفق الوسائط",
+  "FailedRequestOtp": "فشل طلب رمز التحقق",
+  "FailedVerifyOtp": "فشل التحقق من الرمز",
+  "LinkCopied": "تم نسخ الرابط إلى الحافظة!"
 }

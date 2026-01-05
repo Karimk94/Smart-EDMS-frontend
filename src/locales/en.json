@@ -142,5 +142,22 @@
   "uploadsFailed" : "All uploads failed. Please check errors",
   "loginFailed" : "Login failed",
   "items": "Items",
-  "share": "Share"
+  "share": "Share",
+  "SecureDocAccess": "Secure Document Access",
+  "OtpSentMessage": "Please enter the verification code sent to",
+  "VerifyIdentityMessage": "You need to verify your identity to view this document.",
+  "LoginEdms": "Login with EDMS Account",
+  "OrVerifyEmail": "OR VERIFY EMAIL",
+  "OrgEmail": "Organization Email",
+  "SendVerificationCode": "Send Verification Code",
+  "EnterOtp": "Enter OTP Code",
+  "VerifyAccess": "Verify & Access Document",
+  "ChangeEmail": "Change Email",
+  "VerifiedAccessFor": "Verified Access for",
+  "AccessLoggedAt": "Access logged at",
+  "Download": "Download",
+  "DownloadFunctionality": "Download functionality to be connected to media stream",
+  "FailedRequestOtp": "Failed to request OTP",
+  "FailedVerifyOtp": "Failed to verify OTP",
+  "LinkCopied": "Link copied to clipboard!"
 }

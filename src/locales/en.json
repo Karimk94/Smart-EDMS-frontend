@@ -159,5 +159,6 @@
   "DownloadFunctionality": "Download functionality to be connected to media stream",
   "FailedRequestOtp": "Failed to request OTP",
   "FailedVerifyOtp": "Failed to verify OTP",
-  "LinkCopied": "Link copied to clipboard!"
+  "LinkCopied": "Link copied to clipboard!",
+  "PreviewNotAvailable": "Preview not available for this file type."
 }

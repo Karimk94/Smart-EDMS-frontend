@@ -63,7 +63,8 @@ export default function SharedDocumentPage() {
   const parseResponse = async (response: Response) => {
     const text = await response.text();
     try {
-      return JSON.parse(text);
+      // Trim to avoid issues with BOM or whitespace preventing JSON parse
+      return JSON.parse(text.trim());
     } catch (e) {
       if (!response.ok) {
          return { detail: text || response.statusText };
@@ -72,7 +73,48 @@ export default function SharedDocumentPage() {
     }
   };
 
-  // File type detection helpers
+  const extractErrorMessage = (err: any) => {
+    let msg = err?.message || String(err);
+
+    try {
+      let attempts = 0;
+      while (typeof msg === 'string' && (msg.trim().startsWith('{') || msg.trim().startsWith('[')) && attempts < 5) {
+        attempts++;
+        try {
+            const parsed = JSON.parse(msg);
+            
+            const extracted = parsed.detail || parsed.error || parsed.message;
+            
+            if (extracted) {
+                msg = typeof extracted === 'string' ? extracted : JSON.stringify(extracted);
+            } else {
+                break;
+            }
+        } catch (jsonError) {
+            const patterns = [
+                /"detail"\s*:\s*"([^"]*)"/,
+                /"error"\s*:\s*"([^"]*)"/,
+                /"message"\s*:\s*"([^"]*)"/
+            ];
+
+            let found = false;
+            for (const pattern of patterns) {
+                const match = msg.match(pattern);
+                if (match && match[1]) {
+                    msg = match[1];
+                    found = true;
+                    break;
+                }
+            }
+            break; 
+        }
+      }
+    } catch (e) {
+    }
+    
+    return msg;
+  };
+
   const getFileExtension = (name: string): string => {
     return name.split('.').pop()?.toLowerCase() || '';
   };
@@ -238,14 +280,15 @@ export default function SharedDocumentPage() {
       const data = await parseResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.detail || data.error || t('FailedRequestOtp'));
+        // Pass the entire data object to Error so extractErrorMessage can parse it
+        throw new Error(JSON.stringify(data));
       }
 
       setStep('otp_input');
       setStatus('idle');
     } catch (err: any) {
       console.error("OTP Request Error:", err);
-      setErrorMessage(err.message);
+      setErrorMessage(extractErrorMessage(err));
       setStatus('error');
     }
   };
@@ -267,7 +310,7 @@ export default function SharedDocumentPage() {
       const verifyData = await parseResponse(verifyResponse);
 
       if (!verifyResponse.ok) {
-        throw new Error(verifyData.detail || verifyData.error || t('FailedVerifyOtp'));
+        throw new Error(JSON.stringify(verifyData));
       }
 
       setDocumentData(verifyData.document);
@@ -279,7 +322,7 @@ export default function SharedDocumentPage() {
 
       if (!downloadResponse.ok) {
         const errorData = await parseResponse(downloadResponse);
-        throw new Error(errorData.detail || 'Failed to download document');
+        throw new Error(JSON.stringify(errorData));
       }
 
       // Get filename from Content-Disposition header
@@ -318,7 +361,7 @@ export default function SharedDocumentPage() {
 
     } catch (err: any) {
       console.error("OTP Verify/Download Error:", err);
-      setErrorMessage(err.message);
+      setErrorMessage(extractErrorMessage(err));
       setStatus('error');
     }
   };
@@ -565,7 +608,7 @@ export default function SharedDocumentPage() {
                 {/* Video Preview */}
                 {fileUrl && isVideo(fileType) && (
                   <video 
-                    src={fileUrl}
+                    src={fileUrl} 
                     controls
                     className="max-w-full max-h-[500px] mx-auto rounded shadow-lg"
                   >
@@ -626,6 +669,18 @@ export default function SharedDocumentPage() {
         // View: Auth / OTP Forms
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
+            
+            <div className="flex justify-center mb-6">
+              <img 
+                src="/icon.ico" 
+                alt="Logo" 
+                className="h-20 w-auto object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+
             <h2 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">
               {t('SecureDocAccess')}
             </h2>

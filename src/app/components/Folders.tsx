@@ -632,18 +632,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
           {contextMenu.item && (
             <>
-              {/* Share Button (Files only) - Context Menu */}
-              {contextMenu.item.type !== 'folder' && (
-                <button
-                  onClick={() => handleContextMenuAction('share')}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  {t('share') || 'Share'}
-                </button>
-              )}
+              <button
+                onClick={() => handleContextMenuAction('share')}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                {t('share') || 'Share'}
+              </button>
 
               <button
                 onClick={() => handleContextMenuAction('rename')}
@@ -694,7 +691,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         />
       )}
 
-      {/* Share Modal */}
       {isShareModalOpen && itemToShare && (
         <ShareModal
           isOpen={isShareModalOpen}
@@ -702,13 +698,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             setIsShareModalOpen(false);
             setItemToShare(null);
           }}
-          documentId={itemToShare.id}
+          documentId={itemToShare.type !== 'folder' ? itemToShare.id : undefined}
+          folderId={itemToShare.type === 'folder' ? itemToShare.id : undefined}
           documentName={itemToShare.name}
+          itemType={itemToShare.type === 'folder' ? 'folder' : 'file'}
           t={t}
         />
       )}
 
-      {/* Confirmation Modal for Deletion (Standard & Force) */}
       {confirmModalOpen && (
         <div 
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"

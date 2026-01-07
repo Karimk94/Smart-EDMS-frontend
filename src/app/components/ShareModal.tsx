@@ -4,15 +4,25 @@ import { useToast } from '../context/ToastContext';
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  documentId: string;
+  documentId?: string;
+  folderId?: string;
   documentName: string;
-  t: Function
+  itemType?: 'file' | 'folder';
+  t: Function;
 }
 
 type ShareMode = 'open' | 'restricted';
 const ALLOWED_DOMAIN = '@rta.ae';
 
-const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documentId, documentName, t }) => {
+const ShareModal: React.FC<ShareModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  documentId, 
+  folderId,
+  documentName, 
+  itemType = 'file',
+  t 
+}) => {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +61,17 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documentId, do
     setError(null);
     try {
       const payload: any = {
-        document_id: parseInt(documentId),
-        expiry_date: expiryDate ? new Date(expiryDate).toISOString() : null
+        expiry_date: expiryDate ? new Date(expiryDate).toISOString() : null,
+        share_type: itemType,
+        item_name: documentName
       };
+
+      // Set appropriate ID based on item type
+      if (itemType === 'folder') {
+        payload.folder_id = folderId;
+      } else {
+        payload.document_id = parseInt(documentId || '0');
+      }
 
       if (shareMode === 'restricted' && targetEmail.trim()) {
         payload.target_email = targetEmail.trim().toLowerCase();
@@ -100,15 +118,42 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documentId, do
     onClose();
   };
 
+  // Determine icon and colors based on item type
+  const isFolder = itemType === 'folder';
+  const iconBgColor = isFolder ? 'bg-yellow-100 dark:bg-yellow-900/20' : 'bg-blue-100 dark:bg-blue-900/20';
+  const iconColor = isFolder ? 'text-yellow-600 dark:text-yellow-400' : 'text-blue-600 dark:text-blue-400';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
-          {t('share') || 'Share'} "{documentName}"
-        </h2>
+        {/* Header with Icon */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`p-2 rounded-lg ${iconBgColor}`}>
+            {isFolder ? (
+              <svg className={`w-6 h-6 ${iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            ) : (
+              <svg className={`w-6 h-6 ${iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              {t('share') || 'Share'} {isFolder ? (t('folder') || 'Folder') : (t('file') || 'File')}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[280px]" title={documentName}>
+              {documentName}
+            </p>
+          </div>
+        </div>
         
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          {t('shareDescription')}
+          {isFolder 
+            ? (t('shareFolderDescription'))
+            : t('shareDescription')
+          }
         </p>
 
         {!generatedLink ? (
@@ -145,7 +190,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documentId, do
               </div>
             </div>
 
-            {/* NEW: Target Email Input (only for restricted mode) */}
+            {/* Target Email Input (only for restricted mode) */}
             {shareMode === 'restricted' && (
               <div className="mb-4">
                 <label htmlFor="target-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -182,6 +227,20 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documentId, do
               />
             </div>
 
+            {/* Folder share notice */}
+            {isFolder && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    {t('folderShareNotice')}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {error && (
               <p className="mb-4 text-sm text-red-500">{error}</p>
             )}
@@ -213,6 +272,29 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documentId, do
                 ? `${t('restrictedTo')} ${targetEmail}`
                 : (t('openAccessInfo') || `Any ${ALLOWED_DOMAIN} email can access this link`)
               }
+            </div>
+
+            {/* Share type indicator */}
+            <div className={`p-3 rounded-md text-sm flex items-center gap-2 ${
+              isFolder 
+                ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'
+                : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+            }`}>
+              {isFolder ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  {t('folderShareCreated')}
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {t('fileShareCreated')}
+                </>
+              )}
             </div>
 
             <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600 break-all text-sm text-gray-800 dark:text-gray-200">

@@ -67,6 +67,10 @@
   "of": "من",
   "aiDescription": "وصف الذكاء الاصطناعي",
   "backToFolders": "العودة إلى المجلدات",
+  "back": "عودة",
+  "SecureFolderAccess": "الوصول الآمن للمجلد",
+  "enterAccessCode": "أدخل رمز الوصول",
+  "sharedFolder": "المجلد المشترك",
   "folders": "المجلدات",
   "images": "الصور",
   "videos": "الفيديوهات",
@@ -190,5 +194,9 @@
   "restrictedTo" : "مقيد إلى",
   "openAccessInfo": "يمكن لأي بريد إلكتروني rta.ae الوصول إلى هذا الرابط",
   "anyRtaEmail": "أي بريد إلكتروني rta.ae",
-  "oneEmailOnly": "بريد إلكتروني واحد فقط"
+  "oneEmailOnly": "بريد إلكتروني واحد فقط",
+  "folderShareNotice" : "جميع الملفات والمجلدات الفرعية داخل هذا المجلد ستكون قابلة للوصول عبر الرابط المشترك.",
+  "shareFolderDescription": "شارك هذا المجلد وكل محتوياته مع الآخرين.",
+  "folderShareCreated" : "تم إنشاء رابط مشاركة المجلد. يمكن للمستلمين تصفح كل المحتويات.",
+  "fileShareCreated": "تم إنشاء رابط مشاركة الملف."
 }

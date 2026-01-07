@@ -22,6 +22,19 @@ interface ShareInfo {
   is_restricted: boolean;
   target_email_hint: string | null;
   expiry_date: string | null;
+  share_type: 'file' | 'folder';
+}
+
+interface FolderItem {
+  id: string;
+  name: string;
+  type: 'folder' | 'file';
+  media_type: string;
+}
+
+interface BreadcrumbItem {
+  id: string;
+  name: string;
 }
 
 export default function SharedDocumentPage() {
@@ -46,6 +59,15 @@ export default function SharedDocumentPage() {
   const [otp, setOtp] = useState('');
   const [documentData, setDocumentData] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Folder State (for folder shares)
+  const [folderContents, setFolderContents] = useState<FolderItem[]>([]);
+  const [rootFolderId, setRootFolderId] = useState<string | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolderName, setCurrentFolderName] = useState<string>('Shared Folder');
+  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
+  const [isLoadingFolder, setIsLoadingFolder] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<FolderItem | null>(null);
 
   // File URL for displaying/downloading the actual file
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -80,11 +102,11 @@ export default function SharedDocumentPage() {
           setShareInfo(data);
         } else {
           const errData = await response.json().catch(() => ({}));
-          setShareInfoError(errData.detail || t('linkExpired') || 'This link is invalid or has expired.');
+          setShareInfoError(errData.detail || t('linkExpired'));
         }
       } catch (err) {
         console.error('Error fetching share info:', err);
-        setShareInfoError(t('errorLoadingShare') || 'Error loading share information.');
+        setShareInfoError(t('errorLoadingShare'));
       } finally {
         setIsLoadingShareInfo(false);
       }
@@ -209,6 +231,19 @@ export default function SharedDocumentPage() {
            isText(mimeType, name);
   };
 
+  // Get media type from file extension for folder items
+  const getMediaTypeFromName = (name: string): string => {
+    const ext = getFileExtension(name);
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image';
+    if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
+    if (['pdf'].includes(ext)) return 'pdf';
+    if (['doc', 'docx'].includes(ext)) return 'document';
+    if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) return 'excel';
+    if (['ppt', 'pptx', 'pps', 'ppsx', 'odp'].includes(ext)) return 'powerpoint';
+    if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext)) return 'text';
+    return 'file';
+  };
+
   // Excel parsing function
   const parseExcelFile = async (blob: Blob) => {
     setIsLoadingExcel(true);
@@ -313,6 +348,139 @@ export default function SharedDocumentPage() {
     }
   };
 
+  // Fetch folder contents
+  const fetchFolderContents = async (folderId: string | null) => {
+    if (!folderId) return;
+    
+    setIsLoadingFolder(true);
+    try {
+      const params = new URLSearchParams({
+        viewer_email: email,
+        ...(folderId !== rootFolderId && { parent_id: folderId })
+      });
+      
+      const response = await fetch(`/api/share/folder-contents/${token}?${params.toString()}`);
+      
+      if (!response.ok) {
+        const errData = await parseResponse(response);
+        throw new Error(errData.detail || 'Failed to load folder contents');
+      }
+      
+      const data = await response.json();
+      
+      setFolderContents(data.contents || []);
+      setCurrentFolderName(data.folder_name || 'Shared Folder');
+      setBreadcrumbs(data.breadcrumbs || []);
+      setCurrentFolderId(data.folder_id);
+      
+      if (!rootFolderId) {
+        setRootFolderId(data.root_folder_id);
+      }
+    } catch (err: any) {
+      console.error('Error loading folder contents:', err);
+      showToast(extractErrorMessage(err), 'error');
+    } finally {
+      setIsLoadingFolder(false);
+    }
+  };
+
+  // Navigate to a folder
+  const navigateToFolder = (folder: FolderItem) => {
+    setCurrentFolderId(folder.id);
+    fetchFolderContents(folder.id);
+  };
+
+  // Handle breadcrumb click
+  const handleBreadcrumbClick = (item: BreadcrumbItem) => {
+    setCurrentFolderId(item.id);
+    fetchFolderContents(item.id);
+  };
+
+  // Go back to parent folder
+  const goBack = () => {
+    if (breadcrumbs.length > 1) {
+      const parentBreadcrumb = breadcrumbs[breadcrumbs.length - 2];
+      handleBreadcrumbClick(parentBreadcrumb);
+    }
+  };
+
+  // Open file from folder
+  const openFileFromFolder = async (file: FolderItem) => {
+    setSelectedFile(file);
+    setIsLoadingFolder(true);
+    
+    try {
+      const downloadResponse = await fetch(
+        `/api/share/download/${token}?viewer_email=${encodeURIComponent(email)}&doc_id=${file.id}`
+      );
+
+      if (!downloadResponse.ok) {
+        const errorData = await parseResponse(downloadResponse);
+        throw new Error(errorData.detail || 'Failed to download file');
+      }
+
+      // Get filename from Content-Disposition header
+      const contentDisposition = downloadResponse.headers.get('Content-Disposition');
+      let downloadFileName = file.name;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+        if (match && match[1]) {
+          downloadFileName = match[1];
+        }
+      }
+
+      // Get content type
+      const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
+
+      // Convert response to blob and create URL
+      const blob = await downloadResponse.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      setFileUrl(blobUrl);
+      setFileName(downloadFileName);
+      setFileType(contentType);
+
+      // Reset previous preview data
+      setExcelData([]);
+      setSheetNames([]);
+      setSlides([]);
+      setPptThumbnailUrl(null);
+      setPptParseError(null);
+
+      // Parse Excel files
+      if (isExcel(contentType, downloadFileName)) {
+        await parseExcelFile(blob);
+      }
+
+      // Parse PowerPoint files
+      if (isPowerPoint(contentType, downloadFileName)) {
+        await parsePowerPointFile(blob);
+      }
+
+    } catch (err: any) {
+      console.error('Error opening file:', err);
+      showToast(extractErrorMessage(err), 'error');
+      setSelectedFile(null);
+    } finally {
+      setIsLoadingFolder(false);
+    }
+  };
+
+  // Close file preview and go back to folder view
+  const closeFilePreview = () => {
+    if (fileUrl) {
+      URL.revokeObjectURL(fileUrl);
+    }
+    setSelectedFile(null);
+    setFileUrl(null);
+    setFileName('document');
+    setFileType('application/octet-stream');
+    setExcelData([]);
+    setSheetNames([]);
+    setSlides([]);
+    setPptThumbnailUrl(null);
+  };
+
   // Step 1: Request OTP
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,7 +497,6 @@ export default function SharedDocumentPage() {
       const data = await parseResponse(response);
 
       if (!response.ok) {
-        // Pass the entire data object to Error so extractErrorMessage can parse it
         throw new Error(JSON.stringify(data));
       }
 
@@ -342,7 +509,7 @@ export default function SharedDocumentPage() {
     }
   };
 
-  // Step 2: Verify OTP and Download Document
+  // Step 2: Verify OTP and Load Content
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
@@ -362,6 +529,20 @@ export default function SharedDocumentPage() {
         throw new Error(JSON.stringify(verifyData));
       }
 
+      // Check if this is a folder share
+      if (verifyData.share_type === 'folder') {
+        // Set folder ID and fetch contents
+        setRootFolderId(verifyData.folder_id);
+        setCurrentFolderId(verifyData.folder_id);
+        setStep('success');
+        setStatus('idle');
+        
+        // Fetch folder contents
+        await fetchFolderContents(verifyData.folder_id);
+        return;
+      }
+
+      // Handle file share (existing logic)
       setDocumentData(verifyData.document);
 
       // Now download the actual file
@@ -438,6 +619,65 @@ export default function SharedDocumentPage() {
       }
     };
   }, [fileUrl, pptThumbnailUrl]);
+
+  // Render file icon based on media type
+  const renderFileIcon = (item: FolderItem) => {
+    const mediaType = item.media_type || getMediaTypeFromName(item.name);
+    
+    if (item.type === 'folder') {
+      return (
+        <svg className="w-12 h-12 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+        </svg>
+      );
+    }
+
+    switch (mediaType) {
+      case 'image':
+        return (
+          <svg className="w-12 h-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        );
+      case 'video':
+        return (
+          <svg className="w-12 h-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        );
+      case 'pdf':
+        return (
+          <svg className="w-12 h-12 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 4h7v5h5v11H6V4z"/>
+            <path d="M8 12h8v1H8zm0 2h8v1H8zm0 2h5v1H8z"/>
+          </svg>
+        );
+      case 'excel':
+        return (
+          <svg className="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM13 4l5 5h-5V4zM8 17l2-3.5L8 10h1.5l1.5 2.5L12.5 10H14l-2 3.5 2 3.5h-1.5L11 14.5 9.5 17H8z"/>
+          </svg>
+        );
+      case 'powerpoint':
+        return (
+          <svg className="w-12 h-12 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM13 4l5 5h-5V4zM9 10h3.5a2.5 2.5 0 010 5H11v2H9v-7zm2 4h1.5a.5.5 0 000-1H11v1z"/>
+          </svg>
+        );
+      case 'text':
+        return (
+          <svg className="w-12 h-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        );
+    }
+  };
 
   // Render Excel Content
   const renderExcelContent = () => {
@@ -600,6 +840,208 @@ export default function SharedDocumentPage() {
     );
   };
 
+  // Render folder contents view
+  const renderFolderContents = () => {
+    // If a file is selected, show file preview
+    if (selectedFile && fileUrl) {
+      return (
+        <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          {/* File Header with Back Button */}
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-4">
+            <button
+              onClick={closeFilePreview}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={t('back')}
+            >
+              <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {selectedFile.name}
+              </h1>
+            </div>
+            <button 
+              onClick={handleDownload}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {t('Download')}
+            </button>
+          </div>
+
+          {/* File Preview */}
+          <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
+            <div className="w-full max-h-[600px] overflow-auto mb-6">
+              {isImage(fileType) && (
+                <img 
+                  src={fileUrl} 
+                  alt={fileName}
+                  className="max-w-full max-h-[500px] mx-auto rounded shadow-lg object-contain"
+                />
+              )}
+
+              {isPdf(fileType) && (
+                <iframe
+                  src={fileUrl}
+                  className="w-full h-[500px] rounded shadow-lg"
+                  title={fileName}
+                />
+              )}
+
+              {isVideo(fileType) && (
+                <video 
+                  src={fileUrl} 
+                  controls
+                  className="max-w-full max-h-[500px] mx-auto rounded shadow-lg"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              )}
+
+              {isExcel(fileType, fileName) && (
+                <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  {renderExcelContent()}
+                </div>
+              )}
+
+              {isPowerPoint(fileType, fileName) && (
+                <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  {renderPowerPointContent()}
+                </div>
+              )}
+
+              {isText(fileType, fileName) && (
+                <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  {renderTextContent()}
+                </div>
+              )}
+
+              {!isPreviewable(fileType, fileName) && (
+                <div className="text-center py-10">
+                  <div className="h-24 w-24 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto flex items-center justify-center mb-4">
+                    <span className="text-4xl">📄</span>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-400 mb-2">
+                    {t('PreviewNotAvailable')}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500">
+                    {fileName}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Show folder browser
+    return (
+      <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+        {/* Folder Header */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-2 mb-2 overflow-x-auto">
+            <svg className="w-5 h-5 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+            </svg>
+            {breadcrumbs.map((crumb, index) => (
+              <React.Fragment key={crumb.id}>
+                {index > 0 && <span className="text-gray-400">/</span>}
+                <button
+                  onClick={() => handleBreadcrumbClick(crumb)}
+                  className={`text-sm whitespace-nowrap hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
+                    index === breadcrumbs.length - 1
+                      ? 'font-bold text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  {crumb.name}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Folder name and back button */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {breadcrumbs.length > 1 && (
+                <button
+                  onClick={goBack}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  title={t('back') || 'Back'}
+                >
+                  <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              )}
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                {currentFolderName}
+              </h1>
+            </div>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {folderContents.length} {t('items') || 'items'}
+            </span>
+          </div>
+        </div>
+
+        {/* Folder Contents */}
+        <div className="p-6 min-h-[400px]">
+          {isLoadingFolder ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            </div>
+          ) : folderContents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+              <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              <p>{t('emptyFolder') || 'This folder is empty'}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {folderContents.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    if (item.type === 'folder') {
+                      navigateToFolder(item);
+                    } else {
+                      openFileFromFolder(item);
+                    }
+                  }}
+                  className="group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-gray-700 dark:hover:border-gray-600"
+                >
+                  <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200">
+                    {renderFileIcon(item)}
+                  </div>
+                  <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2">
+                    {item.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer with access info */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+          <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{t('VerifiedAccessFor')} <strong>{email}</strong></span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (isLoadingShareInfo) {
     return (
       <>
@@ -659,106 +1101,114 @@ export default function SharedDocumentPage() {
         </button>
       </div>
 
-      {step === 'success' && documentData ? (
-        // View: Document Success State
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center">
-          <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
-                {documentData.docname || documentData.title || fileName}
-              </h1>
-              <button 
-                onClick={handleDownload}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                {t('Download')}
-              </button>
-            </div>
-            
-            <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
-              {/* Document Preview */}
-              <div className="w-full max-h-[600px] overflow-auto mb-6">
-                {/* Image Preview */}
-                {fileUrl && isImage(fileType) && (
-                  <img 
-                    src={fileUrl} 
-                    alt={fileName}
-                    className="max-w-full max-h-[500px] mx-auto rounded shadow-lg object-contain"
-                  />
-                )}
-
-                {/* PDF Preview */}
-                {fileUrl && isPdf(fileType) && (
-                  <iframe
-                    src={fileUrl}
-                    className="w-full h-[500px] rounded shadow-lg"
-                    title={fileName}
-                  />
-                )}
-
-                {/* Video Preview */}
-                {fileUrl && isVideo(fileType) && (
-                  <video 
-                    src={fileUrl} 
-                    controls
-                    className="max-w-full max-h-[500px] mx-auto rounded shadow-lg"
-                  >
-                    Your browser does not support the video tag.
-                  </video>
-                )}
-
-                {/* Excel Preview */}
-                {fileUrl && isExcel(fileType, fileName) && (
-                  <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    {renderExcelContent()}
-                  </div>
-                )}
-
-                {/* PowerPoint Preview */}
-                {fileUrl && isPowerPoint(fileType, fileName) && (
-                  <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    {renderPowerPointContent()}
-                  </div>
-                )}
-
-                {/* Text Preview */}
-                {fileUrl && isText(fileType, fileName) && (
-                  <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    {renderTextContent()}
-                  </div>
-                )}
-
-                {/* Non-previewable files */}
-                {fileUrl && !isPreviewable(fileType, fileName) && (
-                  <div className="text-center py-10">
-                    <div className="h-24 w-24 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto flex items-center justify-center mb-4">
-                      <span className="text-4xl">📄</span>
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-400 mb-2">
-                      {t('PreviewNotAvailable')}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-500">
-                      {fileName}
-                    </p>
-                  </div>
-                )}
+      {step === 'success' ? (
+        // Determine if this is a folder share or file share
+        shareInfo?.share_type === 'folder' || rootFolderId ? (
+          // Folder Share View
+          <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center">
+            {renderFolderContents()}
+          </div>
+        ) : documentData ? (
+          // File Share View (existing behavior)
+          <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center">
+            <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                  {documentData.docname || documentData.title || fileName}
+                </h1>
+                <button 
+                  onClick={handleDownload}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  {t('Download')}
+                </button>
               </div>
+              
+              <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
+                {/* Document Preview */}
+                <div className="w-full max-h-[600px] overflow-auto mb-6">
+                  {/* Image Preview */}
+                  {fileUrl && isImage(fileType) && (
+                    <img 
+                      src={fileUrl} 
+                      alt={fileName}
+                      className="max-w-full max-h-[500px] mx-auto rounded shadow-lg object-contain"
+                    />
+                  )}
 
-              {/* Access Confirmation */}
-              <div className="border border-green-300 dark:border-green-600 rounded-lg p-4 bg-green-50 dark:bg-green-900/20 inline-block text-green-800 dark:text-green-200 text-center">
-                <svg className="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {t('VerifiedAccessFor')} <strong>{email}</strong>
-                <br/>
-                <span className="text-xs opacity-75">{t('AccessLoggedAt')} {new Date().toLocaleTimeString()}</span>
+                  {/* PDF Preview */}
+                  {fileUrl && isPdf(fileType) && (
+                    <iframe
+                      src={fileUrl}
+                      className="w-full h-[500px] rounded shadow-lg"
+                      title={fileName}
+                    />
+                  )}
+
+                  {/* Video Preview */}
+                  {fileUrl && isVideo(fileType) && (
+                    <video 
+                      src={fileUrl} 
+                      controls
+                      className="max-w-full max-h-[500px] mx-auto rounded shadow-lg"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+
+                  {/* Excel Preview */}
+                  {fileUrl && isExcel(fileType, fileName) && (
+                    <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      {renderExcelContent()}
+                    </div>
+                  )}
+
+                  {/* PowerPoint Preview */}
+                  {fileUrl && isPowerPoint(fileType, fileName) && (
+                    <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      {renderPowerPointContent()}
+                    </div>
+                  )}
+
+                  {/* Text Preview */}
+                  {fileUrl && isText(fileType, fileName) && (
+                    <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      {renderTextContent()}
+                    </div>
+                  )}
+
+                  {/* Non-previewable files */}
+                  {fileUrl && !isPreviewable(fileType, fileName) && (
+                    <div className="text-center py-10">
+                      <div className="h-24 w-24 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto flex items-center justify-center mb-4">
+                        <span className="text-4xl">📄</span>
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-400 mb-2">
+                        {t('PreviewNotAvailable')}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500">
+                        {fileName}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Access Confirmation */}
+                <div className="border border-green-300 dark:border-green-600 rounded-lg p-4 bg-green-50 dark:bg-green-900/20 inline-block text-green-800 dark:text-green-200 text-center">
+                  <svg className="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {t('VerifiedAccessFor')} <strong>{email}</strong>
+                  <br/>
+                  <span className="text-xs opacity-75">{t('AccessLoggedAt')} {new Date().toLocaleTimeString()}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : null
       ) : (
         // View: Auth / OTP Forms
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
@@ -776,8 +1226,23 @@ export default function SharedDocumentPage() {
             </div>
 
             <h2 className="text-2xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-              {t('SecureDocAccess')}
+              {shareInfo?.share_type === 'folder' 
+                ? (t('SecureFolderAccess'))
+                : t('SecureDocAccess')
+              }
             </h2>
+
+            {/* Share Type Indicator */}
+            {shareInfo?.share_type === 'folder' && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
+                <div className="flex items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                  </svg>
+                  <span className="font-medium text-sm">{t('sharedFolder')}</span>
+                </div>
+              </div>
+            )}
 
             {/* Restricted Access Notice */}
             {shareInfo?.is_restricted && (
@@ -787,11 +1252,11 @@ export default function SharedDocumentPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
-                    {t('restrictedLink') || 'Restricted Access'}
+                    {t('restrictedLink')}
                   </span>
                 </div>
                 <p className="text-sm text-orange-600 dark:text-orange-400">
-                  {t('restrictedLinkDesc') || 'This link can only be accessed by:'} <strong>{shareInfo.target_email_hint}</strong>
+                  {t('restrictedLinkDesc')} <strong>{shareInfo.target_email_hint}</strong>
                 </p>
               </div>
             )}
@@ -820,7 +1285,7 @@ export default function SharedDocumentPage() {
                     disabled={status === 'loading'}
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
+                      {t('rtaEmailOnly')}
                     </p>
                     <button 
                     type="submit"

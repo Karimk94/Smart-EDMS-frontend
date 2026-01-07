@@ -65,6 +65,10 @@
   "searchTags": "Search Tags",
   "LoadingTags": "Loading tags",
   "of": "of",
+  "back": "Back",
+  "SecureFolderAccess": "Secure Folder Access",
+  "enterAccessCode": "Enter Access Code",
+  "sharedFolder": "Shared Folder",
   "aiDescription": "AI Description",
   "backToFolders": "Back to Folders",
   "folders": "Folders",
@@ -190,6 +194,11 @@
   "restrictedTo" : "Restricted to",
   "openAccessInfo": "This link can be accessed by any @rta.ae email",
   "anyRtaEmail": "Any @rta.ae email",
-  "oneemailOnly": "Only one email allowed"
+  "oneemailOnly": "Only one email allowed",
+  "folderShareNotice" : "All files and subfolders within this folder will be accessible via the shared link.",
+  "oneEmailOnly": "Only one email allowed",
+  "shareFolderDescription": "Share this folder and all its contents with others.",
+  "folderShareCreated" : "Folder share link created. Recipients can browse all contents.",
+  "fileShareCreated": "File share link created."
 
 }

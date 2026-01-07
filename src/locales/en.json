@@ -199,6 +199,8 @@
   "oneEmailOnly": "Only one email allowed",
   "shareFolderDescription": "Share this folder and all its contents with others.",
   "folderShareCreated" : "Folder share link created. Recipients can browse all contents.",
-  "fileShareCreated": "File share link created."
+  "fileShareCreated": "File share link created.",
+  "restoringSession": "Restoring your session...",
+  "OtpSentAutomatically": "Verification code sent to your email"
 
 }

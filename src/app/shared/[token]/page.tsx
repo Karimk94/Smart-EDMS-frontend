@@ -12,6 +12,8 @@ import JSZip from 'jszip';
 
 registerLocale('en-GB', enGB);
 
+const SESSION_KEY_PREFIX = 'share_session_';
+
 interface SlideData {
   id: number;
   title: string;
@@ -20,6 +22,7 @@ interface SlideData {
 
 interface ShareInfo {
   is_restricted: boolean;
+  target_email: string | null;
   target_email_hint: string | null;
   expiry_date: string | null;
   share_type: 'file' | 'folder';
@@ -37,6 +40,13 @@ interface BreadcrumbItem {
   name: string;
 }
 
+interface StoredSession {
+  email: string;
+  verifiedAt: number;
+  shareType: 'file' | 'folder';
+  folderId?: string;
+}
+
 export default function SharedDocumentPage() {
   const params = useParams();
   const token = params.token as string;
@@ -50,6 +60,10 @@ export default function SharedDocumentPage() {
   const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
   const [isLoadingShareInfo, setIsLoadingShareInfo] = useState(true);
   const [shareInfoError, setShareInfoError] = useState<string | null>(null);
+
+  // Session Restoration State
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
+  const [autoOtpSent, setAutoOtpSent] = useState(false);
 
   // Flow State
   const [step, setStep] = useState<'email_input' | 'otp_input' | 'success'>('email_input');
@@ -92,29 +106,201 @@ export default function SharedDocumentPage() {
     setLang(prev => prev === 'en' ? 'ar' : 'en');
   };
 
-  useEffect(() => {
-    const fetchShareInfo = async () => {
-      setIsLoadingShareInfo(true);
-      try {
-        const response = await fetch(`/api/share/info/${token}`);
+  // Session Storage Helpers
+  const getSessionKey = () => `${SESSION_KEY_PREFIX}${token}`;
+
+  const saveSession = (email: string, shareType: 'file' | 'folder', folderId?: string) => {
+    const session: StoredSession = {
+      email,
+      verifiedAt: Date.now(),
+      shareType,
+      folderId
+    };
+    try {
+      localStorage.setItem(getSessionKey(), JSON.stringify(session));
+    } catch (e) {
+      console.warn('Could not save session to localStorage:', e);
+    }
+  };
+
+  const getStoredSession = (): StoredSession | null => {
+    try {
+      const stored = localStorage.getItem(getSessionKey());
+      if (stored) {
+        const session: StoredSession = JSON.parse(stored);
+        // Session valid for 24 hours
+        const sessionAge = Date.now() - session.verifiedAt;
+        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        if (sessionAge < maxAge) {
+          return session;
+        }
+        // Session expired, remove it
+        localStorage.removeItem(getSessionKey());
+      }
+    } catch (e) {
+      console.warn('Could not read session from localStorage:', e);
+    }
+    return null;
+  };
+
+  const clearSession = () => {
+    try {
+      localStorage.removeItem(getSessionKey());
+    } catch (e) {
+      console.warn('Could not clear session from localStorage:', e);
+    }
+  };
+
+  // Try to restore session and load content
+  const tryRestoreSession = async (session: StoredSession, shareInfoData: ShareInfo) => {
+    setEmail(session.email);
+    
+    try {
+      if (shareInfoData.share_type === 'folder') {
+        // For folder shares, try to load folder contents directly
+        const params = new URLSearchParams({ viewer_email: session.email });
+        const response = await fetch(`/api/share/folder-contents/${token}?${params.toString()}`);
+        
         if (response.ok) {
           const data = await response.json();
-          setShareInfo(data);
-        } else {
-          const errData = await response.json().catch(() => ({}));
-          setShareInfoError(errData.detail || t('linkExpired'));
+          setFolderContents(data.contents || []);
+          setCurrentFolderName(data.folder_name || 'Shared Folder');
+          setBreadcrumbs(data.breadcrumbs || []);
+          setCurrentFolderId(data.folder_id);
+          setRootFolderId(data.root_folder_id);
+          setStep('success');
+          return true;
         }
-      } catch (err) {
-        console.error('Error fetching share info:', err);
-        setShareInfoError(t('errorLoadingShare'));
-      } finally {
+      } else {
+        // For file shares, try to download the file
+        const downloadResponse = await fetch(
+          `/api/share/download/${token}?viewer_email=${encodeURIComponent(session.email)}`
+        );
+        
+        if (downloadResponse.ok) {
+          // Get filename from Content-Disposition header
+          const contentDisposition = downloadResponse.headers.get('Content-Disposition');
+          let downloadFileName = 'document';
+          if (contentDisposition) {
+            const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+            if (match && match[1]) {
+              downloadFileName = match[1];
+            }
+          }
+          
+          const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
+          const blob = await downloadResponse.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          
+          setFileUrl(blobUrl);
+          setFileName(downloadFileName);
+          setFileType(contentType);
+          
+          // Parse Excel/PowerPoint if needed
+          if (isExcel(contentType, downloadFileName)) {
+            await parseExcelFile(blob);
+          }
+          if (isPowerPoint(contentType, downloadFileName)) {
+            await parsePowerPointFile(blob);
+          }
+          
+          setStep('success');
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('Session restoration failed:', err);
+    }
+    
+    // Session invalid on server side, clear it
+    clearSession();
+    return false;
+  };
+
+  // Auto-send OTP for restricted shares
+  const autoSendOtp = async (targetEmail: string) => {
+    if (autoOtpSent) return; // Prevent duplicate sends
+    
+    setAutoOtpSent(true);
+    setEmail(targetEmail);
+    setStatus('loading');
+    setErrorMessage(null);
+    
+    try {
+      const response = await fetch(`/api/share/request-access/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viewer_email: targetEmail })
+      });
+      
+      const data = await parseResponse(response);
+      
+      if (!response.ok) {
+        throw new Error(JSON.stringify(data));
+      }
+      
+      setStep('otp_input');
+      setStatus('idle');
+      showToast(t('OtpSentAutomatically'), 'success');
+    } catch (err: any) {
+      console.error("Auto OTP Request Error:", err);
+      setErrorMessage(extractErrorMessage(err));
+      setStatus('error');
+      setStep('email_input');
+    }
+  };
+
+  // Main initialization effect
+  useEffect(() => {
+    const initialize = async () => {
+      if (!token) return;
+      
+      setIsLoadingShareInfo(true);
+      setIsRestoringSession(true);
+      
+      try {
+        // Step 1: Fetch share info
+        const response = await fetch(`/api/share/info/${token}`);
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          setShareInfoError(errData.detail || t('linkExpired') || 'This link is invalid or has expired.');
+          setIsLoadingShareInfo(false);
+          setIsRestoringSession(false);
+          return;
+        }
+        
+        const shareInfoData = await response.json();
+        setShareInfo(shareInfoData);
         setIsLoadingShareInfo(false);
+        
+        // Step 2: Check for existing session
+        const storedSession = getStoredSession();
+        if (storedSession) {
+          const restored = await tryRestoreSession(storedSession, shareInfoData);
+          if (restored) {
+            setIsRestoringSession(false);
+            return;
+          }
+        }
+        
+        // Step 3: If restricted share, auto-send OTP to the target email
+        if (shareInfoData.is_restricted && shareInfoData.target_email) {
+          setIsRestoringSession(false);
+          await autoSendOtp(shareInfoData.target_email);
+          return;
+        }
+        
+        setIsRestoringSession(false);
+        
+      } catch (err) {
+        console.error('Error during initialization:', err);
+        setShareInfoError(t('errorLoadingShare') || 'Error loading share information.');
+        setIsLoadingShareInfo(false);
+        setIsRestoringSession(false);
       }
     };
 
-    if (token) {
-      fetchShareInfo();
-    }
+    initialize();
   }, [token]);
 
   const parseResponse = async (response: Response) => {
@@ -531,6 +717,9 @@ export default function SharedDocumentPage() {
 
       // Check if this is a folder share
       if (verifyData.share_type === 'folder') {
+        // Save session for future visits
+        saveSession(email.trim().toLowerCase(), 'folder', verifyData.folder_id);
+        
         // Set folder ID and fetch contents
         setRootFolderId(verifyData.folder_id);
         setCurrentFolderId(verifyData.folder_id);
@@ -585,6 +774,9 @@ export default function SharedDocumentPage() {
       if (isPowerPoint(contentType, downloadFileName)) {
         await parsePowerPointFile(blob);
       }
+
+      // Save session for future visits
+      saveSession(email.trim().toLowerCase(), 'file');
 
       setStep('success');
       setStatus('idle');
@@ -851,7 +1043,7 @@ export default function SharedDocumentPage() {
             <button
               onClick={closeFilePreview}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              title={t('back')}
+              title={t('back') || 'Back'}
             >
               <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1042,14 +1234,18 @@ export default function SharedDocumentPage() {
     );
   };
 
-  if (isLoadingShareInfo) {
+  if (isLoadingShareInfo || isRestoringSession) {
     return (
       <>
         <HtmlLangUpdater lang={lang} />
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">{t('loading') || 'Loading...'}</p>
+            <p className="text-gray-600 dark:text-gray-400">
+              {isRestoringSession 
+                ? (t('restoringSession')) 
+                : (t('loading') || 'Loading...')}
+            </p>
           </div>
         </div>
       </>
@@ -1227,7 +1423,7 @@ export default function SharedDocumentPage() {
 
             <h2 className="text-2xl font-bold text-center mb-4 text-gray-900 dark:text-white">
               {shareInfo?.share_type === 'folder' 
-                ? (t('SecureFolderAccess'))
+                ? (t('SecureFolderAccess') || 'Secure Folder Access')
                 : t('SecureDocAccess')
               }
             </h2>
@@ -1239,7 +1435,7 @@ export default function SharedDocumentPage() {
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
                   </svg>
-                  <span className="font-medium text-sm">{t('sharedFolder')}</span>
+                  <span className="font-medium text-sm">{t('sharedFolder') || 'Shared Folder'}</span>
                 </div>
               </div>
             )}
@@ -1252,11 +1448,11 @@ export default function SharedDocumentPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
-                    {t('restrictedLink')}
+                    {t('restrictedLink') || 'Restricted Access'}
                   </span>
                 </div>
                 <p className="text-sm text-orange-600 dark:text-orange-400">
-                  {t('restrictedLinkDesc')} <strong>{shareInfo.target_email_hint}</strong>
+                  {t('restrictedLinkDesc') || 'This link can only be accessed by:'} <strong>{shareInfo.target_email_hint}</strong>
                 </p>
               </div>
             )}
@@ -1285,7 +1481,7 @@ export default function SharedDocumentPage() {
                     disabled={status === 'loading'}
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {t('rtaEmailOnly')}
+                      {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
                     </p>
                     <button 
                     type="submit"

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
@@ -18,6 +18,12 @@ interface SlideData {
   content: string[];
 }
 
+interface ShareInfo {
+  is_restricted: boolean;
+  target_email_hint: string | null;
+  expiry_date: string | null;
+}
+
 export default function SharedDocumentPage() {
   const params = useParams();
   const token = params.token as string;
@@ -26,6 +32,11 @@ export default function SharedDocumentPage() {
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const t = useTranslations(lang);
   const { showToast } = useToast();
+
+  // Share Info State
+  const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
+  const [isLoadingShareInfo, setIsLoadingShareInfo] = useState(true);
+  const [shareInfoError, setShareInfoError] = useState<string | null>(null);
 
   // Flow State
   const [step, setStep] = useState<'email_input' | 'otp_input' | 'success'>('email_input');
@@ -59,11 +70,34 @@ export default function SharedDocumentPage() {
     setLang(prev => prev === 'en' ? 'ar' : 'en');
   };
 
-  // Helper to safely parse JSON response
+  useEffect(() => {
+    const fetchShareInfo = async () => {
+      setIsLoadingShareInfo(true);
+      try {
+        const response = await fetch(`/api/share/info/${token}`);
+        if (response.ok) {
+          const data = await response.json();
+          setShareInfo(data);
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          setShareInfoError(errData.detail || t('linkExpired') || 'This link is invalid or has expired.');
+        }
+      } catch (err) {
+        console.error('Error fetching share info:', err);
+        setShareInfoError(t('errorLoadingShare') || 'Error loading share information.');
+      } finally {
+        setIsLoadingShareInfo(false);
+      }
+    };
+
+    if (token) {
+      fetchShareInfo();
+    }
+  }, [token]);
+
   const parseResponse = async (response: Response) => {
     const text = await response.text();
     try {
-      // Trim to avoid issues with BOM or whitespace preventing JSON parse
       return JSON.parse(text.trim());
     } catch (e) {
       if (!response.ok) {
@@ -83,10 +117,24 @@ export default function SharedDocumentPage() {
         try {
             const parsed = JSON.parse(msg);
             
+            if (parsed.detail && Array.isArray(parsed.detail) && parsed.detail.length > 0) {
+              const firstError = parsed.detail[0];
+              if (firstError.msg) {
+                msg = firstError.msg.replace(/^Value error,\s*/i, '');
+                break;
+              }
+            }
+            
             const extracted = parsed.detail || parsed.error || parsed.message;
             
             if (extracted) {
-                msg = typeof extracted === 'string' ? extracted : JSON.stringify(extracted);
+                if (typeof extracted === 'string') {
+                  msg = extracted;
+                } else if (Array.isArray(extracted) && extracted.length > 0 && extracted[0].msg) {
+                  msg = extracted[0].msg.replace(/^Value error,\s*/i, '');
+                } else {
+                  msg = JSON.stringify(extracted);
+                }
             } else {
                 break;
             }
@@ -94,14 +142,15 @@ export default function SharedDocumentPage() {
             const patterns = [
                 /"detail"\s*:\s*"([^"]*)"/,
                 /"error"\s*:\s*"([^"]*)"/,
-                /"message"\s*:\s*"([^"]*)"/
+                /"message"\s*:\s*"([^"]*)"/,
+                /"msg"\s*:\s*"([^"]*)"/
             ];
 
             let found = false;
             for (const pattern of patterns) {
                 const match = msg.match(pattern);
                 if (match && match[1]) {
-                    msg = match[1];
+                    msg = match[1].replace(/^Value error,\s*/i, '');
                     found = true;
                     break;
                 }
@@ -274,7 +323,7 @@ export default function SharedDocumentPage() {
       const response = await fetch(`/api/share/request-access/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewer_email: email })
+        body: JSON.stringify({ viewer_email: email.trim().toLowerCase() })
       });
 
       const data = await parseResponse(response);
@@ -304,7 +353,7 @@ export default function SharedDocumentPage() {
       const verifyResponse = await fetch(`/api/share/verify-access/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewer_email: email, otp: otp })
+        body: JSON.stringify({ viewer_email: email.trim().toLowerCase(), otp: otp })
       });
 
       const verifyData = await parseResponse(verifyResponse);
@@ -317,7 +366,7 @@ export default function SharedDocumentPage() {
 
       // Now download the actual file
       const downloadResponse = await fetch(
-        `/api/share/download/${token}?viewer_email=${encodeURIComponent(email)}`
+        `/api/share/download/${token}?viewer_email=${encodeURIComponent(email.trim().toLowerCase())}`
       );
 
       if (!downloadResponse.ok) {
@@ -551,6 +600,51 @@ export default function SharedDocumentPage() {
     );
   };
 
+  if (isLoadingShareInfo) {
+    return (
+      <>
+        <HtmlLangUpdater lang={lang} />
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">{t('loading') || 'Loading...'}</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (shareInfoError) {
+    return (
+      <>
+        <HtmlLangUpdater lang={lang} />
+        <div className="absolute top-4 right-4 z-50">
+          <button
+            onClick={toggleLanguage}
+            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded shadow hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium border border-gray-200 dark:border-gray-700"
+          >
+            {lang === 'en' ? 'عربي' : 'English'}
+          </button>
+        </div>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              {t('linkInvalid') || 'Link Invalid'}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              {shareInfoError}
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <HtmlLangUpdater lang={lang} />
@@ -681,9 +775,27 @@ export default function SharedDocumentPage() {
               />
             </div>
 
-            <h2 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">
+            <h2 className="text-2xl font-bold text-center mb-4 text-gray-900 dark:text-white">
               {t('SecureDocAccess')}
             </h2>
+
+            {/* Restricted Access Notice */}
+            {shareInfo?.is_restricted && (
+              <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
+                    {t('restrictedLink') || 'Restricted Access'}
+                  </span>
+                </div>
+                <p className="text-sm text-orange-600 dark:text-orange-400">
+                  {t('restrictedLinkDesc') || 'This link can only be accessed by:'} <strong>{shareInfo.target_email_hint}</strong>
+                </p>
+              </div>
+            )}
+
             <p className="text-center text-gray-600 dark:text-gray-300 mb-8">
               {step === 'otp_input' 
                 ? `${t('OtpSentMessage')} ${email}`
@@ -707,6 +819,9 @@ export default function SharedDocumentPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={status === 'loading'}
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
+                    </p>
                     <button 
                     type="submit"
                     className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"

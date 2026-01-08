@@ -146,14 +146,19 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Groups State
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
-  
+  const [groupsPage, setGroupsPage] = useState(1);
+  const [hasMoreGroups, setHasMoreGroups] = useState(true);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [groupSearch, setGroupSearch] = useState('');
+
+  // Members State
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
-  
   const [memberPage, setMemberPage] = useState(1);
   const [hasMoreMembers, setHasMoreMembers] = useState(true);
 
@@ -178,7 +183,6 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   useEffect(() => {
     if (isOpen && docId) {
       fetchTrustees();
-      fetchGroups();
     } else {
       setTrustees([]);
       setGroups([]);
@@ -188,8 +192,22 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       setMemberPage(1);
       setMemberSearch('');
       setHasMoreMembers(true);
+      setGroupsPage(1);
+      setGroupSearch('');
+      setHasMoreGroups(true);
     }
   }, [isOpen, docId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const delayDebounceFn = setTimeout(() => {
+        setGroupsPage(1);
+        fetchGroups(1, groupSearch);
+      }, 300);
+
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [isOpen, groupSearch]);
 
   useEffect(() => {
     if (selectedGroupId) {
@@ -221,18 +239,37 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     }
   };
 
-  const fetchGroups = async () => {
+  const fetchGroups = async (page: number, search: string) => {
+    setIsLoadingGroups(true);
     try {
-      const res = await fetch('/api/groups'); 
+      const res = await fetch(`/api/groups?page=${page}&search=${encodeURIComponent(search)}`);
       if (res.ok) {
         const data = await res.json();
-        setGroups(Array.isArray(data) ? data : []);
+        const newGroups = (data && Array.isArray(data.options)) ? data.options : [];
+        
+        setHasMoreGroups(data.hasMore || false);
+
+        if (page === 1) {
+          setGroups(newGroups);
+        } else {
+          setGroups(prev => [...prev, ...newGroups]);
+        }
       } else {
-        setGroups([]);
+        if (page === 1) setGroups([]);
       }
     } catch (err) {
       console.error('Failed to fetch groups', err);
-      setGroups([]);
+      if (page === 1) setGroups([]);
+    } finally {
+      setIsLoadingGroups(false);
+    }
+  };
+
+  const loadMoreGroups = () => {
+    if (hasMoreGroups && !isLoadingGroups) {
+      const nextPage = groupsPage + 1;
+      setGroupsPage(nextPage);
+      fetchGroups(nextPage, groupSearch);
     }
   };
 
@@ -246,6 +283,8 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
         
         if (newMembers.length === 0) {
            setHasMoreMembers(false);
+        } else {
+           setHasMoreMembers(data.hasMore);
         }
 
         if (page === 1) {
@@ -385,6 +424,10 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                       setMemberSearch('');
                     }}
                     placeholder={t('selectGroup') || "Select Group..."}
+                    onLoadMore={loadMoreGroups}
+                    isLoading={isLoadingGroups}
+                    onSearch={setGroupSearch}
+                    searchValue={groupSearch}
                 />
               </div>
 

@@ -25,7 +25,8 @@ const InfiniteSelect = ({
   isLoading, 
   disabled,
   onSearch,
-  searchValue
+  searchValue,
+  t
 }: {
   options: { label: string; value: string }[];
   value: string;
@@ -36,6 +37,7 @@ const InfiniteSelect = ({
   disabled?: boolean;
   onSearch?: (val: string) => void;
   searchValue?: string;
+  t: Function;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,7 +90,7 @@ const InfiniteSelect = ({
                 type="text"
                 value={searchValue || ''}
                 onChange={(e) => onSearch(e.target.value)}
-                placeholder="Search..."
+                placeholder={t('search')}
                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200"
                 onClick={(e) => e.stopPropagation()}
                 autoFocus
@@ -413,7 +415,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
             <div className="flex flex-col sm:flex-row gap-3">
               {/* Group Selector */}
               <div className="flex-1">
-                <InfiniteSelect 
+                <InfiniteSelect t={t}
                     options={groups.map((g: any) => ({
                         label: g.group_name || g.name,
                         value: g.group_id || g.id
@@ -450,6 +452,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                     disabled={!selectedGroupId}
                     onSearch={setMemberSearch}
                     searchValue={memberSearch}
+                    t={t}
                 />
               </div>
 

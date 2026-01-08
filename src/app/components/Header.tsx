@@ -16,6 +16,7 @@ interface HeaderProps {
   isEditor: boolean;
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
+  activeSection: 'recent' | 'favorites' | 'folders';
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   t,
   isSidebarOpen,
   toggleSidebar,
+  activeSection,
 }) => {
   const handleLanguageChange = async () => {
     const newLang = lang === 'en' ? 'ar' : 'en';
@@ -107,9 +109,11 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Center: Search Bar */}
         <div className="flex-1 flex justify-center px-4 items-center">
-          <div className="w-full max-w-md">
-            <SearchBar onSearch={onSearch} t={t} lang={lang} />
-          </div>
+          {activeSection !== 'folders' && (
+            <div className="w-full max-w-md">
+              <SearchBar onSearch={onSearch} t={t} lang={lang} />
+            </div>
+          )}
         </div>
 
         {/* Right Side: Actions */}
@@ -122,7 +126,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{t('processing')}</span>
             </div>
           )}
-          {isEditor && (
+          {isEditor && activeSection !== 'folders' && (
             <button
               onClick={onOpenUploadModal}
               className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition flex items-center gap-2"

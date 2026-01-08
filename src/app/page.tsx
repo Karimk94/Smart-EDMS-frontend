@@ -631,6 +631,7 @@ const fetchSectionData = useCallback(
           toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           theme={theme}
           onThemeChange={handleThemeChange}
+          activeSection={activeSection}
         />
 
         <div className={`flex flex-1 overflow-hidden ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>

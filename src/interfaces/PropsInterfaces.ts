@@ -297,3 +297,36 @@ export interface AnalysisViewProps {
     lang: 'en' | 'ar';
     theme: 'light' | 'dark';
 }
+
+export interface SlideData {
+  id: number;
+  title: string;
+  content: string[];
+}
+
+export interface ShareInfo {
+  is_restricted: boolean;
+  target_email: string | null;
+  target_email_hint: string | null;
+  expiry_date: string | null;
+  share_type: 'file' | 'folder';
+}
+
+export interface FolderItem {
+  id: string;
+  name: string;
+  type: 'folder' | 'file';
+  media_type: string;
+}
+
+export interface BreadcrumbItem {
+  id: string;
+  name: string;
+}
+
+export interface StoredSession {
+  email: string;
+  verifiedAt: number;
+  shareType: 'file' | 'folder';
+  folderId?: string;
+}

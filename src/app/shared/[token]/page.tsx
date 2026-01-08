@@ -1,51 +1,19 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import { enGB } from 'date-fns/locale/en-GB';
+import JSZip from 'jszip';
 import { useParams } from 'next/navigation';
+import React, { useEffect, useRef, useState } from 'react';
+import { registerLocale } from 'react-datepicker';
+import * as XLSX from 'xlsx';
+import { BreadcrumbItem, FolderItem, ShareInfo, SlideData, StoredSession } from '../../../interfaces';
+import HtmlLangUpdater from '../../components/HtmlLangUpdater';
 import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
-import { enGB } from 'date-fns/locale/en-GB';
-import { registerLocale } from 'react-datepicker';
-import HtmlLangUpdater from '../../components/HtmlLangUpdater';
-import * as XLSX from 'xlsx';
-import JSZip from 'jszip';
 
 registerLocale('en-GB', enGB);
 
 const SESSION_KEY_PREFIX = 'share_session_';
-
-interface SlideData {
-  id: number;
-  title: string;
-  content: string[];
-}
-
-interface ShareInfo {
-  is_restricted: boolean;
-  target_email: string | null;
-  target_email_hint: string | null;
-  expiry_date: string | null;
-  share_type: 'file' | 'folder';
-}
-
-interface FolderItem {
-  id: string;
-  name: string;
-  type: 'folder' | 'file';
-  media_type: string;
-}
-
-interface BreadcrumbItem {
-  id: string;
-  name: string;
-}
-
-interface StoredSession {
-  email: string;
-  verifiedAt: number;
-  shareType: 'file' | 'folder';
-  folderId?: string;
-}
 
 export default function SharedDocumentPage() {
   const params = useParams();
@@ -63,7 +31,9 @@ export default function SharedDocumentPage() {
 
   // Session Restoration State
   const [isRestoringSession, setIsRestoringSession] = useState(true);
-  const [autoOtpSent, setAutoOtpSent] = useState(false);
+  
+  // Use useRef instead of useState to prevent double-firing in Strict Mode
+  const autoOtpSentRef = useRef(false);
 
   // Flow State
   const [step, setStep] = useState<'email_input' | 'otp_input' | 'success'>('email_input');
@@ -130,7 +100,7 @@ export default function SharedDocumentPage() {
         const session: StoredSession = JSON.parse(stored);
         // Session valid for 24 hours
         const sessionAge = Date.now() - session.verifiedAt;
-        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        const maxAge = 24 * 60 * 60 * 1000;
         if (sessionAge < maxAge) {
           return session;
         }
@@ -212,16 +182,15 @@ export default function SharedDocumentPage() {
       console.warn('Session restoration failed:', err);
     }
     
-    // Session invalid on server side, clear it
     clearSession();
     return false;
   };
 
-  // Auto-send OTP for restricted shares
   const autoSendOtp = async (targetEmail: string) => {
-    if (autoOtpSent) return; // Prevent duplicate sends
+    if (autoOtpSentRef.current) return; 
     
-    setAutoOtpSent(true);
+    autoOtpSentRef.current = true;
+    
     setEmail(targetEmail);
     setStatus('loading');
     setErrorMessage(null);
@@ -244,6 +213,7 @@ export default function SharedDocumentPage() {
       showToast(t('OtpSentAutomatically'), 'success');
     } catch (err: any) {
       console.error("Auto OTP Request Error:", err);
+
       setErrorMessage(extractErrorMessage(err));
       setStatus('error');
       setStep('email_input');

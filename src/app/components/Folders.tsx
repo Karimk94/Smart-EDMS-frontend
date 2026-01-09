@@ -11,7 +11,7 @@ interface FolderItem {
   name: string;
   type: 'folder' | 'item' | 'file';
   node_type?: string;
-  media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder' | 'excel' | 'powerpoint';
+  media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder' | 'excel' | 'powerpoint' | 'word';
   is_standard?: boolean;
   count?: number;
   thumbnail_url?: string;
@@ -139,11 +139,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   };
 
   const getMediaType = (item: FolderItem) => {
-    if (item.media_type && item.media_type !== 'folder') return item.media_type;
+    // If backend already resolved it to a specific type, rely on it
+    if (item.media_type && item.media_type !== 'folder' && item.media_type !== 'file') {
+      // Normalize docx to word if needed
+      if (item.media_type === 'docx' as any) return 'word';
+      return item.media_type;
+    }
+
     const ext = item.name.split('.').pop()?.toLowerCase();
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '')) return 'image';
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '')) return 'video';
-    if (['pdf', 'doc', 'docx'].includes(ext || '')) return 'pdf';
+    if (['pdf'].includes(ext || '')) return 'pdf';
+    if (['doc', 'docx'].includes(ext || '')) return 'word';
     if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext || '')) return 'text';
     if (['xls', 'xlsx', 'ods', 'xlsm'].includes(ext || '')) return 'excel';
     if (['ppt', 'pptx', 'odp', 'pps', 'ppsx'].includes(ext || '')) return 'powerpoint';
@@ -172,6 +179,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         else if (detectedType === 'text') mediaType = 'text';
         else if (detectedType === 'excel') mediaType = 'excel';
         else if (detectedType === 'powerpoint') mediaType = 'powerpoint';
+        else if (detectedType === 'word') mediaType = 'word';
         else mediaType = 'file';
 
         const doc = new Document({
@@ -412,6 +420,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         altText = 'PowerPoint';
         invertClass = "";
       }
+      else if (type === 'word') {
+        iconSrc = '/file-word.svg';
+        altText = 'Word';
+        invertClass = "";
+      }
       else if (type === 'text' || type === 'file') {
         iconSrc = '/file-document.svg';
         altText = 'File';
@@ -437,6 +450,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (type === 'video') return 'text-red-500 dark:text-red-400';
     if (type === 'excel') return 'text-green-500 dark:text-green-400';
     if (type === 'powerpoint') return 'text-orange-500 dark:text-orange-400';
+    if (type === 'word') return 'text-blue-700 dark:text-blue-500'; // Darker blue for Word
     return 'text-yellow-500 dark:text-yellow-400';
   };
 

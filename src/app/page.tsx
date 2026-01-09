@@ -27,6 +27,7 @@ import { TagFilter } from './components/TagFilter';
 import { TxtModal } from './components/TxtModal';
 import { UploadModal } from './components/UploadModal';
 import { VideoModal } from './components/VideoModal';
+import { WordModal } from './components/WordModal';
 import { YearFilter } from './components/YearFilter';
 import { useToast } from './context/ToastContext';
 import { useTranslations } from './hooks/useTranslations';
@@ -76,6 +77,7 @@ export default function HomePage() {
   const [selectedTxt, setSelectedTxt] = useState<Document | null>(null);
   const [selectedExcel, setSelectedExcel] = useState<Document | null>(null);
   const [selectedPPT, setSelectedPPT] = useState<Document | null>(null);
+  const [selectedWord, setSelectedWord] = useState<Document | null>(null);
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isFolderUploadModalOpen, setIsFolderUploadModalOpen] = useState(false);
@@ -424,6 +426,8 @@ const fetchSectionData = useCallback(
         setSelectedExcel(doc);
     } else if (doc.media_type === 'powerpoint') {
         setSelectedPPT(doc);
+    } else if (doc.media_type === 'word') {
+        setSelectedWord(doc);
     } else {
         const ext = doc.docname.split('.').pop()?.toLowerCase();
         const textExtensions = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
@@ -459,6 +463,7 @@ const fetchSectionData = useCallback(
     setSelectedTxt(null);
     setSelectedExcel(null);
     setSelectedPPT(null);
+    setSelectedWord(null);
   };
 
   const handleAnalyze = (uploadedFiles: UploadableFile[]) => {
@@ -749,6 +754,20 @@ const fetchSectionData = useCallback(
             <PowerPointModal
                 doc={selectedPPT}
                 onClose={() => setSelectedPPT(null)}
+                apiURL={API_PROXY_URL}
+                onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
+                onToggleFavorite={handleToggleFavorite}
+                isEditor={user?.security_level === 'Editor'}
+                t={t}
+                lang={lang}
+                theme={theme}
+            />
+        )}
+
+        {selectedWord && (
+            <WordModal
+                doc={selectedWord}
+                onClose={() => setSelectedWord(null)}
                 apiURL={API_PROXY_URL}
                 onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
                 onToggleFavorite={handleToggleFavorite}

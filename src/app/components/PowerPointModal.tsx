@@ -6,23 +6,7 @@ import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import JSZip from 'jszip';
 
-interface PowerPointModalProps {
-  doc: Document;
-  onClose: () => void;
-  apiURL: string;
-  onUpdateAbstractSuccess: () => void;
-  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-  isEditor: boolean;
-  t: Function;
-  lang: 'en' | 'ar';
-  theme: 'light' | 'dark';
-}
-
-interface SlideData {
-  id: number;
-  title: string;
-  content: string[];
-}
+import { PowerPointModalProps, SlideData } from '../../interfaces/PropsInterfaces';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -61,7 +45,7 @@ const formatToApiDate = (date: Date | null): string | null => {
 
 export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
-  
+
   // Content State
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -102,65 +86,65 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
       try {
         const response = await fetch(`${apiURL}/document/${doc.doc_id}`);
         if (!response.ok) throw new Error("Failed to fetch document content");
-        
+
         const arrayBuffer = await response.arrayBuffer();
         const zip = await JSZip.loadAsync(arrayBuffer);
-        
+
         // 1. Try to find a thumbnail
         // PowerPoint often stores a preview in docProps/thumbnail.jpeg
         const thumbFile = zip.file("docProps/thumbnail.jpeg");
         if (thumbFile) {
-            const thumbBlob = await thumbFile.async("blob");
-            const thumbUrl = URL.createObjectURL(thumbBlob);
-            setThumbnailUrl(thumbUrl);
+          const thumbBlob = await thumbFile.async("blob");
+          const thumbUrl = URL.createObjectURL(thumbBlob);
+          setThumbnailUrl(thumbUrl);
         }
 
         // 2. Extract Slides Text
-        const slideFiles = Object.keys(zip.files).filter(fileName => 
-            fileName.startsWith("ppt/slides/slide") && fileName.endsWith(".xml")
+        const slideFiles = Object.keys(zip.files).filter(fileName =>
+          fileName.startsWith("ppt/slides/slide") && fileName.endsWith(".xml")
         );
 
         // Sort slides naturally (slide1, slide2, slide10...)
         slideFiles.sort((a, b) => {
-            const numA = parseInt(a.replace(/\D/g, ''));
-            const numB = parseInt(b.replace(/\D/g, ''));
-            return numA - numB;
+          const numA = parseInt(a.replace(/\D/g, ''));
+          const numB = parseInt(b.replace(/\D/g, ''));
+          return numA - numB;
         });
 
         const extractedSlides: SlideData[] = [];
 
         for (let i = 0; i < slideFiles.length; i++) {
-            const fileName = slideFiles[i];
-            const xmlString = await zip.file(fileName)?.async("string");
-            
-            if (xmlString) {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-                
-                // Extract text from <a:t> tags (PowerPoint text runs)
-                const textNodes = xmlDoc.getElementsByTagName("a:t");
-                const slideContent: string[] = [];
-                
-                for (let j = 0; j < textNodes.length; j++) {
-                    const text = textNodes[j].textContent;
-                    if (text && text.trim().length > 0) {
-                        slideContent.push(text);
-                    }
-                }
+          const fileName = slideFiles[i];
+          const xmlString = await zip.file(fileName)?.async("string");
 
-                if (slideContent.length > 0) {
-                    extractedSlides.push({
-                        id: i + 1,
-                        title: `Slide ${i + 1}`,
-                        content: slideContent
-                    });
-                }
+          if (xmlString) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+
+            // Extract text from <a:t> tags (PowerPoint text runs)
+            const textNodes = xmlDoc.getElementsByTagName("a:t");
+            const slideContent: string[] = [];
+
+            for (let j = 0; j < textNodes.length; j++) {
+              const text = textNodes[j].textContent;
+              if (text && text.trim().length > 0) {
+                slideContent.push(text);
+              }
             }
+
+            if (slideContent.length > 0) {
+              extractedSlides.push({
+                id: i + 1,
+                title: `Slide ${i + 1}`,
+                content: slideContent
+              });
+            }
+          }
         }
-        
+
         setSlides(extractedSlides);
         if (extractedSlides.length === 0) {
-            setParseError("No text content found in presentation.");
+          setParseError("No text content found in presentation.");
         }
 
       } catch (error) {
@@ -174,7 +158,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
     fetchPPTX();
 
     return () => {
-        if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
+      if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
     };
 
   }, [doc.title, doc.date, doc.docname, doc.doc_id, apiURL]);
@@ -253,7 +237,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
       setIsEditingAbstract(false);
       onUpdateAbstractSuccess();
     } catch (err: any) {
-        console.error("Error updating metadata", err);
+      console.error("Error updating metadata", err);
     }
   };
 
@@ -330,71 +314,71 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
             </button>
 
             <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2 ${closeButtonColor}`}>
-                <span className="text-3xl leading-none">&times;</span>
+              <span className="text-3xl leading-none">&times;</span>
             </button>
           </div>
         </div>
 
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
-          
+
           {/* Main Viewer (PowerPoint Text) */}
           <div className={`md:col-span-2 col-span-1 h-full bg-white dark:bg-[#1a1a1a] rounded-lg flex flex-col relative overflow-hidden border border-gray-200 dark:border-gray-700`}>
-             
-             {isLoadingContent ? (
-                 <div className="flex flex-col items-center justify-center h-full">
-                    <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                    <span className="text-gray-500">Parsing presentation...</span>
-                 </div>
-             ) : (
-                 <div className="flex flex-col h-full">
-                    {/* Header with thumbnail if available */}
-                    <div className="bg-orange-50 dark:bg-orange-900/10 p-4 border-b border-orange-100 dark:border-orange-900/30 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                             <div className="p-2 bg-white dark:bg-[#252525] rounded-lg shadow-sm">
-                                <img src="/file-document.svg" className="w-6 h-6" style={{ filter: 'invert(52%) sepia(87%) saturate(2336%) hue-rotate(349deg) brightness(98%) contrast(96%)' }} alt="" />
-                             </div>
-                             <div>
-                                <h3 className="font-bold text-gray-800 dark:text-gray-200">Presentation Content</h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{slides.length} slides detected</p>
-                             </div>
-                        </div>
-                        {thumbnailUrl && (
-                            <div className="h-16 w-24 bg-gray-200 rounded overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
-                                <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Slides Scroll Area */}
-                    <div className="flex-grow overflow-y-auto p-6 space-y-8 bg-gray-50 dark:bg-[#121212]">
-                        {parseError ? (
-                             <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                                <p className="text-gray-500 mb-4">{parseError}</p>
-                                <button onClick={handleDownload} className="text-blue-600 hover:underline text-sm">Download File to View</button>
-                             </div>
-                        ) : (
-                            slides.map((slide) => (
-                                <div key={slide.id} className="bg-white dark:bg-[#1e1e1e] p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
-                                        <h4 className="font-bold text-lg text-orange-600 dark:text-orange-400">Slide {slide.id}</h4>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {slide.content.map((text, idx) => (
-                                            <p key={idx} className="text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
-                                                {text}
-                                            </p>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                        {slides.length === 0 && !parseError && (
-                             <div className="text-center text-gray-400 py-10">Empty Presentation</div>
-                        )}
+            {isLoadingContent ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <span className="text-gray-500">Parsing presentation...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col h-full">
+                {/* Header with thumbnail if available */}
+                <div className="bg-orange-50 dark:bg-orange-900/10 p-4 border-b border-orange-100 dark:border-orange-900/30 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white dark:bg-[#252525] rounded-lg shadow-sm">
+                      <img src="/file-document.svg" className="w-6 h-6" style={{ filter: 'invert(52%) sepia(87%) saturate(2336%) hue-rotate(349deg) brightness(98%) contrast(96%)' }} alt="" />
                     </div>
-                 </div>
-             )}
+                    <div>
+                      <h3 className="font-bold text-gray-800 dark:text-gray-200">Presentation Content</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{slides.length} slides detected</p>
+                    </div>
+                  </div>
+                  {thumbnailUrl && (
+                    <div className="h-16 w-24 bg-gray-200 rounded overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
+                      <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Slides Scroll Area */}
+                <div className="flex-grow overflow-y-auto p-6 space-y-8 bg-gray-50 dark:bg-[#121212]">
+                  {parseError ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                      <p className="text-gray-500 mb-4">{parseError}</p>
+                      <button onClick={handleDownload} className="text-blue-600 hover:underline text-sm">Download File to View</button>
+                    </div>
+                  ) : (
+                    slides.map((slide) => (
+                      <div key={slide.id} className="bg-white dark:bg-[#1e1e1e] p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                        <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
+                          <h4 className="font-bold text-lg text-orange-600 dark:text-orange-400">Slide {slide.id}</h4>
+                        </div>
+                        <div className="space-y-3">
+                          {slide.content.map((text, idx) => (
+                            <p key={idx} className="text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
+                              {text}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {slides.length === 0 && !parseError && (
+                    <div className="text-center text-gray-400 py-10">Empty Presentation</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Details Panel */}
@@ -460,13 +444,13 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
                 </p>
               )}
             </div>
-            
+
             <CollapsibleSection title={t('tags')} theme={theme}>
-                {isEditor ? (
+              {isEditor ? (
                 <TagEditor docId={doc.doc_id} apiURL={apiURL} lang={lang} theme={theme} t={t} />
-                ) : (
+              ) : (
                 <ReadOnlyTagDisplay docId={doc.doc_id} apiURL={apiURL} lang={lang} t={t} />
-                )}
+              )}
             </CollapsibleSection>
           </div>
         </div>

@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-interface ReadOnlyTagDisplayProps {
-  docId: number;
-  apiURL: string;
-  lang: 'en' | 'ar';
-  t: Function
-}
-
-interface TagObject {
-  text: string;
-  shortlisted: number;
-  type: 'keyword' | 'person';
-}
+import { ReadOnlyTagDisplayProps } from '../../interfaces/PropsInterfaces';
+import { TagObject } from '../../interfaces/TagObject';
 
 export const ReadOnlyTagDisplay: React.FC<ReadOnlyTagDisplayProps> = ({ docId, apiURL, lang, t }) => {
   const [tags, setTags] = useState<TagObject[]>([]);

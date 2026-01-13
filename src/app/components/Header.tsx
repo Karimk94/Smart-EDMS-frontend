@@ -1,23 +1,7 @@
 import React from 'react';
 import { SearchBar } from './SearchBar';
 
-interface HeaderProps {
-  onSearch: (searchTerm: string) => void;
-  onClearCache: () => void;
-  lang: 'en' | 'ar';
-  setLang: (lang: 'en' | 'ar') => void;
-  theme: 'light' | 'dark';
-  onThemeChange: (theme: 'light' | 'dark') => void;
-  t: Function;
-  apiURL: string;
-  onOpenUploadModal: () => void;
-  isProcessing: boolean;
-  onLogout: () => void;
-  isEditor: boolean;
-  isSidebarOpen: boolean;
-  toggleSidebar: () => void;
-  activeSection: 'recent' | 'favorites' | 'folders';
-}
+import { HeaderProps } from '../../interfaces/PropsInterfaces';
 
 export const Header: React.FC<HeaderProps> = ({
   onSearch,

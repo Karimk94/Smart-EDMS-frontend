@@ -2,16 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
 
-interface DocumentItemProps {
-  doc: Document;
-  onDocumentClick: (doc: Document) => void;
-  apiURL: string;
-  onTagSelect: (tag: string) => void;
-  isProcessing: boolean;
-  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-  lang: 'en' | 'ar';
-  t: Function;
-}
+import { DocumentItemProps } from '../../interfaces/PropsInterfaces';
 
 export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, onToggleFavorite, lang, t }) => {
   const [isPopupVisible, setIsPopupVisible] = useState(false);

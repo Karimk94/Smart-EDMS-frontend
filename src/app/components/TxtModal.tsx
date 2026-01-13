@@ -5,17 +5,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 
-interface TxtModalProps {
-  doc: Document;
-  onClose: () => void;
-  apiURL: string;
-  onUpdateAbstractSuccess: () => void;
-  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-  isEditor: boolean;
-  t: Function;
-  lang: 'en' | 'ar';
-  theme: 'light' | 'dark';
-}
+import { TxtModalProps } from '../../interfaces/PropsInterfaces';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -84,16 +74,16 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
 
     setLoadingContent(true);
     fetch(`${apiURL}/document/${doc.doc_id}`)
-        .then(res => {
-            if (res.ok) return res.text();
-            throw new Error("Failed to load text content");
-        })
-        .then(text => setTextContent(text))
-        .catch(err => {
-            console.error(err);
-            setTextContent("Error loading content preview.");
-        })
-        .finally(() => setLoadingContent(false));
+      .then(res => {
+        if (res.ok) return res.text();
+        throw new Error("Failed to load text content");
+      })
+      .then(text => setTextContent(text))
+      .catch(err => {
+        console.error(err);
+        setTextContent("Error loading content preview.");
+      })
+      .finally(() => setLoadingContent(false));
 
   }, [doc.title, doc.date, doc.doc_id, apiURL]);
 
@@ -175,7 +165,7 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
       setIsEditingAbstract(false);
       onUpdateAbstractSuccess();
     } catch (err: any) {
-        console.error("Error updating metadata", err);
+      console.error("Error updating metadata", err);
     }
   };
 
@@ -253,7 +243,7 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
             </button>
 
             <button onClick={handleFullScreen} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Full Screen">
-            <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
+              <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
             </button>
 
             <button
@@ -267,37 +257,37 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
             </button>
 
             <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2 ${closeButtonColor}`}>
-                <span className="text-3xl leading-none">&times;</span>
+              <span className="text-3xl leading-none">&times;</span>
             </button>
           </div>
         </div>
 
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
-          
+
           {/* Main Viewer (Text) */}
           <div className={`${isFullScreen ? 'fixed inset-0 z-[60]' : (isDetailsVisible ? 'md:col-span-2' : 'col-span-1')} h-full bg-gray-100 dark:bg-[#1a1a1a] rounded-lg flex flex-col items-center justify-center relative overflow-hidden`}>
             {loadingContent ? (
-                 <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mb-3"></div>
-                    <span className="text-gray-500">Loading content...</span>
-                 </div>
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mb-3"></div>
+                <span className="text-gray-500">Loading content...</span>
+              </div>
             ) : (
-                <div className="w-full h-full p-6 overflow-auto">
-                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 dark:text-gray-200">
-                        {textContent || "No content."}
-                    </pre>
-                    {isFullScreen && (
-                    <button
-                        onClick={handleFullScreen}
-                        className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                    )}
-                </div>
+              <div className="w-full h-full p-6 overflow-auto">
+                <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 dark:text-gray-200">
+                  {textContent || "No content."}
+                </pre>
+                {isFullScreen && (
+                  <button
+                    onClick={handleFullScreen}
+                    className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -364,13 +354,13 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
                 </p>
               )}
             </div>
-            
+
             <CollapsibleSection title={t('tags')} theme={theme}>
-                {isEditor ? (
+              {isEditor ? (
                 <TagEditor docId={doc.doc_id} apiURL={apiURL} lang={lang} theme={theme} t={t} />
-                ) : (
+              ) : (
                 <ReadOnlyTagDisplay docId={doc.doc_id} apiURL={apiURL} lang={lang} t={t} />
-                )}
+              )}
             </CollapsibleSection>
           </div>
         </div>

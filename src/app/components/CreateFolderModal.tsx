@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
 
-interface CreateFolderModalProps {
-  onClose: () => void;
-  apiURL: string;
-  onFolderCreated: () => void;
-  t: Function;
-  initialParentId?: string; 
-}
+import { CreateFolderModalProps } from '../../interfaces/PropsInterfaces';
 
 export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, apiURL, onFolderCreated, t, initialParentId = '' }) => {
   const [folderName, setFolderName] = useState('');
   const [description, setDescription] = useState('');
-  const parentId = initialParentId; 
+  const parentId = initialParentId;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showToast } = useToast();
 
@@ -39,7 +33,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
         body: JSON.stringify({
           name: folderName,
           description: description,
-          parent_id: parentId.trim() || null, 
+          parent_id: parentId.trim() || null,
         }),
       });
 

@@ -1,13 +1,10 @@
-import { ExcelModalProps } from '@/interfaces/PropsInterfaces';
+import { WordModalProps } from '@/interfaces/PropsInterfaces';
 import { renderAsync } from 'docx-preview';
 import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
-
-// Reuse the props interface since the structure is identical
-type WordModalProps = ExcelModalProps;
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -46,7 +43,7 @@ const formatToApiDate = (date: Date | null): string | null => {
 
 export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
-  
+
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [documentDate, setDocumentDate] = useState<Date | null>(safeParseDate(doc.date));
   const [initialDate, setInitialDate] = useState<Date | null>(safeParseDate(doc.date));
@@ -82,27 +79,27 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
 
     const loadDoc = async () => {
       if (!containerRef.current) return;
-      
+
       setIsLoadingContent(true);
       setLoadError(null);
       try {
         const response = await fetch(`${apiURL}/document/${doc.doc_id}`);
         if (!response.ok) throw new Error("Failed to fetch document content");
-        
+
         const blob = await response.blob();
-        
+
         if (isMounted && containerRef.current) {
-            // Clear previous content
-            containerRef.current.innerHTML = '';
-            
-            await renderAsync(blob, containerRef.current, containerRef.current, {
-                className: "docx_viewer",
-                inWrapper: true,
-                ignoreWidth: false,
-                ignoreHeight: false,
-                breakPages: true,
-                useBase64URL: true,
-            });
+          // Clear previous content
+          containerRef.current.innerHTML = '';
+
+          await renderAsync(blob, containerRef.current, containerRef.current, {
+            className: "docx_viewer",
+            inWrapper: true,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            breakPages: true,
+            useBase64URL: true,
+          });
         }
       } catch (err: any) {
         console.error("Error loading Word doc:", err);
@@ -191,7 +188,7 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
       setIsEditingAbstract(false);
       onUpdateAbstractSuccess();
     } catch (err: any) {
-        console.error("Error updating metadata", err);
+      console.error("Error updating metadata", err);
     }
   };
 
@@ -268,32 +265,32 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
             </button>
 
             <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2 ${closeButtonColor}`}>
-                <span className="text-3xl leading-none">&times;</span>
+              <span className="text-3xl leading-none">&times;</span>
             </button>
           </div>
         </div>
 
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
-          
+
           {/* Main Viewer (DOCX Preview) */}
           <div className={`md:col-span-2 col-span-1 h-full bg-gray-100 dark:bg-[#1a1a1a] rounded-lg flex flex-col relative overflow-hidden border border-gray-200 dark:border-gray-700`}>
-             <div className="w-full h-full overflow-y-auto custom-scrollbar p-4 bg-white text-black" ref={containerRef}>
-                {/* Content injected by docx-preview here */}
-             </div>
-             
-             {isLoadingContent && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
-                    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                    <span className="text-gray-500 dark:text-gray-400">Loading document...</span>
-                </div>
-             )}
+            <div className="w-full h-full overflow-y-auto custom-scrollbar p-4 bg-white text-black" ref={containerRef}>
+              {/* Content injected by docx-preview here */}
+            </div>
 
-             {loadError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-red-500">
-                    {loadError}
-                </div>
-             )}
+            {isLoadingContent && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
+                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <span className="text-gray-500 dark:text-gray-400">Loading document...</span>
+              </div>
+            )}
+
+            {loadError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-red-500">
+                {loadError}
+              </div>
+            )}
           </div>
 
           {/* Details Panel */}
@@ -359,13 +356,13 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
                 </p>
               )}
             </div>
-            
+
             <CollapsibleSection title={t('tags')} theme={theme}>
-                {isEditor ? (
+              {isEditor ? (
                 <TagEditor docId={doc.doc_id} apiURL={apiURL} lang={lang} theme={theme} t={t} />
-                ) : (
+              ) : (
                 <ReadOnlyTagDisplay docId={doc.doc_id} apiURL={apiURL} lang={lang} t={t} />
-                )}
+              )}
             </CollapsibleSection>
           </div>
         </div>

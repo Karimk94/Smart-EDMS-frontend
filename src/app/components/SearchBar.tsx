@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 
-interface SearchBarProps {
-  onSearch: (searchTerm: string) => void;
-  t: Function;
-  lang: 'en' | 'ar';
-}
+import { SearchBarProps } from '../../interfaces/PropsInterfaces';
 
 export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, t, lang }) => {
   const [input, setInput] = useState('');
 
   const handleSearch = () => onSearch(input.trim());
-  
+
   const handleKeyUp = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSearch();
   };

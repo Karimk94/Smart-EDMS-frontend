@@ -2,9 +2,7 @@
 
 import { useEffect } from 'react';
 
-interface HtmlLangUpdaterProps {
-  lang: 'en' | 'ar';
-}
+import { HtmlLangUpdaterProps } from '../../interfaces/PropsInterfaces';
 
 const HtmlLangUpdater: React.FC<HtmlLangUpdaterProps> = ({ lang }) => {
   useEffect(() => {

@@ -58,13 +58,7 @@ const removeExtension = (filename: string) => {
   return filename.replace(/\.[^/.]+$/, "");
 };
 
-export interface UploadModalProps {
-  onClose: () => void;
-  apiURL: string;
-  onAnalyze: (uploadedFiles: UploadableFile[]) => void;
-  theme: 'light' | 'dark';
-  t: Function
-}
+import { UploadModalProps } from '../../interfaces/PropsInterfaces';
 
 export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme, t }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);

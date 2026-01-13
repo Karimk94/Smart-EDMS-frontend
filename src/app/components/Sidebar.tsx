@@ -2,14 +2,7 @@
 
 import React from 'react';
 
-interface SidebarProps {
-  isSidebarOpen: boolean;
-  activeSection: 'recent' | 'favorites' | 'folders';
-  handleSectionChange: (section: 'recent' | 'favorites' | 'folders') => void;
-  isShowingFullMemories: boolean;
-  t: Function;
-  lang: 'en' | 'ar';
-}
+import { SidebarProps } from '../../interfaces/PropsInterfaces';
 
 const NavLink: React.FC<{
   icon: string;

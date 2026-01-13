@@ -2,15 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PersonSelector } from './PersonSelector';
 import { useToast } from '../context/ToastContext';
 
-interface AnalysisViewProps {
-  result: any;
-  docId: number;
-  apiURL: string;
-  onUpdateAbstractSuccess: () => void;
-  lang: 'en' | 'ar';
-  theme: 'light' | 'dark';
-  t: Function;
-}
+import { AnalysisViewProps } from '../../interfaces/PropsInterfaces';
 
 export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiURL, onUpdateAbstractSuccess, lang, theme, t }) => {
   const [faceNames, setFaceNames] = useState<{ [key: number]: string }>({});
@@ -75,14 +67,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
       setSavingFaceIndex(null);
     }
   };
-  
+
   const confirmedNames = Object.entries(faceNames).filter(([_, name]) => name && name.trim() !== '');
 
   const handleUpdateAbstractClick = () => {
     const namesToSave = confirmedNames.map(([_, name]) => name.trim());
     if (namesToSave.length === 0) {
-        showToast(t('noConfirmedNames'), 'warning');
-        return;
+      showToast(t('noConfirmedNames'), 'warning');
+      return;
     }
     setIsConfirmOpen(true);
   };
@@ -90,7 +82,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
   const confirmUpdateAbstract = async () => {
     setIsConfirmOpen(false);
     const namesToSave = confirmedNames.map(([_, name]) => name.trim());
-    
+
     setIsUpdating(true);
     try {
       const response = await fetch(`${apiURL}/update_abstract`, {
@@ -99,7 +91,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
         body: JSON.stringify({ doc_id: docId, names: namesToSave }),
       });
       if (!response.ok) throw new Error((await response.json()).error);
-      
+
       showToast(t('titleUpdatedSuccessfully'), 'success');
       onUpdateAbstractSuccess();
     } catch (err: any) {
@@ -118,7 +110,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
   return (
     <div className="space-y-6 p-4 overflow-y-auto h-full relative">
       <img src={`data:image/jpeg;base64,${result.processed_image}`} alt="Processed" className="rounded-lg mx-auto max-w-full" />
-      
+
       <div className="space-y-4">
         <h3 className={`font-bold text-lg ${headerColor}`}>Detected Faces</h3>
         {result.faces?.length > 0 ? (
@@ -135,7 +127,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
                   )}
                   <label className={`font-semibold ${subTextColor}`}>Face #{face.index}</label>
                 </div>
-                
+
                 <PersonSelector
                   apiURL={apiURL}
                   value={faceNames[face.index] || ''}
@@ -144,7 +136,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
                   theme={theme}
                 />
 
-                <button 
+                <button
                   onClick={() => handleSaveFace(face)}
                   disabled={savingFaceIndex === face.index}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 transition disabled:bg-blue-800 flex items-center justify-center w-24"
@@ -176,7 +168,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
             {confirmedNames.map(([index, name]) => (
               <span key={index} className="flex items-center px-3 py-1 bg-green-600 text-white text-sm font-medium rounded-full">
                 {name}
-                <button 
+                <button
                   onClick={() => handleRemoveName(parseInt(index, 10))}
                   className="ml-2 -mr-1 p-0.5 rounded-full hover:bg-green-700 focus:outline-none"
                   aria-label={`Remove ${name}`}
@@ -192,16 +184,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
       )}
 
       <div className={`pt-4 border-t ${borderColor}`}>
-        <button 
+        <button
           onClick={handleUpdateAbstractClick}
           disabled={confirmedNames.length === 0 || isUpdating}
           className="w-full py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-600 transition disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
         >
           {isUpdating ? (
-             <svg className="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+            <svg className="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
           ) : (
             'Save Confirmed Names to Title'
           )}
@@ -210,26 +202,26 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
 
       {isConfirmOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className={`bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border ${theme === 'dark' ? 'border-gray-600' : 'border-gray-200'}`}>
-                <h3 className={`text-lg font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Confirm Update</h3>
-                <p className={`mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-                    Update title with: <span className="font-semibold">{confirmedNames.map(([_, name]) => name.trim()).join(', ')}</span>?
-                </p>
-                <div className="flex justify-end gap-3">
-                    <button 
-                        onClick={() => setIsConfirmOpen(false)}
-                        className={`px-4 py-2 rounded ${theme === 'dark' ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} transition-colors`}
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={confirmUpdateAbstract}
-                        className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded hover:bg-yellow-600 transition-colors"
-                    >
-                        Yes, Update
-                    </button>
-                </div>
+          <div className={`bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border ${theme === 'dark' ? 'border-gray-600' : 'border-gray-200'}`}>
+            <h3 className={`text-lg font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Confirm Update</h3>
+            <p className={`mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+              Update title with: <span className="font-semibold">{confirmedNames.map(([_, name]) => name.trim()).join(', ')}</span>?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsConfirmOpen(false)}
+                className={`px-4 py-2 rounded ${theme === 'dark' ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} transition-colors`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmUpdateAbstract}
+                className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded hover:bg-yellow-600 transition-colors"
+              >
+                Yes, Update
+              </button>
             </div>
+          </div>
         </div>
       )}
     </div>

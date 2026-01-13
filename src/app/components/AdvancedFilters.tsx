@@ -6,13 +6,7 @@ import { AsyncPaginate } from 'react-select-async-paginate';
 import { GroupBase, OptionsOrGroups } from 'react-select';
 import { PersonOption } from '../../models/PersonOption';
 
-interface DateRangePickerProps {
-  dateFrom: Date | null;
-  setDateFrom: (date: Date | null) => void;
-  dateTo: Date | null;
-  setDateTo: (date: Date | null) => void;
-  t: Function
-}
+import { DateRangePickerProps, AdvancedFiltersProps } from '../../interfaces/PropsInterfaces';
 
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ dateFrom, setDateFrom, dateTo, setDateTo, t }) => {
   const handleClear = () => {
@@ -120,22 +114,7 @@ const getSelectStyles = (theme: 'light' | 'dark') => ({
 });
 
 
-interface AdvancedFiltersProps {
-  dateFrom: Date | null;
-  setDateFrom: (date: Date | null) => void;
-  dateTo: Date | null;
-  setDateTo: (date: Date | null) => void;
-  selectedPerson: PersonOption[] | null;
-  setSelectedPerson: (person: PersonOption[] | null) => void;
-  personCondition: 'any' | 'all';
-  setPersonCondition: (condition: 'any' | 'all') => void;
-  mediaType: 'image' | 'video' | 'pdf' | null;
-  setMediaType: (type: 'image' | 'video' | 'pdf' | null) => void;
-  apiURL: string;
-  t: Function;
-  lang: 'en' | 'ar';
-  theme: 'light' | 'dark';
-}
+
 
 export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   dateFrom, setDateFrom, dateTo, setDateTo,
@@ -215,8 +194,8 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 <button
                   onClick={() => setMediaType(mediaType === 'image' ? null : 'image')}
                   className={`flex-1 flex items-center justify-center p-2 rounded-md border transition-colors ${mediaType === 'image'
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   title="Images"
                 >
@@ -225,8 +204,8 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 <button
                   onClick={() => setMediaType(mediaType === 'video' ? null : 'video')}
                   className={`flex-1 flex items-center justify-center p-2 rounded-md border transition-colors ${mediaType === 'video'
-                      ? 'bg-red-600 border-red-600 text-white'
-                      : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   title="Videos"
                 >
@@ -235,8 +214,8 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 <button
                   onClick={() => setMediaType(mediaType === 'pdf' ? null : 'pdf')}
                   className={`flex-1 flex items-center justify-center p-2 rounded-md border transition-colors ${mediaType === 'pdf'
-                      ? 'bg-yellow-500 border-yellow-500 text-white'
-                      : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ? 'bg-yellow-500 border-yellow-500 text-white'
+                    : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   title="Files"
                 >

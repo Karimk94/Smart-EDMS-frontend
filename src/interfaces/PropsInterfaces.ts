@@ -1,10 +1,13 @@
 import { Document } from "../models/Document";
+import { UploadableFile } from "./UploadableFile";
+import { PersonOption } from "../models/PersonOption";
 
 export interface UploadModalProps {
     onClose: () => void;
     apiURL: string;
-    onAnalyze: (uploadedFiles: any[]) => void;
+    onAnalyze: (uploadedFiles: UploadableFile[]) => void;
     theme: 'light' | 'dark';
+    t: Function;
 }
 
 export interface FolderUploadModalProps {
@@ -52,8 +55,20 @@ export interface ReadOnlyEventDisplayProps {
     t: Function;
 }
 
+export interface PdfModalProps {
+    doc: Document;
+    onClose: () => void;
+    apiURL: string;
+    onUpdateAbstractSuccess: () => void;
+    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+    isEditor: boolean;
+    t: Function;
+    lang: 'en' | 'ar';
+    theme: 'light' | 'dark';
+}
+
 export interface ImageModalProps {
-    doc: any;
+    doc: Document;
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
@@ -65,7 +80,7 @@ export interface ImageModalProps {
 }
 
 export interface VideoModalProps {
-    doc: any;
+    doc: Document;
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
@@ -76,20 +91,44 @@ export interface VideoModalProps {
     theme: 'light' | 'dark';
 }
 
-export interface PdfModalProps {
-    doc: any;
-    onClose: () => void;
+export interface PersonSelectorProps {
     apiURL: string;
-    onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-    isEditor: boolean;
-    t: Function;
+    value: string;
+    onChange: (name: string) => void;
     lang: 'en' | 'ar';
     theme: 'light' | 'dark';
+    fetchUrl?: string;
+    headers?: Record<string, string>;
+    onSelect?: (person: { USER_ID: string; FULL_NAME: string }) => void;
 }
 
-export interface TextModalProps {
-    doc: any;
+export interface YearFilterProps {
+    selectedYears: number[];
+    setSelectedYears: (years: number[]) => void;
+    t: Function;
+}
+
+// ... (Removing duplicates and updating)
+
+export interface TagFilterProps {
+    apiURL: string;
+    selectedTags: string[];
+    setSelectedTags: (tags: string[]) => void;
+    t: Function;
+    lang: 'en' | 'ar';
+}
+
+export interface ReadOnlyTagDisplayProps {
+    docId: number;
+    apiURL: string;
+    lang: 'en' | 'ar';
+    t: Function
+}
+
+
+
+export interface TxtModalProps {
+    doc: Document;
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
@@ -101,7 +140,7 @@ export interface TextModalProps {
 }
 
 export interface FileModalProps {
-    doc: any;
+    doc: Document;
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
@@ -120,27 +159,73 @@ export interface GalleryModalProps {
 }
 
 export interface ExcelModalProps {
-  doc: Document;
-  onClose: () => void;
-  apiURL: string;
-  onUpdateAbstractSuccess: () => void;
-  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-  isEditor: boolean;
-  t: Function;
-  lang: 'en' | 'ar';
-  theme: 'light' | 'dark';
+    doc: Document;
+    onClose: () => void;
+    apiURL: string;
+    onUpdateAbstractSuccess: () => void;
+    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+    isEditor: boolean;
+    t: Function;
+    lang: 'en' | 'ar';
+    theme: 'light' | 'dark';
+}
+
+export interface WordModalProps {
+    doc: Document;
+    onClose: () => void;
+    apiURL: string;
+    onUpdateAbstractSuccess: () => void;
+    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+    isEditor: boolean;
+    t: Function;
+    lang: 'en' | 'ar';
+    theme: 'light' | 'dark';
 }
 
 export interface PowerPointModalProps {
-  doc: Document;
-  onClose: () => void;
-  apiURL: string;
-  onUpdateAbstractSuccess: () => void;
-  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-  isEditor: boolean;
-  t: Function;
-  lang: 'en' | 'ar';
-  theme: 'light' | 'dark';
+    doc: Document;
+    onClose: () => void;
+    apiURL: string;
+    onUpdateAbstractSuccess: () => void;
+    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+    isEditor: boolean;
+    t: Function;
+    lang: 'en' | 'ar';
+    theme: 'light' | 'dark';
+}
+
+export interface ShareModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    documentId?: string;
+    folderId?: string;
+    documentName: string;
+    itemType?: 'file' | 'folder';
+    t: Function;
+}
+
+export interface Trustee {
+    username: string;
+    rights: number;
+    flag: number;
+}
+
+export interface SecurityModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    docId: string;
+    library: string;
+    itemName: string;
+    t: Function;
+}
+
+export interface FolderUploadModalProps {
+    onClose: () => void;
+    apiURL: string;
+    theme: 'light' | 'dark';
+    parentId: string | null;
+    parentName: string;
+    onUploadComplete: () => void;
 }
 
 export interface TagEditorProps {
@@ -151,70 +236,62 @@ export interface TagEditorProps {
     t: Function;
 }
 
-export interface TagFilterProps {
-    apiURL: string;
-    selectedTags: string[];
-    setSelectedTags: (tags: string[]) => void;
-    t: Function;
-    lang: 'en' | 'ar';
-}
 
-export interface ReadOnlyTagDisplayProps {
-    docId: number;
-    apiURL: string;
-    lang: 'en' | 'ar';
-    t: Function;
-}
-
-export interface YearFilterProps {
-    selectedYears: number[];
-    setSelectedYears: (years: number[]) => void;
-    t: Function;
-}
 
 export interface DateRangePickerProps {
-    dateFrom: string;
-    setDateFrom: (date: string) => void;
-    dateTo: string;
-    setDateTo: (date: string) => void;
+    dateFrom: Date | null;
+    setDateFrom: (date: Date | null) => void;
+    dateTo: Date | null;
+    setDateTo: (date: Date | null) => void;
+    t: Function;
+}
+
+export interface CreateFolderModalProps {
+    onClose: () => void;
+    apiURL: string;
+    onFolderCreated: () => void;
+    t: Function;
+    initialParentId?: string;
 }
 
 export interface AdvancedFiltersProps {
-    dateFrom: string;
-    setDateFrom: (date: string) => void;
-    dateTo: string;
-    setDateTo: (date: string) => void;
-    selectedYears: number[];
-    setSelectedYears: (years: number[]) => void;
-    selectedTags: string[];
-    setSelectedTags: (tags: string[]) => void;
-    selectedPerson: string | null;
-    setSelectedPerson: (person: string | null) => void;
-    t: Function;
+    dateFrom: Date | null;
+    setDateFrom: (date: Date | null) => void;
+    dateTo: Date | null;
+    setDateTo: (date: Date | null) => void;
+    selectedPerson: PersonOption[] | null;
+    setSelectedPerson: (person: PersonOption[] | null) => void;
+    personCondition: 'any' | 'all';
+    setPersonCondition: (condition: 'any' | 'all') => void;
+    mediaType: 'image' | 'video' | 'pdf' | null;
+    setMediaType: (type: 'image' | 'video' | 'pdf' | null) => void;
     apiURL: string;
+    t: Function;
     lang: 'en' | 'ar';
     theme: 'light' | 'dark';
 }
 
 export interface DocumentListProps {
-    documents: any[];
-    onDocumentClick: (doc: any) => void;
+    documents: Document[];
+    onDocumentClick: (doc: Document) => void;
     apiURL: string;
     onTagSelect: (tag: string) => void;
     isLoading: boolean;
     processingDocs: number[];
     onToggleFavorite: (docId: number, isFavorite: boolean) => void;
     lang: 'en' | 'ar';
+    t: Function;
 }
 
 export interface DocumentItemProps {
-    doc: any;
-    onDocumentClick: (doc: any) => void;
+    doc: Document;
+    onDocumentClick: (doc: Document) => void;
     apiURL: string;
     onTagSelect: (tag: string) => void;
     isProcessing: boolean;
     onToggleFavorite: (docId: number, isFavorite: boolean) => void;
     lang: 'en' | 'ar';
+    t: Function;
 }
 
 export interface JourneyProps {
@@ -227,14 +304,6 @@ export interface PaginationProps {
     totalPages: number;
     onPageChange: (page: number) => void;
     t: Function;
-}
-
-export interface PersonSelectorProps {
-    apiURL: string;
-    value: string | null;
-    onChange: (value: string) => void;
-    lang: 'en' | 'ar';
-    theme: 'light' | 'dark';
 }
 
 export interface HeaderProps {
@@ -252,6 +321,7 @@ export interface HeaderProps {
     isEditor: boolean;
     isSidebarOpen: boolean;
     toggleSidebar: () => void;
+    activeSection: 'recent' | 'favorites' | 'folders';
 }
 
 export interface SidebarProps {
@@ -296,37 +366,38 @@ export interface AnalysisViewProps {
     onUpdateAbstractSuccess: () => void;
     lang: 'en' | 'ar';
     theme: 'light' | 'dark';
+    t: Function;
 }
 
 export interface SlideData {
-  id: number;
-  title: string;
-  content: string[];
+    id: number;
+    title: string;
+    content: string[];
 }
 
 export interface ShareInfo {
-  is_restricted: boolean;
-  target_email: string | null;
-  target_email_hint: string | null;
-  expiry_date: string | null;
-  share_type: 'file' | 'folder';
+    is_restricted: boolean;
+    target_email: string | null;
+    target_email_hint: string | null;
+    expiry_date: string | null;
+    share_type: 'file' | 'folder';
 }
 
 export interface FolderItem {
-  id: string;
-  name: string;
-  type: 'folder' | 'file';
-  media_type: string;
+    id: string;
+    name: string;
+    type: 'folder' | 'file';
+    media_type: string;
 }
 
 export interface BreadcrumbItem {
-  id: string;
-  name: string;
+    id: string;
+    name: string;
 }
 
 export interface StoredSession {
-  email: string;
-  verifiedAt: number;
-  shareType: 'file' | 'folder';
-  folderId?: string;
+    email: string;
+    verifiedAt: number;
+    shareType: 'file' | 'folder';
+    folderId?: string;
 }

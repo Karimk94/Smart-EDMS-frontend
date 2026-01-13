@@ -3,17 +3,7 @@ import { DocumentItem } from './DocumentItem';
 import { Document } from '../../models/Document';
 import { DocumentItemSkeleton } from './DocumentItemSkeleton';
 
-interface DocumentListProps {
-  documents: Document[];
-  onDocumentClick: (doc: Document) => void;
-  apiURL: string;
-  onTagSelect: (tag: string) => void;
-  isLoading: boolean;
-  processingDocs: number[];
-  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-  lang: 'en' | 'ar';
-  t: Function;
-}
+import { DocumentListProps } from '../../interfaces/PropsInterfaces';
 
 export const DocumentList: React.FC<DocumentListProps> = ({
   documents,

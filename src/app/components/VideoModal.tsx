@@ -5,17 +5,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 
-interface VideoModalProps {
-  doc: Document;
-  onClose: () => void;
-  apiURL: string;
-  onUpdateAbstractSuccess: () => void;
-  onToggleFavorite: (docId: number, isFavorite: boolean) => void;
-  isEditor: boolean;
-  t: Function;
-  lang: 'en' | 'ar';
-  theme: 'light' | 'dark';
-}
+import { VideoModalProps } from '../../interfaces/PropsInterfaces';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;

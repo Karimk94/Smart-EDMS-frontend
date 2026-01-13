@@ -1,28 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../context/ToastContext';
 
-interface Trustee {
-  username: string;
-  rights: number;
-  flag: number;
-}
+import { SecurityModalProps, Trustee } from '../../interfaces/PropsInterfaces';
 
-interface SecurityModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  docId: string;
-  library: string;
-  itemName: string;
-  t: Function;
-}
-
-const InfiniteSelect = ({ 
-  options, 
-  value, 
-  onChange, 
-  placeholder, 
-  onLoadMore, 
-  isLoading, 
+const InfiniteSelect = ({
+  options,
+  value,
+  onChange,
+  placeholder,
+  onLoadMore,
+  isLoading,
   disabled,
   onSearch,
   searchValue,
@@ -80,7 +67,7 @@ const InfiniteSelect = ({
       </button>
 
       {isOpen && (
-        <div 
+        <div
           className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm dark:bg-gray-700 custom-scrollbar"
           onScroll={handleScroll}
         >
@@ -99,18 +86,17 @@ const InfiniteSelect = ({
           )}
 
           {options.length === 0 && !isLoading ? (
-             <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-400 italic">
-               No options found
-             </div>
+            <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-400 italic">
+              No options found
+            </div>
           ) : (
-             options.map((option, index) => (
+            options.map((option, index) => (
               <div
                 key={index}
-                className={`relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                  option.value === value 
-                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100' 
+                className={`relative cursor-pointer select-none py-2 pl-3 pr-9 ${option.value === value
+                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100'
                     : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600'
-                }`}
+                  }`}
                 onClick={() => {
                   onChange(option.value);
                   setIsOpen(false);
@@ -248,7 +234,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       if (res.ok) {
         const data = await res.json();
         const newGroups = (data && Array.isArray(data.options)) ? data.options : [];
-        
+
         setHasMoreGroups(data.hasMore || false);
 
         if (page === 1) {
@@ -282,20 +268,20 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       if (res.ok) {
         const data = await res.json();
         const newMembers = (data && Array.isArray(data.options)) ? data.options : [];
-        
+
         if (newMembers.length === 0) {
-           setHasMoreMembers(false);
+          setHasMoreMembers(false);
         } else {
-           setHasMoreMembers(data.hasMore);
+          setHasMoreMembers(data.hasMore);
         }
 
         if (page === 1) {
-           setGroupMembers(newMembers);
+          setGroupMembers(newMembers);
         } else {
-           setGroupMembers(prev => [...prev, ...newMembers]);
+          setGroupMembers(prev => [...prev, ...newMembers]);
         }
       } else {
-         if (page === 1) setGroupMembers([]);
+        if (page === 1) setGroupMembers([]);
       }
     } catch (err) {
       console.error('Failed to fetch group members', err);
@@ -307,9 +293,9 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
 
   const loadMoreMembers = () => {
     if (hasMoreMembers && !isLoadingMembers && selectedGroupId) {
-        const nextPage = memberPage + 1;
-        setMemberPage(nextPage);
-        fetchGroupMembers(selectedGroupId, nextPage, memberSearch);
+      const nextPage = memberPage + 1;
+      setMemberPage(nextPage);
+      fetchGroupMembers(selectedGroupId, nextPage, memberSearch);
     }
   };
 
@@ -317,27 +303,27 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     if (!selectedMemberId) return;
 
     const person = groupMembers.find(m => (m.user_id || m.USER_ID || m.id) === selectedMemberId);
-    
+
     if (!person) {
-        console.error("Selected person not found in current list");
-        return;
+      console.error("Selected person not found in current list");
+      return;
     }
 
-    const userId = person.user_id || person.USER_ID || person.id; 
+    const userId = person.user_id || person.USER_ID || person.id;
 
     if (!userId) {
-        console.error("Invalid person object selected:", person);
-        return;
+      console.error("Invalid person object selected:", person);
+      return;
     }
 
     if (!trustees.find(t => t.username === userId)) {
-      setTrustees([...trustees, { 
-        username: userId, 
-        rights: 63, 
-        flag: 2 
+      setTrustees([...trustees, {
+        username: userId,
+        rights: 63,
+        flag: 2
       }]);
     }
-    
+
     setSelectedMemberId('');
   };
 
@@ -346,7 +332,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   };
 
   const handleRightsChange = (username: string, newRights: string) => {
-    setTrustees(trustees.map(t => 
+    setTrustees(trustees.map(t =>
       t.username === username ? { ...t, rights: parseInt(newRights) } : t
     ));
   };
@@ -380,19 +366,19 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
-        
+
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600 dark:text-blue-400">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             <h2 className="text-lg font-semibold dark:text-white">
               {t('securityPermissions')} - {itemName}
@@ -407,7 +393,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
         </div>
 
         <div className="p-6 flex-1 overflow-y-auto">
-          
+
           <div className="mb-6 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               {t('addUserGroup') || "Add User from Group"}
@@ -416,43 +402,43 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
               {/* Group Selector */}
               <div className="flex-1">
                 <InfiniteSelect t={t}
-                    options={groups.map((g: any) => ({
-                        label: g.group_name || g.name,
-                        value: g.group_id || g.id
-                    }))}
-                    value={selectedGroupId}
-                    onChange={(val) => {
-                      setSelectedGroupId(val);
-                      setMemberSearch('');
-                    }}
-                    placeholder={t('selectGroup') || "Select Group..."}
-                    onLoadMore={loadMoreGroups}
-                    isLoading={isLoadingGroups}
-                    onSearch={setGroupSearch}
-                    searchValue={groupSearch}
+                  options={groups.map((g: any) => ({
+                    label: g.group_name || g.name,
+                    value: g.group_id || g.id
+                  }))}
+                  value={selectedGroupId}
+                  onChange={(val) => {
+                    setSelectedGroupId(val);
+                    setMemberSearch('');
+                  }}
+                  placeholder={t('selectGroup') || "Select Group..."}
+                  onLoadMore={loadMoreGroups}
+                  isLoading={isLoadingGroups}
+                  onSearch={setGroupSearch}
+                  searchValue={groupSearch}
                 />
               </div>
 
               {/* Member Selector */}
               <div className="flex-1">
-                <InfiniteSelect 
-                    options={groupMembers.map((m: any) => ({
-                        label: m.name_english || m.name_arabic || m.user_id,
-                        value: m.user_id
-                    }))}
-                    value={selectedMemberId}
-                    onChange={setSelectedMemberId}
-                    placeholder={!selectedGroupId 
-                        ? "Select Group First" 
-                        : groupMembers.length === 0 
-                            ? "No members found" 
-                            : (t('selectUser') || "Select User...")}
-                    isLoading={isLoadingMembers}
-                    onLoadMore={loadMoreMembers}
-                    disabled={!selectedGroupId}
-                    onSearch={setMemberSearch}
-                    searchValue={memberSearch}
-                    t={t}
+                <InfiniteSelect
+                  options={groupMembers.map((m: any) => ({
+                    label: m.name_english || m.name_arabic || m.user_id,
+                    value: m.user_id
+                  }))}
+                  value={selectedMemberId}
+                  onChange={setSelectedMemberId}
+                  placeholder={!selectedGroupId
+                    ? "Select Group First"
+                    : groupMembers.length === 0
+                      ? "No members found"
+                      : (t('selectUser') || "Select User...")}
+                  isLoading={isLoadingMembers}
+                  onLoadMore={loadMoreMembers}
+                  disabled={!selectedGroupId}
+                  onSearch={setMemberSearch}
+                  searchValue={memberSearch}
+                  t={t}
                 />
               </div>
 

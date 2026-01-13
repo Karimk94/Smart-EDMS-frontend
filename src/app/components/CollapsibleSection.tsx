@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 
-interface CollapsibleSectionProps {
-  title: string;
-  children: React.ReactNode;
-  theme: 'light' | 'dark';
-}
+import { CollapsibleSectionProps } from '../../interfaces/PropsInterfaces';
 
 export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children, theme }) => {
   const [isOpen, setIsOpen] = useState(true);

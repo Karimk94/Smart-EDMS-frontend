@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-interface GalleryModalProps {
-  title: string;
-  images: string[];
-  startIndex: number;
-  onClose: () => void;
-}
+import { GalleryModalProps } from '../../interfaces/PropsInterfaces';
 
 export const GalleryModal: React.FC<GalleryModalProps> = ({ title, images, startIndex, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(startIndex);

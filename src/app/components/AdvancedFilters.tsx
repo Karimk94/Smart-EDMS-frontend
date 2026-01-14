@@ -189,7 +189,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
           <div className="space-y-4">
             {/* Media Type Buttons */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Media Type</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('mediaType')}</label>
               <div className="flex gap-2">
                 <button
                   onClick={() => setMediaType(mediaType === 'image' ? null : 'image')}
@@ -197,9 +197,9 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     ? 'bg-blue-600 border-blue-600 text-white'
                     : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
-                  title="Images"
+                  title={t('images')}
                 >
-                  <img src="/file-image.svg" alt="Images" className={`w-5 h-5 `} />
+                  <img src="/file-image.svg" alt={t('images')} className={`w-5 h-5 `} />
                 </button>
                 <button
                   onClick={() => setMediaType(mediaType === 'video' ? null : 'video')}
@@ -207,9 +207,9 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     ? 'bg-red-600 border-red-600 text-white'
                     : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
-                  title="Videos"
+                  title={t('videos')}
                 >
-                  <img src="/file-video.svg" alt="Videos" className={`w-5 h-5`} />
+                  <img src="/file-video.svg" alt={t('videos')} className={`w-5 h-5`} />
                 </button>
                 <button
                   onClick={() => setMediaType(mediaType === 'pdf' ? null : 'pdf')}
@@ -217,9 +217,9 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     ? 'bg-yellow-500 border-yellow-500 text-white'
                     : 'bg-white dark:bg-[#121212] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
-                  title="Files"
+                  title={t("files")}
                 >
-                  <img src="/file-document.svg" alt="Files" className={`w-5 h-5`} />
+                  <img src="/file-document.svg" alt={t("files")} className={`w-5 h-5`} />
                 </button>
               </div>
             </div>

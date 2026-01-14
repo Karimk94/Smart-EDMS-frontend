@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { CreateFolderModal } from './CreateFolderModal';
 import { Document } from '../../models/Document';
 import SecurityModal from './SecurityModal';
@@ -23,6 +24,8 @@ interface FoldersProps {
   onUploadClick: (parentId: string | null, parentName: string) => void;
   t: Function;
   apiURL: string;
+  isEditor: boolean;
+  initialFolderId?: string | null;
 }
 
 interface ContextMenuState {
@@ -32,8 +35,9 @@ interface ContextMenuState {
   item: FolderItem | null;
 }
 
-export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL }) => {
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId }) => {
+  const router = useRouter();
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialFolderId || null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
     { id: null, name: t('home') || 'Home' }
   ]);
@@ -91,24 +95,30 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (confirmModalOpen) {
-            setConfirmModalOpen(false);
-            setItemToDelete(null);
+          setConfirmModalOpen(false);
+          setItemToDelete(null);
         }
         if (isRenameModalOpen) {
-            setIsRenameModalOpen(false);
+          setIsRenameModalOpen(false);
         }
         if (isShareModalOpen) {
-            setIsShareModalOpen(false);
+          setIsShareModalOpen(false);
         }
       }
     };
 
     if (confirmModalOpen || isRenameModalOpen || isShareModalOpen) {
-        document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keydown', handleKeyDown);
     }
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [confirmModalOpen, isRenameModalOpen, isShareModalOpen]);
 
+
+  useEffect(() => {
+    if (initialFolderId !== undefined) {
+      setCurrentFolderId(initialFolderId);
+    }
+  }, [initialFolderId]);
 
   const fetchContents = async (parentId: string | null) => {
     setIsLoading(true);
@@ -129,6 +139,56 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       if (response.ok) {
         const data = await response.json();
         setItems(data.contents || []);
+
+        // Attempt to Use backend breadcrumbs if available
+        if ((data as any).breadcrumbs && Array.isArray((data as any).breadcrumbs)) {
+          setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, ...(data as any).breadcrumbs]);
+        }
+        // Check for client-side passed breadcrumbs in URL
+        else {
+          const urlParams = new URLSearchParams(window.location.search);
+          const breadcrumbsParam = urlParams.get('breadcrumbs');
+
+          if (breadcrumbsParam) {
+            try {
+              const parsed = JSON.parse(breadcrumbsParam);
+              if (Array.isArray(parsed)) {
+                // Ensure the current folder is the last one
+                const last = parsed[parsed.length - 1];
+                if (last.id !== parentId && parentId) {
+                  // This might happen if user manually changes ID but keeps params. 
+                  // We can append or reset. For now, let's trust the params if they end in current ID, 
+                  // OR if we are just loading this page for the first time.
+                  // Actually, let's just use them.
+                  setBreadcrumbs(parsed);
+                } else {
+                  setBreadcrumbs(parsed);
+                }
+              }
+            } catch (e) {
+              console.error("Failed to parse breadcrumbs", e);
+            }
+          }
+          // Fallback to name param or ID if no breadcrumbs param
+          else if (parentId && !['images', 'videos', 'files'].includes(parentId)) {
+            const folderName = urlParams.get('name');
+            if (folderName) {
+              setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: parentId, name: folderName }]);
+            } else {
+              const inBreadcrumbs = breadcrumbs.some(b => b.id === parentId);
+              if (!inBreadcrumbs) {
+                setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: parentId, name: t('folder') + ' ' + parentId }]);
+              }
+            }
+          } else if (!parentId) {
+            setBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
+          }
+        }
+
+      } else {
+        if (response.status === 404) {
+          router.push('/404');
+        }
       }
     } catch (error) {
       console.error('Failed to fetch folder contents:', error);
@@ -161,10 +221,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const isStandardView = ['images', 'videos', 'files'].includes(currentFolderId || '');
 
     if (folder.is_standard) {
-      if (isStandardView && folder.id === currentFolderId) return;
-      setCurrentFolderId(folder.id);
-      setBreadcrumbs(prev => [...prev, { id: folder.id, name: t(folder.id) }]);
-      setSearchTerm('');
+      router.push(`/folder/${folder.id}`);
       return;
     }
 
@@ -195,17 +252,23 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       return;
     }
 
-    setCurrentFolderId(folder.id);
-    setBreadcrumbs(prev => [...prev, { id: folder.id, name: folder.name }]);
-    setSearchTerm('');
+    // Dynamic Route Navigation
+    // Construct new breadcrumbs
+    const newBreadcrumbs = [...breadcrumbs, { id: folder.id, name: folder.name }];
+    const breadcrumbsJson = JSON.stringify(newBreadcrumbs);
+    router.push(`/folder/${folder.id}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}`);
   };
 
   const handleBreadcrumbClick = (index: number) => {
     const target = breadcrumbs[index];
-    const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
-    setBreadcrumbs(newBreadcrumbs);
-    setCurrentFolderId(target.id);
-    setSearchTerm('');
+    if (target.id === null) {
+      router.push('/folders');
+    } else {
+      // We are navigating back, need to pass the sliced breadcrumbs
+      const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
+      const breadcrumbsJson = JSON.stringify(newBreadcrumbs);
+      router.push(`/folder/${target.id}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}`);
+    }
   };
 
   const refreshCurrentView = () => {
@@ -214,6 +277,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const handleRightClick = (e: React.MouseEvent, item: FolderItem) => {
     e.preventDefault();
+    if (!isEditor) return;
     if (item.is_standard) return;
 
     setContextMenu({
@@ -226,6 +290,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const handleBackgroundContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!isEditor) return;
     if (e.target !== e.currentTarget) return;
 
     setContextMenu({
@@ -315,12 +380,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const processDelete = async () => {
     if (!itemToDelete) return;
 
-    const url = deleteMode === 'force' 
+    const url = deleteMode === 'force'
       ? `${apiURL}/folders/${itemToDelete.id}?force=true`
       : `${apiURL}/folders/${itemToDelete.id}`;
 
     setIsLoading(true);
-    
+
     if (deleteMode === 'standard') {
       setConfirmModalOpen(false);
     }
@@ -350,14 +415,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
 
         if (deleteMode === 'standard' && (res.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate"))) {
-           setDeleteMode('force');
-           setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records or is not empty.");
-           setConfirmModalOpen(true);
+          setDeleteMode('force');
+          setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records or is not empty.");
+          setConfirmModalOpen(true);
         } else {
-           showToast(t('errorDeleting') || `Error: ${err.detail || err.error || res.statusText}`, 'error');
-           if (deleteMode === 'force') {
-             setConfirmModalOpen(false);
-           }
+          showToast(t('errorDeleting') || `Error: ${err.detail || err.error || res.statusText}`, 'error');
+          if (deleteMode === 'force') {
+            setConfirmModalOpen(false);
+          }
         }
       }
     } catch (e) {
@@ -509,7 +574,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             </svg>
           </button>
 
-          <button
+          {isEditor && (<button
             onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())}
             className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
           >
@@ -518,13 +583,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             </svg>
             {t('upload')}
           </button>
+          )}
 
-          <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            {t('createFolder')}
-          </button>
+          {isEditor && (
+            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {t('createFolder')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -721,14 +789,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       )}
 
       {confirmModalOpen && (
-        <div 
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                    setConfirmModalOpen(false);
-                    setItemToDelete(null);
-                }
-            }}
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setConfirmModalOpen(false);
+              setItemToDelete(null);
+            }
+          }}
         >
           <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-600">
             <div className={`flex items-center gap-3 mb-4 ${deleteMode === 'force' ? 'text-amber-500' : 'text-red-500'}`}>
@@ -769,7 +837,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 className={`px-4 py-2 text-sm text-white rounded transition-colors shadow-sm flex items-center gap-2 ${deleteMode === 'force' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
                 disabled={isLoading}
               >
-                {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
+                {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>}
                 {deleteMode === 'force' ? (t('yesDelete') || 'Yes, Delete') : (t('delete') || 'Delete')}
               </button>
             </div>
@@ -779,19 +847,19 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
       {/* Rename Modal */}
       {isRenameModalOpen && (
-        <div 
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) setIsRenameModalOpen(false);
-            }}
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsRenameModalOpen(false);
+          }}
         >
           <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-600">
             <h3 className="text-lg font-bold dark:text-white mb-4">{t('rename') || 'Rename'}</h3>
             <form onSubmit={handleRenameSubmit}>
               <div className="mb-4">
-                <input 
-                  type="text" 
-                  value={renameValue} 
+                <input
+                  type="text"
+                  value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
@@ -810,7 +878,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                   disabled={isRenaming || !renameValue.trim()}
                   className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
                 >
-                   {isRenaming ? 'Saving...' : (t('save') || 'Save')}
+                  {isRenaming ? 'Saving...' : (t('save') || 'Save')}
                 </button>
               </div>
             </form>

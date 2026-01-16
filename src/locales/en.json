@@ -202,5 +202,10 @@
   "fileShareCreated": "File share link created.",
   "restoringSession": "Restoring your session...",
   "OtpSentAutomatically": "Verification code sent to your email",
-  "mediaType": "Media Type"
+  "mediaType": "Media Type",
+  "pageNotFound": "Page Not Found",
+  "folderNotFound": "Folder not found",
+  "somethingWentWrong": "Something went wrong.",
+  "retry": "Retry",
+  "goHome": "Go Home"
 }

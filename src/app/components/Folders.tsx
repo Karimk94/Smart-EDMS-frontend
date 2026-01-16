@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CreateFolderModal } from './CreateFolderModal';
 import { Document } from '../../models/Document';
 import SecurityModal from './SecurityModal';
@@ -37,6 +38,7 @@ interface ContextMenuState {
 
 export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId }) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialFolderId || null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
     { id: null, name: t('home') || 'Home' }
@@ -81,6 +83,20 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   }, [searchTerm]);
 
   useEffect(() => {
+    // Sync breadcrumbs from URL if present
+    if (!searchParams) return;
+    const breadcrumbsParam = searchParams.get('breadcrumbs');
+    if (breadcrumbsParam) {
+      try {
+        const parsed = JSON.parse(breadcrumbsParam);
+        if (Array.isArray(parsed)) {
+          setBreadcrumbs(parsed);
+        }
+      } catch (e) { console.error("Error parsing breadcrumbs", e); }
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       // Close Context Menu
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
@@ -112,7 +128,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [confirmModalOpen, isRenameModalOpen, isShareModalOpen]);
-
 
   useEffect(() => {
     if (initialFolderId !== undefined) {
@@ -146,38 +161,25 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
         // Check for client-side passed breadcrumbs in URL
         else {
-          const urlParams = new URLSearchParams(window.location.search);
-          const breadcrumbsParam = urlParams.get('breadcrumbs');
+          // If we have breadcrumbs in state from URL effect, we might trust them, 
+          // or parse again to be sure if this fetch was triggered by prop change not URL
+          const breadcrumbsParam = searchParams?.get('breadcrumbs');
 
           if (breadcrumbsParam) {
-            try {
-              const parsed = JSON.parse(breadcrumbsParam);
-              if (Array.isArray(parsed)) {
-                // Ensure the current folder is the last one
-                const last = parsed[parsed.length - 1];
-                if (last.id !== parentId && parentId) {
-                  // This might happen if user manually changes ID but keeps params. 
-                  // We can append or reset. For now, let's trust the params if they end in current ID, 
-                  // OR if we are just loading this page for the first time.
-                  // Actually, let's just use them.
-                  setBreadcrumbs(parsed);
-                } else {
-                  setBreadcrumbs(parsed);
-                }
-              }
-            } catch (e) {
-              console.error("Failed to parse breadcrumbs", e);
-            }
+            // Already handled by effect mostly, but ensuring init consistency
           }
           // Fallback to name param or ID if no breadcrumbs param
           else if (parentId && !['images', 'videos', 'files'].includes(parentId)) {
-            const folderName = urlParams.get('name');
+            const folderName = searchParams?.get('name');
             if (folderName) {
               setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: parentId, name: folderName }]);
             } else {
               const inBreadcrumbs = breadcrumbs.some(b => b.id === parentId);
               if (!inBreadcrumbs) {
-                setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: parentId, name: t('folder') + ' ' + parentId }]);
+                // Keep existing breadcrumbs if we are just searching/refreshing
+                if (breadcrumbs.length <= 1) {
+                  setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: parentId, name: t('folder') + ' ' + parentId }]);
+                }
               }
             }
           } else if (!parentId) {
@@ -187,7 +189,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
       } else {
         if (response.status === 404) {
-          router.push('/404');
+          const currentPath = window.location.pathname + window.location.search;
+          router.push(`/error?code=404&message=${encodeURIComponent(t('folderNotFound') || "Folder not found")}&retry=${encodeURIComponent(currentPath)}`);
         }
       }
     } catch (error) {
@@ -196,6 +199,87 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getFolderHref = (item: FolderItem) => {
+    if (item.is_standard) {
+      return `/folder/${item.id}`;
+    }
+    const newBreadcrumbs = [...breadcrumbs, { id: item.id, name: item.name }];
+    const json = JSON.stringify(newBreadcrumbs);
+    // Include name param as backup
+    return `/folder/${item.id}?breadcrumbs=${encodeURIComponent(json)}&name=${encodeURIComponent(item.name)}`;
+  };
+
+  const renderIcon = (item: FolderItem, isStandard = false) => {
+    let iconSrc = '/folder-icon.svg';
+    let altText = 'Folder';
+    let className = "h-14 w-14";
+    let invertClass = "";
+
+    let type: string = 'folder';
+    if (isStandard) {
+      if (item.id === 'images') type = 'image';
+      else if (item.id === 'videos') type = 'video';
+      else type = 'file';
+    } else {
+      if (item.type === 'file') {
+        const mType = getMediaType(item);
+        type = mType;
+      }
+    }
+
+    if (isStandard) {
+      className = "h-6 w-6";
+      invertClass = "";
+
+      if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
+      else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
+      else { iconSrc = '/file-document.svg'; altText = 'Files'; }
+    } else {
+      if (type === 'image') {
+        iconSrc = '/file-image.svg';
+        altText = 'Image';
+        invertClass = "";
+      }
+      else if (type === 'video') {
+        iconSrc = '/file-video.svg';
+        altText = 'Video';
+        invertClass = "";
+      }
+      else if (type === 'excel') {
+        iconSrc = '/file-excel.svg';
+        altText = 'Excel';
+        invertClass = "";
+      }
+      else if (type === 'pdf') {
+        iconSrc = '/file-pdf.svg';
+        altText = 'PDF';
+        invertClass = "";
+      }
+      else if (type === 'powerpoint') {
+        iconSrc = '/file-powerpoint.svg';
+        altText = 'PowerPoint';
+        invertClass = "";
+      }
+      else if (type === 'word') {
+        iconSrc = '/file-word.svg';
+        altText = 'Word';
+        invertClass = "";
+      }
+      else if (type === 'text' || type === 'file') {
+        iconSrc = '/file-document.svg';
+        altText = 'File';
+        invertClass = "";
+      }
+      else {
+        iconSrc = '/folder-icon.svg';
+        altText = 'Folder';
+        invertClass = "";
+      }
+    }
+
+    return <img src={iconSrc} alt={altText} className={`${className} ${invertClass}`} />;
   };
 
   const getMediaType = (item: FolderItem) => {
@@ -253,10 +337,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
 
     // Dynamic Route Navigation
-    // Construct new breadcrumbs
-    const newBreadcrumbs = [...breadcrumbs, { id: folder.id, name: folder.name }];
-    const breadcrumbsJson = JSON.stringify(newBreadcrumbs);
-    router.push(`/folder/${folder.id}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}`);
+    const href = getFolderHref(folder);
+    router.push(href);
   };
 
   const handleBreadcrumbClick = (index: number) => {
@@ -434,77 +516,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
   };
 
-  const renderIcon = (item: FolderItem, isStandard = false) => {
-    let iconSrc = '/folder-icon.svg';
-    let altText = 'Folder';
-    let className = "h-14 w-14";
-    let invertClass = "";
-
-    let type: string = 'folder';
-    if (isStandard) {
-      if (item.id === 'images') type = 'image';
-      else if (item.id === 'videos') type = 'video';
-      else type = 'file';
-    } else {
-      if (item.type === 'file') {
-        const mType = getMediaType(item);
-        type = mType;
-      }
-    }
-
-    if (isStandard) {
-      className = "h-6 w-6";
-      invertClass = "";
-
-      if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
-      else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
-      else { iconSrc = '/file-document.svg'; altText = 'Files'; }
-    } else {
-      if (type === 'image') {
-        iconSrc = '/file-image.svg';
-        altText = 'Image';
-        invertClass = "";
-      }
-      else if (type === 'video') {
-        iconSrc = '/file-video.svg';
-        altText = 'Video';
-        invertClass = "";
-      }
-      else if (type === 'excel') {
-        iconSrc = '/file-excel.svg';
-        altText = 'Excel';
-        invertClass = "";
-      }
-      else if (type === 'pdf') {
-        iconSrc = '/file-pdf.svg';
-        altText = 'PDF';
-        invertClass = "";
-      }
-      else if (type === 'powerpoint') {
-        iconSrc = '/file-powerpoint.svg';
-        altText = 'PowerPoint';
-        invertClass = "";
-      }
-      else if (type === 'word') {
-        iconSrc = '/file-word.svg';
-        altText = 'Word';
-        invertClass = "";
-      }
-      else if (type === 'text' || type === 'file') {
-        iconSrc = '/file-document.svg';
-        altText = 'File';
-        invertClass = "";
-      }
-      else {
-        iconSrc = '/folder-icon.svg';
-        altText = 'Folder';
-        invertClass = "";
-      }
-    }
-
-    return <img src={iconSrc} alt={altText} className={`${className} ${invertClass}`} />;
-  };
-
   const getStandardFolderColor = (id: string) => {
     return 'bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700';
   };
@@ -543,6 +554,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           {breadcrumbs.map((crumb, index) => (
             <div key={index} className="flex items-center whitespace-nowrap">
               {index > 0 && <span className="mx-2 text-gray-400">/</span>}
+              {/* Use Link or clickable element for breadcrumbs (could use Link for optimisation, but button with router.push acts similar for now) */}
               <button
                 onClick={() => handleBreadcrumbClick(index)}
                 className={`hover:text-blue-500 hover:underline transition-colors ${index === breadcrumbs.length - 1 ? 'font-bold text-gray-900 dark:text-white' : ''
@@ -610,30 +622,24 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                   {t('libraries') || 'Quick Access'}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {standardItems.map((item) => {
-                    let type: 'image' | 'video' | 'file' = 'file';
-                    if (item.id === 'images') type = 'image';
-                    if (item.id === 'videos') type = 'video';
-
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => handleNavigate(item)}
-                        className={`group flex items-center p-4 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${getStandardFolderColor(item.id)}`}
-                      >
-                        <div className="flex-shrink-0 p-2 bg-white dark:bg-[#333] rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                          {renderIcon(item, true)}
-                        </div>
-                        <div className="ml-4 flex-1 min-w-0">
-                          <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{t(item.id)}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} ${t('items')}` : ''}</p>
-                        </div>
-                        <div className="text-gray-300 dark:text-gray-600">
-                          <svg className="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                        </div>
+                  {standardItems.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={`/folder/${item.id}`}
+                      className={`group flex items-center p-4 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${getStandardFolderColor(item.id)}`}
+                    >
+                      <div className="flex-shrink-0 p-2 bg-white dark:bg-[#333] rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                        {renderIcon(item, true)}
                       </div>
-                    );
-                  })}
+                      <div className="ml-4 flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{t(item.id)}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} ${t('items')}` : ''}</p>
+                      </div>
+                      <div className="text-gray-300 dark:text-gray-600">
+                        <svg className="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>
             )}
@@ -646,6 +652,24 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {userItems.map((item) => {
                   const isFile = item.type === 'file';
+
+                  if (!isFile && item.type === 'folder') {
+                    return (
+                      <Link
+                        key={item.id}
+                        href={getFolderHref(item)}
+                        onContextMenu={(e) => handleRightClick(e, item)}
+                        className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700`}
+                      >
+                        <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200 text-gray-400 group-hover:text-blue-500">
+                          {renderIcon(item, false)}
+                        </div>
+                        <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
+                          {item.name}
+                        </span>
+                      </Link>
+                    );
+                  }
 
                   return (
                     <div

@@ -201,5 +201,10 @@
   "fileShareCreated": "تم إنشاء رابط مشاركة الملف.",
   "restoringSession": "جارٍ استعادة جلستك...",
   "OtpSentAutomatically": "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
-  "mediaType": "نوع الوسائط"
+  "mediaType": "نوع الوسائط",
+  "pageNotFound": "الصفحة غير موجودة",
+  "folderNotFound": "المجلد غير موجود",
+  "somethingWentWrong": "حدث خطأ ما.",
+  "retry": "إعادة المحاولة",
+  "goHome": "الذهاب للرئيسية"
 }

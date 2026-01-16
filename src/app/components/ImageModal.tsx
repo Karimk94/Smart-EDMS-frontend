@@ -286,6 +286,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
             </button>
             <h2 className={`text-xl font-bold ${textHeader} break-words pt-1 mt-0.5`}>
               {doc.docname.replace(/\.[^/.]+$/, "")}
+              <span className="ml-2 text-sm font-normal text-gray-400">File preview</span>
             </h2>
           </div>
 

@@ -290,7 +290,10 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isFavorite ? 1 : 2} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z" />
               </svg>
             </button>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white break-words pt-1 mt-0.5">{doc.docname.replace(/\.[^/.]+$/, "")}</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white break-words pt-1 mt-0.5">
+              {doc.docname.replace(/\.[^/.]+$/, "")}
+              <span className="ml-2 text-sm font-normal text-gray-400">File preview</span>
+            </h2>
           </div>
 
           {/* Right: Actions */}

@@ -81,11 +81,11 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
         // Use the document endpoint to get the raw file bytes
         const response = await fetch(`${apiURL}/document/${doc.doc_id}`);
         if (!response.ok) throw new Error("Failed to fetch document content");
-        
+
         const arrayBuffer = await response.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         workbookRef.current = workbook;
-        
+
         setSheetNames(workbook.SheetNames);
         if (workbook.SheetNames.length > 0) {
           const firstSheet = workbook.SheetNames[0];
@@ -188,7 +188,7 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
       setIsEditingAbstract(false);
       onUpdateAbstractSuccess();
     } catch (err: any) {
-        console.error("Error updating metadata", err);
+      console.error("Error updating metadata", err);
     }
   };
 
@@ -248,7 +248,10 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isFavorite ? 1 : 2} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z" />
               </svg>
             </button>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white break-words pt-1 mt-0.5">{doc.docname.replace(/\.[^/.]+$/, "")}</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white break-words pt-1 mt-0.5">
+              {doc.docname.replace(/\.[^/.]+$/, "")}
+              <span className="ml-2 text-sm font-normal text-gray-400">File preview</span>
+            </h2>
           </div>
 
           {/* Right: Actions */}
@@ -272,69 +275,69 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
             </button>
 
             <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2 ${closeButtonColor}`}>
-                <span className="text-3xl leading-none">&times;</span>
+              <span className="text-3xl leading-none">&times;</span>
             </button>
           </div>
         </div>
 
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
-          
+
           {/* Main Viewer (Excel Grid) */}
           <div className={`md:col-span-2 col-span-1 h-full bg-white dark:bg-[#1a1a1a] rounded-lg flex flex-col relative overflow-hidden border border-gray-200 dark:border-gray-700`}>
-             
-             {isLoadingContent ? (
-                 <div className="flex flex-col items-center justify-center h-full">
-                    <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                    <span className="text-gray-500">Loading spreadsheet...</span>
-                 </div>
-             ) : (
-                 <>
-                    {/* Sheet Tabs */}
-                    {sheetNames.length > 0 && (
-                        <div className="flex bg-gray-100 dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-                            {sheetNames.map((sheet) => (
-                                <button
-                                    key={sheet}
-                                    onClick={() => handleSheetChange(sheet)}
-                                    className={`px-4 py-2 text-sm font-medium border-r border-gray-200 dark:border-gray-700 whitespace-nowrap
-                                        ${activeSheet === sheet 
-                                            ? 'bg-white dark:bg-[#1a1a1a] text-green-600 dark:text-green-400 border-b-2 border-b-green-500' 
-                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#333]'}`}
-                                >
-                                    {sheet}
-                                </button>
-                            ))}
-                        </div>
-                    )}
 
-                    {/* Data Table */}
-                    <div className="flex-grow overflow-auto">
-                        <table className="w-full text-left border-collapse text-sm">
-                            <tbody>
-                                {excelData.map((row, rowIndex) => (
-                                    <tr key={rowIndex} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#222]">
-                                        {/* Row Number Header */}
-                                        <td className="bg-gray-50 dark:bg-[#252525] text-gray-500 dark:text-gray-400 font-mono text-xs px-2 border-r border-gray-200 dark:border-gray-700 w-10 text-center select-none sticky left-0">
-                                            {rowIndex + 1}
-                                        </td>
-                                        {row.map((cell: any, cellIndex: number) => (
-                                            <td key={cellIndex} className="px-3 py-1.5 border-r border-gray-100 dark:border-gray-800 text-gray-900 dark:text-gray-200 whitespace-nowrap">
-                                                {cell !== null && cell !== undefined ? String(cell) : ''}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {excelData.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                                <p>Empty Sheet</p>
-                            </div>
-                        )}
+            {isLoadingContent ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <span className="text-gray-500">Loading spreadsheet...</span>
+              </div>
+            ) : (
+              <>
+                {/* Sheet Tabs */}
+                {sheetNames.length > 0 && (
+                  <div className="flex bg-gray-100 dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                    {sheetNames.map((sheet) => (
+                      <button
+                        key={sheet}
+                        onClick={() => handleSheetChange(sheet)}
+                        className={`px-4 py-2 text-sm font-medium border-r border-gray-200 dark:border-gray-700 whitespace-nowrap
+                                        ${activeSheet === sheet
+                            ? 'bg-white dark:bg-[#1a1a1a] text-green-600 dark:text-green-400 border-b-2 border-b-green-500'
+                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#333]'}`}
+                      >
+                        {sheet}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Data Table */}
+                <div className="flex-grow overflow-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <tbody>
+                      {excelData.map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#222]">
+                          {/* Row Number Header */}
+                          <td className="bg-gray-50 dark:bg-[#252525] text-gray-500 dark:text-gray-400 font-mono text-xs px-2 border-r border-gray-200 dark:border-gray-700 w-10 text-center select-none sticky left-0">
+                            {rowIndex + 1}
+                          </td>
+                          {row.map((cell: any, cellIndex: number) => (
+                            <td key={cellIndex} className="px-3 py-1.5 border-r border-gray-100 dark:border-gray-800 text-gray-900 dark:text-gray-200 whitespace-nowrap">
+                              {cell !== null && cell !== undefined ? String(cell) : ''}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {excelData.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <p>Empty Sheet</p>
                     </div>
-                 </>
-             )}
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Details Panel */}
@@ -400,13 +403,13 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
                 </p>
               )}
             </div>
-            
+
             <CollapsibleSection title={t('tags')} theme={theme}>
-                {isEditor ? (
+              {isEditor ? (
                 <TagEditor docId={doc.doc_id} apiURL={apiURL} lang={lang} theme={theme} t={t} />
-                ) : (
+              ) : (
                 <ReadOnlyTagDisplay docId={doc.doc_id} apiURL={apiURL} lang={lang} t={t} />
-                )}
+              )}
             </CollapsibleSection>
           </div>
         </div>

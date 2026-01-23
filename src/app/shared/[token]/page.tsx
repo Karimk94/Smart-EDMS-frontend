@@ -2,6 +2,7 @@
 
 import { enGB } from 'date-fns/locale/en-GB';
 import JSZip from 'jszip';
+import { renderAsync } from 'docx-preview';
 import { useParams } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import { registerLocale } from 'react-datepicker';
@@ -18,7 +19,7 @@ const SESSION_KEY_PREFIX = 'share_session_';
 export default function SharedDocumentPage() {
   const params = useParams();
   const token = params.token as string;
-  
+
   // Language State
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const t = useTranslations(lang);
@@ -31,14 +32,14 @@ export default function SharedDocumentPage() {
 
   // Session Restoration State
   const [isRestoringSession, setIsRestoringSession] = useState(true);
-  
+
   // Use useRef instead of useState to prevent double-firing in Strict Mode
   const autoOtpSentRef = useRef(false);
 
   // Flow State
   const [step, setStep] = useState<'email_input' | 'otp_input' | 'success'>('email_input');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
-  
+
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [documentData, setDocumentData] = useState<any>(null);
@@ -65,11 +66,17 @@ export default function SharedDocumentPage() {
   const [isLoadingExcel, setIsLoadingExcel] = useState(false);
   const workbookRef = useRef<XLSX.WorkBook | null>(null);
 
+
   // PowerPoint State
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [pptThumbnailUrl, setPptThumbnailUrl] = useState<string | null>(null);
   const [isLoadingPpt, setIsLoadingPpt] = useState(false);
   const [pptParseError, setPptParseError] = useState<string | null>(null);
+
+  // Word State
+  const wordContainerRef = useRef<HTMLDivElement>(null);
+  const [isRenderingWord, setIsRenderingWord] = useState(false);
+  const [wordRenderError, setWordRenderError] = useState<string | null>(null);
 
   // Toggle Language Helper
   const toggleLanguage = () => {
@@ -124,13 +131,13 @@ export default function SharedDocumentPage() {
   // Try to restore session and load content
   const tryRestoreSession = async (session: StoredSession, shareInfoData: ShareInfo) => {
     setEmail(session.email);
-    
+
     try {
       if (shareInfoData.share_type === 'folder') {
         // For folder shares, try to load folder contents directly
         const params = new URLSearchParams({ viewer_email: session.email });
         const response = await fetch(`/api/share/folder-contents/${token}?${params.toString()}`);
-        
+
         if (response.ok) {
           const data = await response.json();
           setFolderContents(data.contents || []);
@@ -146,7 +153,7 @@ export default function SharedDocumentPage() {
         const downloadResponse = await fetch(
           `/api/share/download/${token}?viewer_email=${encodeURIComponent(session.email)}`
         );
-        
+
         if (downloadResponse.ok) {
           // Get filename from Content-Disposition header
           const contentDisposition = downloadResponse.headers.get('Content-Disposition');
@@ -157,15 +164,15 @@ export default function SharedDocumentPage() {
               downloadFileName = match[1];
             }
           }
-          
+
           const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
           const blob = await downloadResponse.blob();
           const blobUrl = URL.createObjectURL(blob);
-          
+
           setFileUrl(blobUrl);
           setFileName(downloadFileName);
           setFileType(contentType);
-          
+
           // Parse Excel/PowerPoint if needed
           if (isExcel(contentType, downloadFileName)) {
             await parseExcelFile(blob);
@@ -173,7 +180,7 @@ export default function SharedDocumentPage() {
           if (isPowerPoint(contentType, downloadFileName)) {
             await parsePowerPointFile(blob);
           }
-          
+
           setStep('success');
           return true;
         }
@@ -181,33 +188,33 @@ export default function SharedDocumentPage() {
     } catch (err) {
       console.warn('Session restoration failed:', err);
     }
-    
+
     clearSession();
     return false;
   };
 
   const autoSendOtp = async (targetEmail: string) => {
-    if (autoOtpSentRef.current) return; 
-    
+    if (autoOtpSentRef.current) return;
+
     autoOtpSentRef.current = true;
-    
+
     setEmail(targetEmail);
     setStatus('loading');
     setErrorMessage(null);
-    
+
     try {
       const response = await fetch(`/api/share/request-access/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ viewer_email: targetEmail })
       });
-      
+
       const data = await parseResponse(response);
-      
+
       if (!response.ok) {
         throw new Error(JSON.stringify(data));
       }
-      
+
       setStep('otp_input');
       setStatus('idle');
       showToast(t('OtpSentAutomatically'), 'success');
@@ -220,14 +227,115 @@ export default function SharedDocumentPage() {
     }
   };
 
+  // Direct access for restricted shares (skip OTP verification)
+  const directAccessForRestrictedShare = async (targetEmail: string, shareInfoData: ShareInfo) => {
+    if (autoOtpSentRef.current) return;
+
+    autoOtpSentRef.current = true;
+
+    setEmail(targetEmail);
+    setStatus('loading');
+    setErrorMessage(null);
+
+    try {
+      // For restricted shares with skip_otp, call verify endpoint directly without OTP
+      const verifyResponse = await fetch(`/api/share/verify-access/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          viewer_email: targetEmail,
+          skip_otp: true  // Signal to backend that this is a direct access for restricted share
+        })
+      });
+
+      const verifyData = await parseResponse(verifyResponse);
+
+      if (!verifyResponse.ok) {
+        throw new Error(JSON.stringify(verifyData));
+      }
+
+      // Check if this is a folder share
+      if (verifyData.share_type === 'folder') {
+        // Save session for future visits
+        saveSession(targetEmail, 'folder', verifyData.folder_id);
+
+        // Set folder ID and fetch contents
+        setRootFolderId(verifyData.folder_id);
+        setCurrentFolderId(verifyData.folder_id);
+        setStep('success');
+        setStatus('idle');
+
+        // Fetch folder contents
+        await fetchFolderContents(verifyData.folder_id, targetEmail);
+        return;
+      }
+
+      // Handle file share
+      setDocumentData(verifyData.document);
+
+      // Download the file
+      const downloadResponse = await fetch(
+        `/api/share/download/${token}?viewer_email=${encodeURIComponent(targetEmail)}`
+      );
+
+      if (!downloadResponse.ok) {
+        const errorData = await parseResponse(downloadResponse);
+        throw new Error(JSON.stringify(errorData));
+      }
+
+      // Get filename from Content-Disposition header
+      const contentDisposition = downloadResponse.headers.get('Content-Disposition');
+      let downloadFileName = 'document';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+        if (match && match[1]) {
+          downloadFileName = match[1];
+        }
+      }
+
+      // Get content type
+      const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
+
+      // Convert response to blob and create URL
+      const blob = await downloadResponse.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      setFileUrl(blobUrl);
+      setFileName(downloadFileName);
+      setFileType(contentType);
+
+      // Parse Excel files
+      if (isExcel(contentType, downloadFileName)) {
+        await parseExcelFile(blob);
+      }
+
+      // Parse PowerPoint files
+      if (isPowerPoint(contentType, downloadFileName)) {
+        await parsePowerPointFile(blob);
+      }
+
+      // Save session for future visits
+      saveSession(targetEmail, 'file');
+
+      setStep('success');
+      setStatus('idle');
+
+    } catch (err: any) {
+      console.error("Direct Access Error:", err);
+      setErrorMessage(extractErrorMessage(err));
+      setStatus('error');
+      setStep('email_input');
+    }
+  };
+
   // Main initialization effect
   useEffect(() => {
     const initialize = async () => {
       if (!token) return;
-      
+
       setIsLoadingShareInfo(true);
       setIsRestoringSession(true);
-      
+
       try {
         // Step 1: Fetch share info
         const response = await fetch(`/api/share/info/${token}`);
@@ -238,11 +346,11 @@ export default function SharedDocumentPage() {
           setIsRestoringSession(false);
           return;
         }
-        
+
         const shareInfoData = await response.json();
         setShareInfo(shareInfoData);
         setIsLoadingShareInfo(false);
-        
+
         // Step 2: Check for existing session
         const storedSession = getStoredSession();
         if (storedSession) {
@@ -252,16 +360,22 @@ export default function SharedDocumentPage() {
             return;
           }
         }
-        
-        // Step 3: If restricted share, auto-send OTP to the target email
+        // Step 3: If restricted share with skip_otp, access directly without OTP
         if (shareInfoData.is_restricted && shareInfoData.target_email) {
           setIsRestoringSession(false);
-          await autoSendOtp(shareInfoData.target_email);
+
+          // For restricted shares, skip OTP and access directly
+          if (shareInfoData.skip_otp) {
+            await directAccessForRestrictedShare(shareInfoData.target_email, shareInfoData);
+          } else {
+            // Fallback to OTP flow if skip_otp is not enabled
+            await autoSendOtp(shareInfoData.target_email);
+          }
           return;
         }
-        
+
         setIsRestoringSession(false);
-        
+
       } catch (err) {
         console.error('Error during initialization:', err);
         setShareInfoError(t('errorLoadingShare') || 'Error loading share information.');
@@ -279,7 +393,7 @@ export default function SharedDocumentPage() {
       return JSON.parse(text.trim());
     } catch (e) {
       if (!response.ok) {
-         return { detail: text || response.statusText };
+        return { detail: text || response.statusText };
       }
       throw new Error("Invalid server response format");
     }
@@ -293,52 +407,52 @@ export default function SharedDocumentPage() {
       while (typeof msg === 'string' && (msg.trim().startsWith('{') || msg.trim().startsWith('[')) && attempts < 5) {
         attempts++;
         try {
-            const parsed = JSON.parse(msg);
-            
-            if (parsed.detail && Array.isArray(parsed.detail) && parsed.detail.length > 0) {
-              const firstError = parsed.detail[0];
-              if (firstError.msg) {
-                msg = firstError.msg.replace(/^Value error,\s*/i, '');
-                break;
-              }
-            }
-            
-            const extracted = parsed.detail || parsed.error || parsed.message;
-            
-            if (extracted) {
-                if (typeof extracted === 'string') {
-                  msg = extracted;
-                } else if (Array.isArray(extracted) && extracted.length > 0 && extracted[0].msg) {
-                  msg = extracted[0].msg.replace(/^Value error,\s*/i, '');
-                } else {
-                  msg = JSON.stringify(extracted);
-                }
-            } else {
-                break;
-            }
-        } catch (jsonError) {
-            const patterns = [
-                /"detail"\s*:\s*"([^"]*)"/,
-                /"error"\s*:\s*"([^"]*)"/,
-                /"message"\s*:\s*"([^"]*)"/,
-                /"msg"\s*:\s*"([^"]*)"/
-            ];
+          const parsed = JSON.parse(msg);
 
-            let found = false;
-            for (const pattern of patterns) {
-                const match = msg.match(pattern);
-                if (match && match[1]) {
-                    msg = match[1].replace(/^Value error,\s*/i, '');
-                    found = true;
-                    break;
-                }
+          if (parsed.detail && Array.isArray(parsed.detail) && parsed.detail.length > 0) {
+            const firstError = parsed.detail[0];
+            if (firstError.msg) {
+              msg = firstError.msg.replace(/^Value error,\s*/i, '');
+              break;
             }
-            break; 
+          }
+
+          const extracted = parsed.detail || parsed.error || parsed.message;
+
+          if (extracted) {
+            if (typeof extracted === 'string') {
+              msg = extracted;
+            } else if (Array.isArray(extracted) && extracted.length > 0 && extracted[0].msg) {
+              msg = extracted[0].msg.replace(/^Value error,\s*/i, '');
+            } else {
+              msg = JSON.stringify(extracted);
+            }
+          } else {
+            break;
+          }
+        } catch (jsonError) {
+          const patterns = [
+            /"detail"\s*:\s*"([^"]*)"/,
+            /"error"\s*:\s*"([^"]*)"/,
+            /"message"\s*:\s*"([^"]*)"/,
+            /"msg"\s*:\s*"([^"]*)"/
+          ];
+
+          let found = false;
+          for (const pattern of patterns) {
+            const match = msg.match(pattern);
+            if (match && match[1]) {
+              msg = match[1].replace(/^Value error,\s*/i, '');
+              found = true;
+              break;
+            }
+          }
+          break;
         }
       }
     } catch (e) {
     }
-    
+
     return msg;
   };
 
@@ -349,7 +463,7 @@ export default function SharedDocumentPage() {
   const isImage = (mimeType: string) => mimeType.startsWith('image/');
   const isPdf = (mimeType: string) => mimeType === 'application/pdf';
   const isVideo = (mimeType: string) => mimeType.startsWith('video/');
-  
+
   const isExcel = (mimeType: string, name: string): boolean => {
     const ext = getFileExtension(name);
     const excelMimes = [
@@ -372,6 +486,13 @@ export default function SharedDocumentPage() {
     return pptMimes.includes(mimeType) || pptExts.includes(ext);
   };
 
+  const isWord = (mimeType: string, name: string): boolean => {
+    const ext = getFileExtension(name);
+    return mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimeType === 'application/msword' ||
+      ['doc', 'docx'].includes(ext);
+  };
+
   const isText = (mimeType: string, name: string): boolean => {
     const ext = getFileExtension(name);
     const textExts = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
@@ -379,25 +500,36 @@ export default function SharedDocumentPage() {
   };
 
   const isPreviewable = (mimeType: string, name: string): boolean => {
-    return isImage(mimeType) || 
-           isPdf(mimeType) || 
-           isVideo(mimeType) || 
-           isExcel(mimeType, name) || 
-           isPowerPoint(mimeType, name) ||
-           isText(mimeType, name);
+    return isImage(mimeType) ||
+      isPdf(mimeType) ||
+      isVideo(mimeType) ||
+      isExcel(mimeType, name) ||
+      isPowerPoint(mimeType, name) ||
+      isWord(mimeType, name) ||
+      isText(mimeType, name);
   };
 
-  // Get media type from file extension for folder items
-  const getMediaTypeFromName = (name: string): string => {
-    const ext = getFileExtension(name);
+  // Resolve media type with fallback to name-based detection (porting logic from Folders.tsx)
+  const resolveMediaType = (item: FolderItem): string => {
+    // If backend already resolved it to a specific type, rely on it
+    // But ignore generic types like 'folder' or 'file' if we want to be more specific based on extension
+    if (item.media_type && item.media_type !== 'folder' && item.media_type !== 'file') {
+      // Normalize docx to word if needed
+      if ((item.media_type as any) === 'docx') return 'word';
+      return item.media_type;
+    }
+
+    const ext = getFileExtension(item.name);
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image';
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
     if (['pdf'].includes(ext)) return 'pdf';
-    if (['doc', 'docx'].includes(ext)) return 'document';
+    if (['doc', 'docx'].includes(ext)) return 'word';
     if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) return 'excel';
     if (['ppt', 'pptx', 'pps', 'ppsx', 'odp'].includes(ext)) return 'powerpoint';
     if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext)) return 'text';
-    return 'file';
+
+    // Fallback to media_type if extension unknown
+    return item.media_type || 'file';
   };
 
   // Excel parsing function
@@ -407,7 +539,7 @@ export default function SharedDocumentPage() {
       const arrayBuffer = await blob.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       workbookRef.current = workbook;
-      
+
       setSheetNames(workbook.SheetNames);
       if (workbook.SheetNames.length > 0) {
         const firstSheet = workbook.SheetNames[0];
@@ -439,7 +571,7 @@ export default function SharedDocumentPage() {
     try {
       const arrayBuffer = await blob.arrayBuffer();
       const zip = await JSZip.loadAsync(arrayBuffer);
-      
+
       // Try to find a thumbnail
       const thumbFile = zip.file("docProps/thumbnail.jpeg");
       if (thumbFile) {
@@ -449,7 +581,7 @@ export default function SharedDocumentPage() {
       }
 
       // Extract Slides Text
-      const slideFiles = Object.keys(zip.files).filter(fileName => 
+      const slideFiles = Object.keys(zip.files).filter(fileName =>
         fileName.startsWith("ppt/slides/slide") && fileName.endsWith(".xml")
       );
 
@@ -465,15 +597,15 @@ export default function SharedDocumentPage() {
       for (let i = 0; i < slideFiles.length; i++) {
         const slideFileName = slideFiles[i];
         const xmlString = await zip.file(slideFileName)?.async("string");
-        
+
         if (xmlString) {
           const parser = new DOMParser();
           const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-          
+
           // Extract text from <a:t> tags (PowerPoint text runs)
           const textNodes = xmlDoc.getElementsByTagName("a:t");
           const slideContent: string[] = [];
-          
+
           for (let j = 0; j < textNodes.length; j++) {
             const text = textNodes[j].textContent;
             if (text && text.trim().length > 0) {
@@ -490,7 +622,7 @@ export default function SharedDocumentPage() {
           }
         }
       }
-      
+
       setSlides(extractedSlides);
       if (extractedSlides.length === 0) {
         setPptParseError("No text content found in presentation.");
@@ -505,30 +637,30 @@ export default function SharedDocumentPage() {
   };
 
   // Fetch folder contents
-  const fetchFolderContents = async (folderId: string | null) => {
+  const fetchFolderContents = async (folderId: string | null, emailOverride?: string) => {
     if (!folderId) return;
-    
+
     setIsLoadingFolder(true);
     try {
       const params = new URLSearchParams({
-        viewer_email: email,
+        viewer_email: emailOverride || email,
         ...(folderId !== rootFolderId && { parent_id: folderId })
       });
-      
+
       const response = await fetch(`/api/share/folder-contents/${token}?${params.toString()}`);
-      
+
       if (!response.ok) {
         const errData = await parseResponse(response);
         throw new Error(errData.detail || 'Failed to load folder contents');
       }
-      
+
       const data = await response.json();
-      
+
       setFolderContents(data.contents || []);
       setCurrentFolderName(data.folder_name || 'Shared Folder');
       setBreadcrumbs(data.breadcrumbs || []);
       setCurrentFolderId(data.folder_id);
-      
+
       if (!rootFolderId) {
         setRootFolderId(data.root_folder_id);
       }
@@ -564,7 +696,7 @@ export default function SharedDocumentPage() {
   const openFileFromFolder = async (file: FolderItem) => {
     setSelectedFile(file);
     setIsLoadingFolder(true);
-    
+
     try {
       const downloadResponse = await fetch(
         `/api/share/download/${token}?viewer_email=${encodeURIComponent(email)}&doc_id=${file.id}`
@@ -689,13 +821,13 @@ export default function SharedDocumentPage() {
       if (verifyData.share_type === 'folder') {
         // Save session for future visits
         saveSession(email.trim().toLowerCase(), 'folder', verifyData.folder_id);
-        
+
         // Set folder ID and fetch contents
         setRootFolderId(verifyData.folder_id);
         setCurrentFolderId(verifyData.folder_id);
         setStep('success');
         setStatus('idle');
-        
+
         // Fetch folder contents
         await fetchFolderContents(verifyData.folder_id);
         return;
@@ -784,60 +916,28 @@ export default function SharedDocumentPage() {
 
   // Render file icon based on media type
   const renderFileIcon = (item: FolderItem) => {
-    const mediaType = item.media_type || getMediaTypeFromName(item.name);
-    
+    const mediaType = resolveMediaType(item);
+
     if (item.type === 'folder') {
-      return (
-        <svg className="w-12 h-12 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
-        </svg>
-      );
+      return <img src="/folder-icon.svg" alt="Folder" className="w-12 h-12" />;
     }
 
     switch (mediaType) {
       case 'image':
-        return (
-          <svg className="w-12 h-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        );
+        return <img src="/file-image.svg" alt="Image" className="w-12 h-12" />;
       case 'video':
-        return (
-          <svg className="w-12 h-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-        );
+        return <img src="/file-video.svg" alt="Video" className="w-12 h-12" />;
       case 'pdf':
-        return (
-          <svg className="w-12 h-12 text-red-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 4h7v5h5v11H6V4z"/>
-            <path d="M8 12h8v1H8zm0 2h8v1H8zm0 2h5v1H8z"/>
-          </svg>
-        );
+        return <img src="/file-pdf.svg" alt="PDF" className="w-12 h-12" />;
       case 'excel':
-        return (
-          <svg className="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM13 4l5 5h-5V4zM8 17l2-3.5L8 10h1.5l1.5 2.5L12.5 10H14l-2 3.5 2 3.5h-1.5L11 14.5 9.5 17H8z"/>
-          </svg>
-        );
+        return <img src="/file-excel.svg" alt="Excel" className="w-12 h-12" />;
       case 'powerpoint':
-        return (
-          <svg className="w-12 h-12 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM13 4l5 5h-5V4zM9 10h3.5a2.5 2.5 0 010 5H11v2H9v-7zm2 4h1.5a.5.5 0 000-1H11v1z"/>
-          </svg>
-        );
+        return <img src="/file-powerpoint.svg" alt="PowerPoint" className="w-12 h-12" />;
+      case 'word':
+        return <img src="/file-word.svg" alt="Word" className="w-12 h-12" />;
       case 'text':
-        return (
-          <svg className="w-12 h-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        );
       default:
-        return (
-          <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-          </svg>
-        );
+        return <img src="/file-document.svg" alt="File" className="w-12 h-12" />;
     }
   };
 
@@ -862,8 +962,8 @@ export default function SharedDocumentPage() {
                 key={sheet}
                 onClick={() => handleSheetChange(sheet)}
                 className={`px-4 py-2 text-sm font-medium border-r border-gray-200 dark:border-gray-600 whitespace-nowrap
-                  ${activeSheet === sheet 
-                    ? 'bg-white dark:bg-gray-800 text-green-600 dark:text-green-400 border-b-2 border-b-green-500' 
+                  ${activeSheet === sheet
+                    ? 'bg-white dark:bg-gray-800 text-green-600 dark:text-green-400 border-b-2 border-b-green-500'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
               >
                 {sheet}
@@ -919,7 +1019,7 @@ export default function SharedDocumentPage() {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
               <svg className="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/>
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z" />
               </svg>
             </div>
             <div>
@@ -1002,6 +1102,62 @@ export default function SharedDocumentPage() {
     );
   };
 
+  // Render Word Content
+  const renderWordContent = () => {
+    return (
+      <div className="w-full h-full min-h-[500px] flex flex-col bg-white dark:bg-[#1a1a1a] rounded-lg relative overflow-hidden">
+        {isRenderingWord && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <span className="text-gray-500 dark:text-gray-400">Loading document...</span>
+          </div>
+        )}
+
+        {wordRenderError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-red-500">
+            {wordRenderError}
+          </div>
+        )}
+
+        <div className="w-full h-full overflow-y-auto custom-scrollbar p-6 bg-white text-black" ref={wordContainerRef}>
+          {/* Content injected by docx-preview here */}
+        </div>
+      </div>
+    );
+  };
+
+  // Effect to render Word document
+  useEffect(() => {
+    const loadWordDoc = async () => {
+      if (fileUrl && isWord(fileType, fileName) && wordContainerRef.current) {
+        setIsRenderingWord(true);
+        setWordRenderError(null);
+
+        try {
+          // We need the blob again. Since fileUrl is a blob URL, we can fetch it.
+          const res = await fetch(fileUrl);
+          const blob = await res.blob();
+
+          await renderAsync(blob, wordContainerRef.current, wordContainerRef.current, {
+            className: "docx_viewer",
+            inWrapper: true,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            breakPages: true,
+            useBase64URL: true,
+          });
+        } catch (err) {
+          console.error("Error rendering Word doc:", err);
+          setWordRenderError("Failed to render document preview.");
+        } finally {
+          setIsRenderingWord(false);
+        }
+      }
+    };
+
+    loadWordDoc();
+  }, [fileUrl, fileType, fileName]);
+
   // Render folder contents view
   const renderFolderContents = () => {
     // If a file is selected, show file preview
@@ -1024,7 +1180,7 @@ export default function SharedDocumentPage() {
                 {selectedFile.name}
               </h1>
             </div>
-            <button 
+            <button
               onClick={handleDownload}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2"
             >
@@ -1039,8 +1195,8 @@ export default function SharedDocumentPage() {
           <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
             <div className="w-full max-h-[600px] overflow-auto mb-6">
               {isImage(fileType) && (
-                <img 
-                  src={fileUrl} 
+                <img
+                  src={fileUrl}
                   alt={fileName}
                   className="max-w-full max-h-[500px] mx-auto rounded shadow-lg object-contain"
                 />
@@ -1055,8 +1211,8 @@ export default function SharedDocumentPage() {
               )}
 
               {isVideo(fileType) && (
-                <video 
-                  src={fileUrl} 
+                <video
+                  src={fileUrl}
                   controls
                   className="max-w-full max-h-[500px] mx-auto rounded shadow-lg"
                 >
@@ -1073,6 +1229,12 @@ export default function SharedDocumentPage() {
               {isPowerPoint(fileType, fileName) && (
                 <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   {renderPowerPointContent()}
+                </div>
+              )}
+
+              {isWord(fileType, fileName) && (
+                <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  {renderWordContent()}
                 </div>
               )}
 
@@ -1109,18 +1271,17 @@ export default function SharedDocumentPage() {
           {/* Breadcrumbs */}
           <div className="flex items-center gap-2 mb-2 overflow-x-auto">
             <svg className="w-5 h-5 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
             </svg>
             {breadcrumbs.map((crumb, index) => (
               <React.Fragment key={crumb.id}>
                 {index > 0 && <span className="text-gray-400">/</span>}
                 <button
                   onClick={() => handleBreadcrumbClick(crumb)}
-                  className={`text-sm whitespace-nowrap hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
-                    index === breadcrumbs.length - 1
-                      ? 'font-bold text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
+                  className={`text-sm whitespace-nowrap hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${index === breadcrumbs.length - 1
+                    ? 'font-bold text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-400'
+                    }`}
                 >
                   {crumb.name}
                 </button>
@@ -1212,8 +1373,8 @@ export default function SharedDocumentPage() {
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600 dark:text-gray-400">
-              {isRestoringSession 
-                ? (t('restoringSession')) 
+              {isRestoringSession
+                ? (t('restoringSession'))
                 : (t('loading') || 'Loading...')}
             </p>
           </div>
@@ -1256,7 +1417,7 @@ export default function SharedDocumentPage() {
   return (
     <>
       <HtmlLangUpdater lang={lang} />
-      
+
       {/* Language Toggle Button (Absolute Position) */}
       <div className="absolute top-4 right-4 z-50">
         <button
@@ -1282,7 +1443,7 @@ export default function SharedDocumentPage() {
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
                   {documentData.docname || documentData.title || fileName}
                 </h1>
-                <button 
+                <button
                   onClick={handleDownload}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2"
                 >
@@ -1292,14 +1453,14 @@ export default function SharedDocumentPage() {
                   {t('Download')}
                 </button>
               </div>
-              
+
               <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
                 {/* Document Preview */}
                 <div className="w-full max-h-[600px] overflow-auto mb-6">
                   {/* Image Preview */}
                   {fileUrl && isImage(fileType) && (
-                    <img 
-                      src={fileUrl} 
+                    <img
+                      src={fileUrl}
                       alt={fileName}
                       className="max-w-full max-h-[500px] mx-auto rounded shadow-lg object-contain"
                     />
@@ -1316,8 +1477,8 @@ export default function SharedDocumentPage() {
 
                   {/* Video Preview */}
                   {fileUrl && isVideo(fileType) && (
-                    <video 
-                      src={fileUrl} 
+                    <video
+                      src={fileUrl}
                       controls
                       className="max-w-full max-h-[500px] mx-auto rounded shadow-lg"
                     >
@@ -1368,7 +1529,7 @@ export default function SharedDocumentPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {t('VerifiedAccessFor')} <strong>{email}</strong>
-                  <br/>
+                  <br />
                   <span className="text-xs opacity-75">{t('AccessLoggedAt')} {new Date().toLocaleTimeString()}</span>
                 </div>
               </div>
@@ -1379,11 +1540,11 @@ export default function SharedDocumentPage() {
         // View: Auth / OTP Forms
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
-            
+
             <div className="flex justify-center mb-6">
-              <img 
-                src="/icon.ico" 
-                alt="Logo" 
+              <img
+                src="/icon.ico"
+                alt="Logo"
                 className="h-20 w-auto object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -1392,7 +1553,7 @@ export default function SharedDocumentPage() {
             </div>
 
             <h2 className="text-2xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-              {shareInfo?.share_type === 'folder' 
+              {shareInfo?.share_type === 'folder'
                 ? (t('SecureFolderAccess') || 'Secure Folder Access')
                 : t('SecureDocAccess')
               }
@@ -1403,7 +1564,7 @@ export default function SharedDocumentPage() {
               <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
                 <div className="flex items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
                   </svg>
                   <span className="font-medium text-sm">{t('sharedFolder') || 'Shared Folder'}</span>
                 </div>
@@ -1428,93 +1589,93 @@ export default function SharedDocumentPage() {
             )}
 
             <p className="text-center text-gray-600 dark:text-gray-300 mb-8">
-              {step === 'otp_input' 
+              {step === 'otp_input'
                 ? `${t('OtpSentMessage')} ${email}`
                 : t('VerifyIdentityMessage')}
             </p>
 
             <div className="space-y-4">
-              
+
               {/* Email Input Step */}
               {step === 'email_input' && (
                 <form onSubmit={handleRequestOTP} className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {t('OrgEmail')}
-                    </label>
-                    <input 
-                    type="email" 
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t('OrgEmail')}
+                  </label>
+                  <input
+                    type="email"
                     required
                     placeholder="name@rta.ae"
                     className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={status === 'loading'}
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
-                    </p>
-                    <button 
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
+                  </p>
+                  <button
                     type="submit"
                     className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
                     disabled={status === 'loading'}
-                    >
+                  >
                     {status === 'loading' ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     ) : (
-                        t('SendVerificationCode')
+                      t('SendVerificationCode')
                     )}
-                    </button>
+                  </button>
                 </form>
               )}
 
               {/* OTP Input Step */}
               {step === 'otp_input' && (
-                 <form onSubmit={handleVerifyOTP} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          {t('EnterOtp')}
-                        </label>
-                        <input 
-                          type="text" 
-                          required
-                          placeholder="123456"
-                          maxLength={6}
-                          className="w-full px-4 py-3 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none tracking-[0.5em] text-center text-xl font-mono"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                          disabled={status === 'loading'}
-                        />
-                    </div>
-                    <button 
-                      type="submit"
-                      className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
+                <form onSubmit={handleVerifyOTP} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {t('EnterOtp')}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="123456"
+                      maxLength={6}
+                      className="w-full px-4 py-3 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none tracking-[0.5em] text-center text-xl font-mono"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                       disabled={status === 'loading'}
-                    >
-                      {status === 'loading' ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      ) : (
-                        t('VerifyAccess')
-                      )}
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                          setStep('email_input');
-                          setErrorMessage(null);
-                          setOtp('');
-                      }}
-                      className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mt-2"
-                      disabled={status === 'loading'}
-                    >
-                      {t('ChangeEmail')}
-                    </button>
-                 </form>
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
+                    disabled={status === 'loading'}
+                  >
+                    {status === 'loading' ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                      t('VerifyAccess')
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep('email_input');
+                      setErrorMessage(null);
+                      setOtp('');
+                    }}
+                    className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mt-2"
+                    disabled={status === 'loading'}
+                  >
+                    {t('ChangeEmail')}
+                  </button>
+                </form>
               )}
 
               {errorMessage && (
                 <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm text-center animate-pulse">
-                    {errorMessage}
+                  {errorMessage}
                 </div>
               )}
             </div>

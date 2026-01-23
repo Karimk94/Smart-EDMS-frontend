@@ -43,17 +43,17 @@ async function proxyHandler(req: NextRequest): Promise<NextResponse> {
     let responseBody = response.body;
 
     if (isJson && !response.ok) {
-        const json = await response.json();
-        
-        if (json.detail && !json.error) {
-            const errorMsg = typeof json.detail === 'string' 
-                ? json.detail 
-                : Array.isArray(json.detail) 
-                    ? json.detail.map((e: any) => e.msg).join(", ") 
-                    : JSON.stringify(json.detail);
-            json.error = errorMsg;
-        }
-        responseBody = JSON.stringify(json) as any;
+      const json = await response.json();
+
+      if (json.detail && !json.error) {
+        const errorMsg = typeof json.detail === 'string'
+          ? json.detail
+          : Array.isArray(json.detail)
+            ? json.detail.map((e: any) => e.msg).join(", ")
+            : JSON.stringify(json.detail);
+        json.error = errorMsg;
+      }
+      responseBody = JSON.stringify(json) as any;
     }
 
     const newHeaders = new Headers(response.headers);

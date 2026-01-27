@@ -58,6 +58,7 @@ export default function SharedDocumentPage() {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('document');
   const [fileType, setFileType] = useState<string>('application/octet-stream');
+  const [isDownloading, setIsDownloading] = useState(false); // Add downloading state
 
   // Excel State
   const [excelData, setExcelData] = useState<any[][]>([]);
@@ -149,10 +150,64 @@ export default function SharedDocumentPage() {
           return true;
         }
       } else {
-        // For file shares, try to download the file
-        const downloadResponse = await fetch(
-          `/api/share/download/${token}?viewer_email=${encodeURIComponent(session.email)}`
-        );
+        // For file shares, try to download or stream the file
+        const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(session.email)}`;
+
+        let isVideoFile = false;
+        let pFileName = 'document';
+        let pContentType = 'application/octet-stream';
+        let initialResponse: Response | null = null;
+        let fullDownloadNeeded = true;
+
+        try {
+          // Use GET with Range instead of HEAD to avoid 502 errors and still peek at headers
+          initialResponse = await fetch(downloadUrl, {
+            method: 'GET',
+            headers: { 'Range': 'bytes=0-0' }
+          });
+
+          if (initialResponse.ok || initialResponse.status === 206) {
+            pContentType = initialResponse.headers.get('Content-Type') || 'application/octet-stream';
+            const contentDisposition = initialResponse.headers.get('Content-Disposition');
+            if (contentDisposition) {
+              const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+              if (match && match[1]) {
+                pFileName = match[1];
+              }
+            }
+
+            // Check if it is a video
+            if (pContentType.startsWith('video/')) {
+              isVideoFile = true;
+            }
+
+            // If it's not a video, checking if we already have the full response (status 200)
+            // If status is 206, we only have partial content, so we need to re-fetch full
+            if (!isVideoFile && initialResponse.status === 200) {
+              fullDownloadNeeded = false; // We can use initialResponse
+            }
+          }
+        } catch (e) {
+          console.warn('Range request failed, falling back to full download', e);
+        }
+
+        if (isVideoFile) {
+          // It's a video! Use stream URL
+          const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(session.email)}`;
+          setFileUrl(streamUrl);
+          setFileName(pFileName);
+          setFileType(pContentType);
+          setStep('success');
+          return true;
+        }
+
+        // Not a video - proceed with full download
+        let downloadResponse;
+        if (!fullDownloadNeeded && initialResponse) {
+          downloadResponse = initialResponse;
+        } else {
+          downloadResponse = await fetch(downloadUrl);
+        }
 
         if (downloadResponse.ok) {
           // Get filename from Content-Disposition header
@@ -273,10 +328,26 @@ export default function SharedDocumentPage() {
       // Handle file share
       setDocumentData(verifyData.document);
 
-      // Download the file
-      const downloadResponse = await fetch(
-        `/api/share/download/${token}?viewer_email=${encodeURIComponent(targetEmail)}`
-      );
+      // Download the file or set up streaming
+      const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(targetEmail)}`;
+
+      // Check if video - if so, stream it
+      if (verifyData.document?.media_type === 'video' ||
+        verifyData.document?.mime_type?.startsWith('video/') ||
+        (verifyData.document?.docname && (verifyData.document.docname.endsWith('.mp4') || verifyData.document.docname.endsWith('.mov')))) {
+
+        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(targetEmail)}`;
+        setFileUrl(streamUrl);
+        setFileName(verifyData.document.docname || 'video.mp4');
+        setFileType('video/mp4');
+        saveSession(targetEmail, 'file');
+        setStep('success');
+        setStatus('idle');
+        return;
+      }
+
+      // Normal download for non-video files
+      const downloadResponse = await fetch(downloadUrl);
 
       if (!downloadResponse.ok) {
         const errorData = await parseResponse(downloadResponse);
@@ -698,6 +769,17 @@ export default function SharedDocumentPage() {
     setIsLoadingFolder(true);
 
     try {
+      const isVideo = resolveMediaType(file) === 'video';
+
+      if (isVideo) {
+        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(email)}&doc_id=${file.id}`;
+        setFileUrl(streamUrl);
+        setFileName(file.name);
+        setFileType('video/mp4'); // Approximate
+        setIsLoadingFolder(false);
+        return;
+      }
+
       const downloadResponse = await fetch(
         `/api/share/download/${token}?viewer_email=${encodeURIComponent(email)}&doc_id=${file.id}`
       );
@@ -836,10 +918,26 @@ export default function SharedDocumentPage() {
       // Handle file share (existing logic)
       setDocumentData(verifyData.document);
 
-      // Now download the actual file
-      const downloadResponse = await fetch(
-        `/api/share/download/${token}?viewer_email=${encodeURIComponent(email.trim().toLowerCase())}`
-      );
+      // Now download the actual file, or prepare for streaming
+      const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(email.trim().toLowerCase())}`;
+
+      // Check if video - if so, stream it
+      if (verifyData.document?.media_type === 'video' ||
+        verifyData.document?.mime_type?.startsWith('video/') ||
+        (verifyData.document?.docname && (verifyData.document.docname.endsWith('.mp4') || verifyData.document.docname.endsWith('.mov')))) {
+
+        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(email.trim().toLowerCase())}`;
+        setFileUrl(streamUrl);
+        setFileName(verifyData.document.docname || 'video.mp4');
+        setFileType('video/mp4');
+
+        saveSession(email.trim().toLowerCase(), 'file');
+        setStep('success');
+        setStatus('idle');
+        return;
+      }
+
+      const downloadResponse = await fetch(downloadUrl);
 
       if (!downloadResponse.ok) {
         const errorData = await parseResponse(downloadResponse);
@@ -891,14 +989,51 @@ export default function SharedDocumentPage() {
   };
 
   // Handle manual download
-  const handleDownload = () => {
-    if (fileUrl) {
+  const handleDownload = async () => {
+    if (!fileUrl) return;
+
+    // If it's already a blob url (already downloaded), just save it
+    if (fileUrl.startsWith('blob:')) {
       const link = document.createElement('a');
       link.href = fileUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      return;
+    }
+
+    // If it's a remote URL (streaming video), we need to fetch it FROM THE DOWNLOAD ENDPOINT to get the watermarked version
+    try {
+      setIsDownloading(true);
+
+      let finalUrl = fileUrl;
+      // If it's the stream URL, swap it for the download URL (watermarked)
+      if (fileUrl.includes('/api/share/stream/')) {
+        finalUrl = fileUrl.replace('/api/share/stream/', '/api/share/download/');
+      }
+
+      const response = await fetch(finalUrl);
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up the temporary blob url
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+    } catch (error) {
+      console.error('Download error:', error);
+      showToast(t('downloadError') || 'Download failed', 'error');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -1182,12 +1317,17 @@ export default function SharedDocumentPage() {
             </div>
             <button
               onClick={handleDownload}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2"
+              disabled={isDownloading}
+              className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2 ${isDownloading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              {t('Download')}
+              {isDownloading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              )}
+              {isDownloading ? (t('Downloading') || 'Downloading...') : (t('Download'))}
             </button>
           </div>
 
@@ -1445,12 +1585,17 @@ export default function SharedDocumentPage() {
                 </h1>
                 <button
                   onClick={handleDownload}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2"
+                  disabled={isDownloading}
+                  className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2 ${isDownloading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  {t('Download')}
+                  {isDownloading ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  )}
+                  {isDownloading ? (t('Downloading') || 'Downloading...') : (t('Download'))}
                 </button>
               </div>
 

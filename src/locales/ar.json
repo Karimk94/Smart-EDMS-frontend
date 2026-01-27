@@ -206,5 +206,7 @@
   "folderNotFound": "المجلد غير موجود",
   "somethingWentWrong": "حدث خطأ ما.",
   "retry": "إعادة المحاولة",
-  "goHome": "الذهاب للرئيسية"
+  "goHome": "الذهاب للرئيسية",
+  "downloadError": "فشل في تحميل الملف",
+  "Downloading": "جاري التحميل..."
 }

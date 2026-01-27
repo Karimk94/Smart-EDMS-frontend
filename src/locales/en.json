@@ -207,5 +207,7 @@
   "folderNotFound": "Folder not found",
   "somethingWentWrong": "Something went wrong.",
   "retry": "Retry",
-  "goHome": "Go Home"
+  "goHome": "Go Home",
+  "downloadError": "Failed to download file",
+  "Downloading": "Downloading..."
 }

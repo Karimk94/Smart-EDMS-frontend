@@ -49,9 +49,10 @@ registerLocale('en-GB', enGB);
 interface MainDashboardProps {
     initialSection?: ActiveSection;
     initialFolderId?: string | null;
+    hiddenSections?: ('recent' | 'favorites' | 'folders')[];
 }
 
-export function MainDashboard({ initialSection = 'recent', initialFolderId = null }: MainDashboardProps) {
+export function MainDashboard({ initialSection = 'recent', initialFolderId = null, hiddenSections = [] }: MainDashboardProps) {
     const [user, setUser] = useState<User | null>(null);
     const router = useRouter();
 
@@ -523,7 +524,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
             const response = await fetch('/api/auth/logout', { method: 'POST' });
             if (response.ok) {
                 setUser(null);
-                router.push('/login');
+                router.push('/');
             } else {
                 console.error('Logout failed');
                 showToast(t('LogoutFailed'), 'error');
@@ -659,6 +660,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         isShowingFullMemories={false}
                         t={t}
                         lang={lang}
+                        hiddenSections={hiddenSections}
                     />
 
                     <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-w-0">

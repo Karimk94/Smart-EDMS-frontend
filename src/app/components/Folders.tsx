@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { CreateFolderModal } from './CreateFolderModal';
 import { Document } from '../../models/Document';
 import SecurityModal from './SecurityModal';
@@ -37,7 +36,6 @@ interface ContextMenuState {
 }
 
 export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId }) => {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialFolderId || null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
@@ -135,6 +133,52 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
   }, [initialFolderId]);
 
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      const searchParamsObj = new URLSearchParams(window.location.search);
+
+      if (path === '/folders') {
+        // Root folders view
+        setCurrentFolderId(null);
+        setBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
+      } else if (path.startsWith('/folder/')) {
+        // Extract folder ID from path
+        const folderId = path.split('/folder/')[1]?.split('?')[0];
+        if (folderId) {
+          setCurrentFolderId(folderId);
+
+          // Try to restore breadcrumbs from URL
+          const breadcrumbsParam = searchParamsObj.get('breadcrumbs');
+          if (breadcrumbsParam) {
+            try {
+              const parsed = JSON.parse(breadcrumbsParam);
+              if (Array.isArray(parsed)) {
+                setBreadcrumbs(parsed);
+              }
+            } catch (e) {
+              // Fallback breadcrumbs
+              const folderName = searchParamsObj.get('name') || folderId;
+              setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: folderName }]);
+            }
+          } else {
+            // Standard folder or no breadcrumbs in URL
+            if (['images', 'videos', 'files'].includes(folderId)) {
+              setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: t(folderId) || folderId }]);
+            } else {
+              const folderName = searchParamsObj.get('name') || folderId;
+              setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: folderName }]);
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [t]);
+
   const fetchContents = async (parentId: string | null) => {
     setIsLoading(true);
     try {
@@ -190,7 +234,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       } else {
         if (response.status === 404) {
           const currentPath = window.location.pathname + window.location.search;
-          router.push(`/error?code=404&message=${encodeURIComponent(t('folderNotFound') || "Folder not found")}&retry=${encodeURIComponent(currentPath)}`);
+          window.location.href = `/error?code=404&message=${encodeURIComponent(t('folderNotFound') || "Folder not found")}&retry=${encodeURIComponent(currentPath)}`;
         }
       }
     } catch (error) {
@@ -301,11 +345,25 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     return 'file';
   };
 
-  const handleNavigate = (folder: FolderItem) => {
-    const isStandardView = ['images', 'videos', 'files'].includes(currentFolderId || '');
+  // Helper function to update URL without full page reload (shallow routing)
+  const updateUrlShallow = (folderId: string | null, newBreadcrumbs: { id: string | null; name: string }[]) => {
+    if (folderId === null) {
+      window.history.pushState(null, '', '/folders');
+    } else if (['images', 'videos', 'files'].includes(folderId)) {
+      window.history.pushState(null, '', `/folder/${folderId}`);
+    } else {
+      const breadcrumbsJson = JSON.stringify(newBreadcrumbs);
+      const folderName = newBreadcrumbs.length > 0 ? newBreadcrumbs[newBreadcrumbs.length - 1].name : '';
+      window.history.pushState(null, '', `/folder/${folderId}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}&name=${encodeURIComponent(folderName)}`);
+    }
+  };
 
+  const handleNavigate = (folder: FolderItem) => {
     if (folder.is_standard) {
-      router.push(`/folder/${folder.id}`);
+      // For standard folders (images, videos, files), use internal state update
+      setCurrentFolderId(folder.id);
+      setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
+      updateUrlShallow(folder.id, [{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
       return;
     }
 
@@ -336,20 +394,26 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       return;
     }
 
-    // Dynamic Route Navigation
-    const href = getFolderHref(folder);
-    router.push(href);
+    // Internal state navigation for dynamic folders (no full page reload)
+    const newBreadcrumbs = [...breadcrumbs, { id: folder.id, name: folder.name }];
+    setCurrentFolderId(folder.id);
+    setBreadcrumbs(newBreadcrumbs);
+    updateUrlShallow(folder.id, newBreadcrumbs);
   };
 
   const handleBreadcrumbClick = (index: number) => {
     const target = breadcrumbs[index];
     if (target.id === null) {
-      router.push('/folders');
+      // Navigate back to root folders
+      setCurrentFolderId(null);
+      setBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
+      updateUrlShallow(null, [{ id: null, name: t('home') || 'Home' }]);
     } else {
-      // We are navigating back, need to pass the sliced breadcrumbs
+      // Navigate back to a specific folder in the breadcrumb trail
       const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
-      const breadcrumbsJson = JSON.stringify(newBreadcrumbs);
-      router.push(`/folder/${target.id}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}`);
+      setCurrentFolderId(target.id);
+      setBreadcrumbs(newBreadcrumbs);
+      updateUrlShallow(target.id, newBreadcrumbs);
     }
   };
 
@@ -623,9 +687,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {standardItems.map((item) => (
-                    <Link
+                    <div
                       key={item.id}
-                      href={`/folder/${item.id}`}
+                      onClick={() => handleNavigate(item)}
                       className={`group flex items-center p-4 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${getStandardFolderColor(item.id)}`}
                     >
                       <div className="flex-shrink-0 p-2 bg-white dark:bg-[#333] rounded-lg shadow-sm group-hover:scale-110 transition-transform">
@@ -638,7 +702,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                       <div className="text-gray-300 dark:text-gray-600">
                         <svg className="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -655,9 +719,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
                   if (!isFile && item.type === 'folder') {
                     return (
-                      <Link
+                      <div
                         key={item.id}
-                        href={getFolderHref(item)}
+                        onClick={() => handleNavigate(item)}
                         onContextMenu={(e) => handleRightClick(e, item)}
                         className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700`}
                       >
@@ -667,7 +731,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                         <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
                           {item.name}
                         </span>
-                      </Link>
+                      </div>
                     );
                   }
 

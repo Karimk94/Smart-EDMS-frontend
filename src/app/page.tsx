@@ -1,8 +1,8 @@
 "use client";
 
 import React from 'react';
-import { MainDashboard } from './components/MainDashboard';
+import { PortalLanding } from './components/PortalLanding';
 
 export default function HomePage() {
-  return <MainDashboard initialSection="recent" />;
+  return <PortalLanding />;
 }

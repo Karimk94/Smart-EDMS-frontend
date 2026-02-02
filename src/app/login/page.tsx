@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from '../hooks/useTranslations';
 import HtmlLangUpdater from '../components/HtmlLangUpdater';
+import HtmlThemeUpdater from '../components/HtmlThemeUpdater';
 import { useToast } from '../context/ToastContext';
 
 export default function LoginPage() {
@@ -11,10 +12,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
-  
-  const [lang, setLang] = useState<'en' | 'ar'>('en'); 
+
+  const [lang, setLang] = useState<'en' | 'ar'>('en');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const t = useTranslations(lang);
-  
+
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -23,7 +25,7 @@ export default function LoginPage() {
       try {
         const response = await fetch('/api/auth/user');
         if (response.ok) {
-          router.push('/');
+          router.push('/folders');
         } else {
           setIsChecking(false);
         }
@@ -49,7 +51,7 @@ export default function LoginPage() {
       });
 
       if (response.ok) {
-        router.push('/');
+        router.push('/folders');
       } else {
         const data = await response.json();
         showToast(data.error || t('loginFailed'), 'error');
@@ -65,6 +67,10 @@ export default function LoginPage() {
     setLang(prev => prev === 'en' ? 'ar' : 'en');
   };
 
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
   if (isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
@@ -76,14 +82,34 @@ export default function LoginPage() {
   return (
     <>
       <HtmlLangUpdater lang={lang} />
+      <HtmlThemeUpdater theme={theme} />
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white relative">
-        {/* Language Toggle Button */}
-        <button
-          onClick={toggleLanguage}
-          className="absolute top-4 right-4 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium text-sm"
-        >
-          {lang === 'en' ? 'العربية' : 'English'}
-        </button>
+        {/* Toggle Buttons */}
+        <div className="absolute top-4 right-4 flex gap-2">
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {theme === 'light' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+              </svg>
+            )}
+          </button>
+          {/* Language Toggle */}
+          <button
+            onClick={toggleLanguage}
+            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium text-sm"
+          >
+            {lang === 'en' ? 'العربية' : 'English'}
+          </button>
+        </div>
 
         <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
           <h1 className="text-2xl font-bold text-center">{t('loginTitle')}</h1>

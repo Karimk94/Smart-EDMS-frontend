@@ -331,6 +331,7 @@ export interface SidebarProps {
     isShowingFullMemories: boolean;
     t: Function;
     lang: 'en' | 'ar';
+    hiddenSections?: ('recent' | 'favorites' | 'folders')[];
 }
 
 export interface SearchBarProps {

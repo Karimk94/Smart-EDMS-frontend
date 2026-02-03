@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from '../hooks/useTranslations';
 import HtmlLangUpdater from '../components/HtmlLangUpdater';
 import HtmlThemeUpdater from '../components/HtmlThemeUpdater';
@@ -13,8 +13,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
-  const [lang, setLang] = useState<'en' | 'ar'>('en');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const searchParams = useSearchParams();
+  const initialLang = (searchParams.get('lang') as 'en' | 'ar') || 'en';
+  const initialTheme = (searchParams.get('theme') as 'light' | 'dark') || 'light';
+
+  const [lang, setLang] = useState<'en' | 'ar'>(initialLang);
+  const [theme, setTheme] = useState<'light' | 'dark'>(initialTheme);
   const t = useTranslations(lang);
 
   const router = useRouter();

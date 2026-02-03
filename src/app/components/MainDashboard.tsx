@@ -1,7 +1,7 @@
 "use client";
 
 import { enGB } from 'date-fns/locale/en-GB';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { registerLocale } from 'react-datepicker';
 import { UploadableFile } from '../../interfaces';
@@ -55,6 +55,7 @@ interface MainDashboardProps {
 export function MainDashboard({ initialSection = 'recent', initialFolderId = null, hiddenSections = [] }: MainDashboardProps) {
     const [user, setUser] = useState<User | null>(null);
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const [activeSection, setActiveSection] = useState<ActiveSection>(initialSection);
     const [activeFolder, setActiveFolder] = useState<'images' | 'videos' | 'files' | null>(null);
@@ -120,14 +121,28 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     setLang(data.user.lang || 'en');
                     setTheme(data.user.theme || 'light');
                 } else {
-                    router.push('/login');
+                    const currentLang = searchParams.get('lang');
+                    const currentTheme = searchParams.get('theme');
+                    const params = new URLSearchParams();
+                    if (currentLang) params.set('lang', currentLang);
+                    if (currentTheme) params.set('theme', currentTheme);
+
+                    const queryString = params.toString();
+                    router.push(queryString ? `/login?${queryString}` : '/login');
                 }
             } catch (err) {
-                router.push('/login');
+                const currentLang = searchParams.get('lang');
+                const currentTheme = searchParams.get('theme');
+                const params = new URLSearchParams();
+                if (currentLang) params.set('lang', currentLang);
+                if (currentTheme) params.set('theme', currentTheme);
+
+                const queryString = params.toString();
+                router.push(queryString ? `/login?${queryString}` : '/login');
             }
         };
         checkUser();
-    }, [router]);
+    }, [router, searchParams]);
 
     const handleThemeChange = async (newTheme: 'light' | 'dark') => {
         if (!user) return;

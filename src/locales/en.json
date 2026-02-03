@@ -209,5 +209,15 @@
   "retry": "Retry",
   "goHome": "Go Home",
   "downloadError": "Failed to download file",
-  "Downloading": "Downloading..."
+  "Downloading": "Downloading...",
+  "edmsPortal": "EDMS Portal",
+  "welcomeToEdms": "Welcome to EDMS Portal",
+  "selectSystem": "Select a system below to access your document management tools",
+  "smartEdmsTitle": "Smart EDMS",
+  "smartEdmsDesc": "Electronic Document Management System with AI-powered analysis for organizing, searching, and managing your digital documents efficiently.",
+  "ptaEdmsTitle": "PTAEDMS",
+  "ptaEdmsDesc": "PTA Electronic Document Management System for handling Public Transport Agency-specific documentation and workflow management.",
+  "rightsReserved": "RTA. All rights reserved.",
+  "switchToDark": "Switch to dark mode",
+  "switchToLight": "Switch to light mode"
 }

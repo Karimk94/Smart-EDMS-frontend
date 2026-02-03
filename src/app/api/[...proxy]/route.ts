@@ -57,6 +57,9 @@ async function proxyHandler(req: NextRequest): Promise<NextResponse> {
     }
 
     const newHeaders = new Headers(response.headers);
+    newHeaders.delete('content-length');
+    newHeaders.delete('content-encoding');
+
     return new NextResponse(responseBody, {
       status: response.status,
       statusText: response.statusText,

@@ -54,9 +54,11 @@ export default function LoginPage() {
         router.push('/folders');
       } else {
         const data = await response.json();
-        showToast(data.error || t('loginFailed'), 'error');
+        console.log('Login error response:', data);
+        showToast(data.detail || data.error || t('loginFailed'), 'error');
       }
     } catch (err) {
+      console.error('Login exception:', err);
       showToast(t('errorOccurred'), 'error');
     } finally {
       setIsLoading(false);

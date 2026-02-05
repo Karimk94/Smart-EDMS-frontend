@@ -1,5 +1,6 @@
 import React from 'react';
 import { SearchBar } from './SearchBar';
+import QuotaPieChart from './QuotaPieChart';
 
 import { HeaderProps } from '../../interfaces/PropsInterfaces';
 
@@ -19,6 +20,8 @@ export const Header: React.FC<HeaderProps> = ({
   isSidebarOpen,
   toggleSidebar,
   activeSection,
+  quota,
+  remainingQuota,
 }) => {
   const handleLanguageChange = async () => {
     const newLang = lang === 'en' ? 'ar' : 'en';
@@ -104,6 +107,11 @@ export const Header: React.FC<HeaderProps> = ({
         <div
           className={`flex items-center gap-4 ${searchBarMargin} ${rtlClass}`}
         >
+          {activeSection === 'folders' && quota !== undefined && remainingQuota !== undefined && (
+            <div className="bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm flex items-center gap-2 border border-gray-100 dark:border-gray-700 mx-2">
+              <QuotaPieChart remaining={remainingQuota} total={quota} compact={true} />
+            </div>
+          )}
           {isProcessing && (
             <div className="flex items-center gap-2 text-gray-900 dark:text-white text-sm">
               <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>

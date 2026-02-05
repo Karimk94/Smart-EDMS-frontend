@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "../context/ToastContext";
+import QuotaPieChart from "../components/QuotaPieChart";
 
 interface EdmsUser {
     username: string;
@@ -13,6 +14,8 @@ interface EdmsUser {
     security_level_id: number;
     lang: string;
     theme: string;
+    remaining_quota: number;
+    quota: number;
 }
 
 interface SecurityLevel {
@@ -67,7 +70,18 @@ export default function AdminPage() {
     const [editSecurityLevel, setEditSecurityLevel] = useState<number | null>(null);
     const [editLang, setEditLang] = useState("en");
     const [editTheme, setEditTheme] = useState("light");
+    const [editQuota, setEditQuota] = useState<number | null>(null);
+    const [editTotalQuota, setEditTotalQuota] = useState<number | null>(null);
     const [isEditing, setIsEditing] = useState(false);
+
+    // Format quota helper
+    const formatQuota = (bytes: number) => {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    };
 
     // Delete confirmation
     const [deleteTarget, setDeleteTarget] = useState<EdmsUser | null>(null);
@@ -232,6 +246,8 @@ export default function AdminPage() {
         setEditSecurityLevel(user.security_level_id);
         setEditLang(user.lang);
         setEditTheme(user.theme);
+        setEditQuota(user.remaining_quota);
+        setEditTotalQuota(user.quota);
     };
 
     const closeEditModal = () => {
@@ -239,6 +255,9 @@ export default function AdminPage() {
         setEditSecurityLevel(null);
         setEditLang("en");
         setEditTheme("light");
+        setEditTheme("light");
+        setEditQuota(null);
+        setEditTotalQuota(null);
     };
 
     const handleEditUser = async () => {
@@ -256,6 +275,8 @@ export default function AdminPage() {
                     security_level_id: editSecurityLevel,
                     lang: editLang,
                     theme: editTheme,
+                    remaining_quota: editQuota,
+                    quota: editTotalQuota,
                 }),
             });
 
@@ -409,6 +430,9 @@ export default function AdminPage() {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Theme
                                 </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Quota (Usage)
+                                </th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Actions
                                 </th>
@@ -433,6 +457,9 @@ export default function AdminPage() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 capitalize">
                                         {user.theme}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 font-mono">
+                                        <QuotaPieChart remaining={user.remaining_quota} total={user.quota} />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                                         <button
@@ -762,6 +789,43 @@ export default function AdminPage() {
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Quota Edit */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Remaining Quota (bytes)
+                                </label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="number"
+                                        value={editQuota ?? ""}
+                                        onChange={(e) => setEditQuota(Number(e.target.value))}
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                        {formatQuota(editQuota || 0)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Total Quota Edit */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Total Quota (bytes)
+                                </label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="number"
+                                        value={editTotalQuota ?? ""}
+                                        onChange={(e) => setEditTotalQuota(Number(e.target.value))}
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                        {formatQuota(editTotalQuota || 0)}
+                                    </span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Default 1GB = 1073741824 bytes</p>
                         </div>
 
                         {/* Modal Footer */}
@@ -793,37 +857,40 @@ export default function AdminPage() {
                         </div>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Delete Confirmation Modal */}
-            {deleteTarget && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                            Confirm Delete
-                        </h3>
-                        <p className="text-gray-600 dark:text-gray-300 mb-6">
-                            Are you sure you want to remove <strong>{deleteTarget.username}</strong> from EDMS access?
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setDeleteTarget(null)}
-                                disabled={isDeleting}
-                                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDeleteUser}
-                                disabled={isDeleting}
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
-                            >
-                                {isDeleting ? "Deleting..." : "Delete"}
-                            </button>
+            {
+                deleteTarget && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                Confirm Delete
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-300 mb-6">
+                                Are you sure you want to remove <strong>{deleteTarget.username}</strong> from EDMS access?
+                            </p>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => setDeleteTarget(null)}
+                                    disabled={isDeleting}
+                                    className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteUser}
+                                    disabled={isDeleting}
+                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
+                                >
+                                    {isDeleting ? "Deleting..." : "Delete"}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

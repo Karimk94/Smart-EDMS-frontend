@@ -665,6 +665,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     theme={theme}
                     onThemeChange={handleThemeChange}
                     activeSection={activeSection}
+                    quota={user?.quota}
+                    remainingQuota={user?.remaining_quota}
                 />
 
                 <div className={`flex flex-1 overflow-hidden ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>
@@ -745,6 +747,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                                 )}
                             </div>
                         )}
+
+
 
                         {renderContent()}
 

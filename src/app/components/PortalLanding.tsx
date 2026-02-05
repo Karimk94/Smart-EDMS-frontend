@@ -64,7 +64,7 @@ export function PortalLanding() {
     return (
         <>
             <HtmlThemeUpdater theme={theme} />
-            <HtmlLangUpdater lang={lang} />
+            <HtmlLangUpdater lang={lang} forceDir="ltr" />
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col">
                 {/* Header */}
                 <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">

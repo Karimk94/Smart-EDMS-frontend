@@ -321,7 +321,9 @@ export interface HeaderProps {
     isEditor: boolean;
     isSidebarOpen: boolean;
     toggleSidebar: () => void;
-    activeSection: 'recent' | 'favorites' | 'folders';
+    activeSection?: 'recent' | 'favorites' | 'folders';
+    quota?: number;
+    remainingQuota?: number;
 }
 
 export interface SidebarProps {
@@ -352,6 +354,7 @@ export interface HtmlThemeUpdaterProps {
 
 export interface HtmlLangUpdaterProps {
     lang: 'en' | 'ar';
+    forceDir?: 'ltr' | 'rtl';
 }
 
 export interface MemoriesStackProps {

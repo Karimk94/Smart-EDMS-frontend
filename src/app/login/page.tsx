@@ -29,7 +29,8 @@ export default function LoginPage() {
       try {
         const response = await fetch('/api/auth/user');
         if (response.ok) {
-          router.push('/folders');
+          const redirectPath = searchParams.get('redirect') || '/folders';
+          router.push(redirectPath);
         } else {
           setIsChecking(false);
         }
@@ -55,7 +56,8 @@ export default function LoginPage() {
       });
 
       if (response.ok) {
-        router.push('/folders');
+        const redirectPath = searchParams.get('redirect') || '/folders';
+        router.push(redirectPath);
       } else {
         const data = await response.json();
         console.log('Login error response:', data);

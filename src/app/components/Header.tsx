@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
               ></path>
             </svg>
           </button>
-          <a href="/">
+          <a href="/dashboard">
             <h1
               className={`text-xl font-bold text-gray-900 dark:text-white ${logoMargin} cursor-pointer`}
             >

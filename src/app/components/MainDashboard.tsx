@@ -126,6 +126,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     const params = new URLSearchParams();
                     if (currentLang) params.set('lang', currentLang);
                     if (currentTheme) params.set('theme', currentTheme);
+                    params.set('redirect', window.location.pathname);
 
                     const queryString = params.toString();
                     router.push(queryString ? `/login?${queryString}` : '/login');
@@ -136,6 +137,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                 const params = new URLSearchParams();
                 if (currentLang) params.set('lang', currentLang);
                 if (currentTheme) params.set('theme', currentTheme);
+                params.set('redirect', window.location.pathname);
 
                 const queryString = params.toString();
                 router.push(queryString ? `/login?${queryString}` : '/login');

@@ -33,6 +33,7 @@ async function proxyHandler(req: NextRequest): Promise<NextResponse> {
       method: req.method,
       headers: headers,
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      cache: 'no-store',
       // @ts-ignore
       duplex: 'half',
     });

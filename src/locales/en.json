@@ -219,5 +219,6 @@
   "ptaEdmsDesc": "PTA Electronic Document Management System for handling Public Transport Agency-specific documentation and workflow management.",
   "rightsReserved": "RTA. All rights reserved.",
   "switchToDark": "Switch to dark mode",
-  "switchToLight": "Switch to light mode"
+  "switchToLight": "Switch to light mode",
+  "foldersDesc": "Browse all your files and folders"
 }

@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isShowingFullMemories,
   t,
   lang,
-  hiddenSections = [],
+
 }) => {
   const getIsActive = (section: 'recent' | 'favorites' | 'folders') => {
     return section === activeSection;
@@ -65,43 +65,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const padding = isSidebarOpen ? 'p-4' : 'p-3';
   const borderClass = lang === 'ar' ? 'border-l' : 'border-r';
 
-  const isHidden = (section: 'recent' | 'favorites' | 'folders') => hiddenSections.includes(section);
+
 
   return (
     <aside
       className={`flex-shrink-0 bg-[var(--color-bg-sidebar)] ${sidebarWidth} ${padding} transition-all duration-300 ease-in-out flex flex-col ${borderClass} border-[var(--color-border-primary)]`}
     >
       <nav className="flex-1 space-y-2">
-        {!isHidden('recent') && (
-          <NavLink
-            icon="/clock.svg"
-            label={t('recentlyAdded')}
-            isActive={getIsActive('recent')}
-            isSidebarOpen={isSidebarOpen}
-            onClick={() => handleSectionChange('recent')}
-            lang={lang}
-          />
-        )}
-        {!isHidden('favorites') && (
-          <NavLink
-            icon="/star.svg"
-            label={t('favorites')}
-            isActive={getIsActive('favorites')}
-            isSidebarOpen={isSidebarOpen}
-            onClick={() => handleSectionChange('favorites')}
-            lang={lang}
-          />
-        )}
-        {!isHidden('folders') && (
-          <NavLink
-            icon="/folder.svg"
-            label={t('folders')}
-            isActive={getIsActive('folders')}
-            isSidebarOpen={isSidebarOpen}
-            onClick={() => handleSectionChange('folders')}
-            lang={lang}
-          />
-        )}
+
+        <NavLink
+          icon="/clock.svg"
+          label={t('recentlyAdded')}
+          isActive={getIsActive('recent')}
+          isSidebarOpen={isSidebarOpen}
+          onClick={() => handleSectionChange('recent')}
+          lang={lang}
+        />
+        <NavLink
+          icon="/star.svg"
+          label={t('favorites')}
+          isActive={getIsActive('favorites')}
+          isSidebarOpen={isSidebarOpen}
+          onClick={() => handleSectionChange('favorites')}
+          lang={lang}
+        />
+        <NavLink
+          icon="/folder.svg"
+          label={t('folders')}
+          isActive={getIsActive('folders')}
+          isSidebarOpen={isSidebarOpen}
+          onClick={() => handleSectionChange('folders')}
+          lang={lang}
+        />
 
       </nav>
     </aside>

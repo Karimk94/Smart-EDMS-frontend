@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
           className={`flex items-center gap-4 ${searchBarMargin} ${rtlClass}`}
         >
           {activeSection === 'folders' && quota !== undefined && remainingQuota !== undefined && (
-            <div className="bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm flex items-center gap-2 border border-gray-100 dark:border-gray-700 mx-2">
+            <div className="bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm flex items-center gap-2 border border-gray-100 dark:border-gray-700 mx-2 cursor-pointer">
               <QuotaPieChart remaining={remainingQuota} total={quota} compact={true} />
             </div>
           )}

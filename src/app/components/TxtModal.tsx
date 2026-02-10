@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Document } from '../../models/Document';
+import { useDocumentContent } from '../../hooks/useDocumentContent';
 import { TagEditor } from './TagEditor';
 import { CollapsibleSection } from './CollapsibleSection';
 import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useDownload } from '../../hooks/useDownload';
 
 import { TxtModalProps } from '../../interfaces/PropsInterfaces';
 
@@ -42,7 +45,7 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
@@ -57,7 +60,8 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+
+  const { download, isDownloading } = useDownload();
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -71,21 +75,19 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
     setInitialDate(newDate);
     setIsEditingAbstract(false);
     setIsEditingDate(false);
+  }, [doc.title, doc.date]);
 
-    setLoadingContent(true);
-    fetch(`${apiURL}/document/${doc.doc_id}`)
-      .then(res => {
-        if (res.ok) return res.text();
-        throw new Error("Failed to load text content");
-      })
-      .then(text => setTextContent(text))
-      .catch(err => {
-        console.error(err);
-        setTextContent("Error loading content preview.");
-      })
-      .finally(() => setLoadingContent(false));
+  const { data: fetchedContent, isLoading: isFetchingContent } = useDocumentContent(doc.doc_id, {
+    responseType: 'text',
+    enabled: !!doc.doc_id
+  });
 
-  }, [doc.title, doc.date, doc.doc_id, apiURL]);
+  useEffect(() => {
+    setLoadingContent(isFetchingContent);
+    if (fetchedContent) {
+      setTextContent(fetchedContent as string);
+    }
+  }, [isFetchingContent, fetchedContent]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -125,6 +127,8 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
     setIsEditingAbstract(false);
   };
 
+  const { updateMetadata, toggleFavorite } = useDocumentMutations();
+
   const handleUpdateMetadata = async () => {
     const payload: { doc_id: number; abstract?: string; date_taken?: string | null } = {
       doc_id: doc.doc_id,
@@ -151,12 +155,7 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
     }
 
     try {
-      const response = await fetch(`${apiURL}/update_metadata`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || 'Failed to update metadata');
+      await updateMetadata(payload);
 
       if (payload.abstract !== undefined) setInitialAbstract(payload.abstract);
       if (payload.date_taken !== undefined) setInitialDate(documentDate);
@@ -165,40 +164,28 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
       setIsEditingAbstract(false);
       onUpdateAbstractSuccess();
     } catch (err: any) {
-      console.error("Error updating metadata", err);
+      // Error handling managed by hook/global
     }
   };
 
-  const handleToggleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
-    onToggleFavorite(doc.doc_id, newFavoriteStatus);
+
+    try {
+      await toggleFavorite({ docId: doc.doc_id, isFavorite: newFavoriteStatus });
+    } catch (error) {
+      setIsFavorite(!newFavoriteStatus);
+    }
   };
 
   const handleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
   };
 
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      const response = await fetch(`${apiURL}/download_watermarked/${doc.doc_id}`);
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', doc.docname || 'download');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download error:', error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleDownload = () => {
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';

@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
-import { AsyncPaginate } from 'react-select-async-paginate';
 import { GroupBase, OptionsOrGroups } from 'react-select';
+import { AsyncPaginate } from 'react-select-async-paginate';
+import { fetchPersons } from '../../hooks/usePersons';
 import { PersonOption } from '../../models/PersonOption';
 
-import { DateRangePickerProps, AdvancedFiltersProps } from '../../interfaces/PropsInterfaces';
+import { AdvancedFiltersProps, DateRangePickerProps } from '../../interfaces/PropsInterfaces';
 
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ dateFrom, setDateFrom, dateTo, setDateTo, t }) => {
   const handleClear = () => {
@@ -147,22 +148,28 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     additional: { page: number } | undefined
   ) => {
     const page = additional?.page || 1;
-    const response = await fetch(`${apiURL}/persons?page=${page}&search=${search}&lang=${lang}`);
-    const data = await response.json();
+    try {
+      const data = await fetchPersons(page, search, lang);
 
-    return {
-      options: data.options.map((person: any) => {
+      const options = data.options.map((person: any) => {
         const label = (lang === 'ar' && person.name_arabic)
           ? `${person.name_arabic} - ${person.name_english}`
           : `${person.name_english}${person.name_arabic ? ` - ${person.name_arabic}` : ''}`;
 
         return { value: person.id, label };
-      }),
-      hasMore: data.hasMore,
-      additional: {
-        page: page + 1,
-      },
-    };
+      });
+
+      return {
+        options,
+        hasMore: data.hasMore,
+        additional: {
+          page: page + 1,
+        },
+      };
+    } catch (error) {
+      console.error("Error loading person options:", error);
+      return { options: [], hasMore: false };
+    }
   };
 
   return (

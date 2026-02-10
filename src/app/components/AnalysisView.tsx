@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { PersonSelector } from './PersonSelector';
+import React, { useEffect, useState } from 'react';
+import { useAnalysis } from '../../hooks/useAnalysis';
 import { useToast } from '../context/ToastContext';
+import { PersonSelector } from './PersonSelector';
 
 import { AnalysisViewProps } from '../../interfaces/PropsInterfaces';
 
@@ -9,6 +10,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
   const [isUpdating, setIsUpdating] = useState(false);
   const [savingFaceIndex, setSavingFaceIndex] = useState<number | null>(null);
   const { showToast } = useToast();
+  const { addFace, addPerson, updateAbstract } = useAnalysis();
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -43,23 +45,17 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
       return;
     }
     setSavingFaceIndex(face.index);
+    setSavingFaceIndex(face.index);
     try {
-      await fetch(`${apiURL}/add_face`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          location: face.location,
-          original_image_b64: result.original_image_b64,
-        }),
+      await addFace({
+        name: name.trim(),
+        location: face.location,
+        original_image_b64: result.original_image_b64,
       });
       showToast(`${t('SuccessfullySaved')} "${name.trim()}" ${t('toTheKnownFacesDatabase')}`, 'success');
 
-      await fetch(`${apiURL}/add_person`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), lang: lang }),
-      });
+      await addPerson({ name: name.trim(), lang: lang });
+
 
     } catch (error: any) {
       showToast(`${t('error')}: ${error.message}`, 'error');
@@ -85,12 +81,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
 
     setIsUpdating(true);
     try {
-      const response = await fetch(`${apiURL}/update_abstract`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doc_id: docId, names: namesToSave }),
-      });
-      if (!response.ok) throw new Error((await response.json()).error);
+      await updateAbstract({ doc_id: docId, names: namesToSave });
 
       showToast(t('titleUpdatedSuccessfully'), 'success');
       onUpdateAbstractSuccess();

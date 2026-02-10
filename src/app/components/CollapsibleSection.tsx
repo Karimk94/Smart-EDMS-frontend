@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-
 import { CollapsibleSectionProps } from '../../interfaces/PropsInterfaces';
 
 export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children, theme }) => {

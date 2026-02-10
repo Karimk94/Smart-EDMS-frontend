@@ -1,13 +1,19 @@
 "use client";
 
+import { useQueryClient } from '@tanstack/react-query';
 import { enGB } from 'date-fns/locale/en-GB';
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { useState, useEffect, Suspense, useCallback } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { registerLocale } from 'react-datepicker';
+import { useDocuments } from '../../hooks/useDocuments';
 import { UploadableFile } from '../../interfaces';
 import { Document } from '../../models/Document';
 import { PersonOption } from '../../models/PersonOption';
 import { User } from '../../models/User';
+import { useToast } from '../context/ToastContext';
+import { useUser } from '../context/UserContext';
+import { useTranslations } from '../hooks/useTranslations';
+import { useClearCache, useProcessDocuments } from '../../hooks/useSystemOperations';
 import { AdvancedFilters } from './AdvancedFilters';
 import { DocumentItemSkeleton } from './DocumentItemSkeleton';
 import { DocumentList } from './DocumentList';
@@ -17,7 +23,6 @@ import { Folders } from './Folders';
 import { FolderUploadModal } from './FolderUploadModal';
 import { Header } from './Header';
 import HtmlLangUpdater from './HtmlLangUpdater';
-import HtmlThemeUpdater from './HtmlThemeUpdater';
 import { ImageModal } from './ImageModal';
 import { Pagination } from './Pagination';
 import { PdfModal } from './PdfModal';
@@ -29,8 +34,6 @@ import { UploadModal } from './UploadModal';
 import { VideoModal } from './VideoModal';
 import { WordModal } from './WordModal';
 import { YearFilter } from './YearFilter';
-import { useToast } from '../context/ToastContext';
-import { useTranslations } from '../hooks/useTranslations';
 
 type ActiveSection = 'recent' | 'favorites' | 'folders';
 
@@ -53,20 +56,18 @@ interface MainDashboardProps {
 }
 
 export function MainDashboard({ initialSection = 'recent', initialFolderId = null, hiddenSections = [] }: MainDashboardProps) {
-    const [user, setUser] = useState<User | null>(null);
+    const { user, logout, isAuthenticated, isLoading: isLoadingUser } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();
 
     const [activeSection, setActiveSection] = useState<ActiveSection>(initialSection);
     const [activeFolder, setActiveFolder] = useState<'images' | 'videos' | 'files' | null>(null);
-    const [documents, setDocuments] = useState<Document[]>([]);
 
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    // React Query
+    const queryClient = useQueryClient();
 
+    // Filters & Pagination State
     const [currentPage, setCurrentPage] = useState<number>(1);
-    const [totalPages, setTotalPages] = useState<number>(1);
-
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [dateFrom, setDateFrom] = useState<Date | null>(null);
     const [dateTo, setDateTo] = useState<Date | null>(null);
@@ -76,6 +77,41 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     const [personCondition, setPersonCondition] = useState<'any' | 'all'>('any');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedYears, setSelectedYears] = useState<number[]>([]);
+    const [filterMediaType, setFilterMediaType] = useState<'image' | 'video' | 'pdf' | null>(null);
+
+    // Lang & Theme (User Prefs)
+    const lang = user?.lang || 'en';
+    const theme = user?.theme || 'light';
+    const t = useTranslations(lang);
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+    // Documents Hook
+    const {
+        data: documentsData,
+        isLoading: isDocumentsLoading,
+        error: documentsError
+    } = useDocuments({
+        activeSection,
+        activeFolder,
+        currentPage,
+        searchTerm,
+        dateFrom,
+        dateTo,
+        selectedPerson,
+        personCondition,
+        selectedTags,
+        selectedYears,
+        filterMediaType,
+        lang,
+        isEnabled: !!user
+    });
+
+    const documents = documentsData?.documents || [];
+    const totalPages = documentsData?.total_pages || 1;
+    const isLoading = isDocumentsLoading; // Mapped for compatibility
+    const error = documentsError instanceof Error ? documentsError.message : (documentsError ? String(documentsError) : null);
 
     const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
     const [selectedVideo, setSelectedVideo] = useState<Document | null>(null);
@@ -94,210 +130,46 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     const [isClearCacheModalOpen, setIsClearCacheModalOpen] = useState(false);
 
-    const [lang, setLang] = useState<'en' | 'ar'>('en');
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const t = useTranslations(lang);
-
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [initialLoadDone, setInitialLoadDone] = useState(false);
-
     const [refreshFoldersKey, setRefreshFoldersKey] = useState(0);
-    const [filterMediaType, setFilterMediaType] = useState<'image' | 'video' | 'pdf' | null>(null);
+
+    const clearCacheMutation = useClearCache();
+    const processDocumentsMutation = useProcessDocuments();
 
     const API_PROXY_URL = '/api';
-    const { showToast } = useToast();
+    const { showToast, removeToast } = useToast();
 
     useEffect(() => {
         setActiveSection(initialSection);
     }, [initialSection]);
 
     useEffect(() => {
-        const checkUser = async () => {
-            try {
-                const response = await fetch('/api/auth/user');
-                if (response.ok) {
-                    const data = await response.json();
-                    setUser(data.user);
-                    setLang(data.user.lang || 'en');
-                    setTheme(data.user.theme || 'light');
-                } else {
-                    const currentLang = searchParams.get('lang');
-                    const currentTheme = searchParams.get('theme');
-                    const params = new URLSearchParams();
-                    if (currentLang) params.set('lang', currentLang);
-                    if (currentTheme) params.set('theme', currentTheme);
-                    params.set('redirect', window.location.pathname);
-
-                    const queryString = params.toString();
-                    router.push(queryString ? `/login?${queryString}` : '/login');
-                }
-            } catch (err) {
-                const currentLang = searchParams.get('lang');
-                const currentTheme = searchParams.get('theme');
-                const params = new URLSearchParams();
-                if (currentLang) params.set('lang', currentLang);
-                if (currentTheme) params.set('theme', currentTheme);
-                params.set('redirect', window.location.pathname);
-
-                const queryString = params.toString();
-                router.push(queryString ? `/login?${queryString}` : '/login');
-            }
-        };
-        checkUser();
-    }, [router, searchParams]);
-
-    const handleThemeChange = async (newTheme: 'light' | 'dark') => {
-        if (!user) return;
-        try {
-            setTheme(newTheme);
-            await fetch('/api/user/theme', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ theme: newTheme }),
-            });
-            setUser(prevUser => prevUser ? ({ ...prevUser, theme: newTheme }) : null);
-        } catch (error) {
-            console.error('Failed to update theme', error);
-            setTheme(newTheme === 'light' ? 'dark' : 'light');
-        }
-    };
-
-    const fetchSectionData = useCallback(
-        async () => {
-            setIsLoading(true);
-            setError(null);
-            setDocuments([]);
-
-            let url: URL;
+        if (!isAuthenticated && !isLoadingUser) {
+            const currentLang = searchParams.get('lang');
+            const currentTheme = searchParams.get('theme');
             const params = new URLSearchParams();
-            params.append('page', String(currentPage));
-            params.append('pageSize', '20');
-            params.append('lang', lang);
+            if (currentLang) params.set('lang', currentLang);
+            if (currentTheme) params.set('theme', currentTheme);
+            params.set('redirect', window.location.pathname);
 
-            if (searchTerm) params.append('search', searchTerm);
-            if (selectedPerson && selectedPerson.length > 0) {
-                const personNames = selectedPerson
-                    .map((p) => p.label.split(' - ')[0])
-                    .join(',');
-                params.append('persons', personNames);
-                if (selectedPerson.length > 1) {
-                    params.append('person_condition', personCondition);
-                }
-            }
-            if (selectedTags.length > 0) {
-                params.append('tags', selectedTags.join(','));
-            }
-            const formattedDateFrom = formatToApiDateTime(dateFrom);
-            if (formattedDateFrom) params.append('date_from', formattedDateFrom);
-            const formattedDateTo = formatToApiDateTime(dateTo);
-            if (formattedDateTo) params.append('date_to', formattedDateTo);
-            if (selectedYears.length > 0) {
-                params.append('years', selectedYears.join(','));
-            }
-
-            if (activeSection === 'folders' && activeFolder) {
-                if (activeFolder === 'images') params.append('media_type', 'image');
-                else if (activeFolder === 'videos') params.append('media_type', 'video');
-                else if (activeFolder === 'files') params.append('media_type', 'pdf');
-
-                params.append('scope', 'folders');
-            } else if (filterMediaType) {
-                params.append('media_type', filterMediaType);
-            }
-
-            try {
-                let endpoint = '';
-                let dataSetter: React.Dispatch<React.SetStateAction<any[]>> = setDocuments;
-                let dataKey = 'documents';
-                let totalPagesKey = 'total_pages';
-
-                switch (activeSection) {
-                    case 'recent':
-                        endpoint = '/documents';
-                        params.append('sort', 'date_desc');
-                        dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
-                        dataKey = 'documents';
-                        break;
-                    case 'favorites':
-                        endpoint = '/favorites';
-                        dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
-                        dataKey = 'documents';
-                        break;
-                    case 'folders':
-                        if (activeFolder) {
-                            endpoint = '/documents';
-                            dataSetter = setDocuments as React.Dispatch<React.SetStateAction<Document[]>>;
-                            dataKey = 'documents';
-                        } else {
-                            setIsLoading(false);
-                            return;
-                        }
-                        break;
-                    default:
-                        throw new Error(`Invalid section: ${activeSection} `);
-                }
-
-                if (endpoint) {
-                    url = new URL(`${API_PROXY_URL}${endpoint} `, window.location.origin);
-                    url.search = params.toString();
-
-                    const response = await fetch(url);
-                    if (!response.ok)
-                        throw new Error(`Failed to fetch.Status: ${response.status} `);
-                    const data = await response.json();
-
-                    let fetchedDocs = data[dataKey] || [];
-
-                    if (activeSection === 'folders' && activeFolder) {
-                        fetchedDocs = fetchedDocs.filter((doc: Document) => {
-                            if (activeFolder === 'images') return doc.media_type === 'image';
-                            if (activeFolder === 'videos') return doc.media_type === 'video';
-                            if (activeFolder === 'files') return doc.media_type === 'pdf';
-                            return true;
-                        });
-                    }
-
-                    dataSetter(fetchedDocs);
-                    setTotalPages(data[totalPagesKey] || 1);
-                } else {
-                    setDocuments([]);
-                    setTotalPages(1);
-                }
-            } catch (err: any) {
-                console.error(`Error fetching: `, err);
-                setError(`Failed to fetch.${err.message} `);
-                setDocuments([]);
-                setTotalPages(1);
-            } finally {
-                setIsLoading(false);
-                if (!initialLoadDone) {
-                    setIsSidebarOpen(false);
-                    setInitialLoadDone(true);
-                }
-            }
-        },
-        [
-            activeSection,
-            activeFolder,
-            currentPage,
-            searchTerm,
-            dateFrom,
-            dateTo,
-            selectedPerson,
-            personCondition,
-            selectedTags,
-            selectedYears,
-            initialLoadDone,
-            lang,
-            filterMediaType
-        ]
-    );
-
-    useEffect(() => {
-        if (user) {
-            fetchSectionData();
+            const queryString = params.toString();
+            router.push(queryString ? `/login?${queryString}` : '/login');
         }
-    }, [fetchSectionData, currentPage, user?.username, lang]);
+    }, [isAuthenticated, isLoadingUser, router, searchParams]);
+
+
+    // UseEffect for initial load done is handled by query success effectively, but we can keep sidebar logic if needed
+    useEffect(() => {
+        if (!initialLoadDone && !isDocumentsLoading) {
+            // Logic to close sidebar on mobile if needed, or just set initial load done
+            if (!isDocumentsLoading) {
+                // Original logic: setIsSidebarOpen(false); setInitialLoadDone(true);
+                // We'll just set it to avoid issues, though sidebar logic seems to want to close it? 
+                // Actually the original logic closed sidebar on first load completion.
+                setIsSidebarOpen(false);
+                setInitialLoadDone(true);
+            }
+        }
+    }, [isDocumentsLoading, initialLoadDone]);
 
     useEffect(() => {
         if (user) {
@@ -345,7 +217,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         if (stillProcessing.length === 0) {
                             clearInterval(interval);
                             if (activeSection === 'recent' || (activeSection === 'folders' && activeFolder)) {
-                                fetchSectionData();
+                                queryClient.invalidateQueries({ queryKey: ['documents'] });
                             }
                             if (activeSection === 'folders' && !activeFolder) {
                                 setRefreshFoldersKey(prev => prev + 1);
@@ -363,10 +235,10 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
         }
     }, [
         processingDocs,
-        fetchSectionData,
         activeSection,
         activeFolder,
         user?.username,
+        queryClient
     ]);
 
     const handleSearch = (newSearchTerm: string) => {
@@ -391,13 +263,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     const confirmClearCache = async () => {
         setIsClearCacheModalOpen(false);
         try {
-            const response = await fetch(`${API_PROXY_URL}/clear_cache`, {
-                method: 'POST',
-            });
-            if (!response.ok)
-                throw new Error(`Cache clear failed: ${response.statusText}`);
+            await clearCacheMutation.mutateAsync({ apiURL: API_PROXY_URL });
             showToast(t('ThumbnailCacheCleared'), 'success');
-            fetchSectionData();
         } catch (err: any) {
             console.error('Cache clear error:', err);
             showToast(`${t('FailedToClearCache')}: ${err.message}`, 'error');
@@ -412,6 +279,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     const handleFolderUploadComplete = () => {
         setIsFolderUploadModalOpen(false);
+        queryClient.invalidateQueries({ queryKey: ['folders'] });
         setRefreshFoldersKey(prev => prev + 1);
     };
 
@@ -423,7 +291,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     const handleSectionChange = (section: ActiveSection) => {
         if (section === 'recent') {
-            router.push('/');
+            router.push('/dashboard');
         } else if (section === 'favorites') {
             router.push('/favorites');
         } else if (section === 'folders') {
@@ -476,7 +344,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     };
 
     const handleUpdateMetadataSuccess = () => {
-        fetchSectionData();
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
         const updatedDocId = selectedDoc?.doc_id || selectedVideo?.doc_id || selectedPdf?.doc_id;
 
         setSelectedDoc(null);
@@ -499,58 +367,23 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
             setRefreshFoldersKey(prev => prev + 1);
         } else if (activeSection === 'recent') {
             setCurrentPage(1);
-            fetchSectionData();
+            queryClient.invalidateQueries({ queryKey: ['documents'] });
         }
 
-        fetch(`${API_PROXY_URL}/process_uploaded_documents`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ docnumbers }),
-        }).catch((error) => {
-            console.error('Error initiating processing:', error);
-            setProcessingDocs((prev) => prev.filter((d) => !docnumbers.includes(d)));
-        });
+        processDocumentsMutation.mutate(
+            { docnumbers, apiURL: API_PROXY_URL },
+            {
+                onError: (error) => {
+                    console.error('Error initiating processing:', error);
+                    setProcessingDocs((prev) => prev.filter((d) => !docnumbers.includes(d)));
+                }
+            }
+        );
     };
 
-    const handleToggleFavorite = async (docId: number, isFavorite: boolean) => {
-        try {
-            const response = await fetch(`${API_PROXY_URL}/favorites/${docId}`, {
-                method: isFavorite ? 'POST' : 'DELETE',
-            });
-            if (!response.ok) {
-                throw new Error('Failed to update favorite status');
-            }
-            if (activeSection === 'favorites' || activeSection === 'recent') {
-                setDocuments(
-                    documents.map((d) =>
-                        d.doc_id === docId ? { ...d, is_favorite: isFavorite } : d
-                    )
-                );
-            }
-            if (activeSection === 'favorites' && !isFavorite) {
-                fetchSectionData();
-            }
-        } catch (error) {
-            console.error(error);
-            showToast(t('FailedToUpdateFavoriteStatus'), 'error');
-        }
-    };
 
-    const handleLogout = async () => {
-        try {
-            const response = await fetch('/api/auth/logout', { method: 'POST' });
-            if (response.ok) {
-                setUser(null);
-                router.push('/');
-            } else {
-                console.error('Logout failed');
-                showToast(t('LogoutFailed'), 'error');
-            }
-        } catch (error) {
-            console.error('Error during logout:', error);
-            showToast(t('ErrorLogout'), 'error');
-        }
-    };
+
+
 
     const hasActiveFilters = Boolean(
         dateFrom || dateTo || selectedPerson?.length || selectedTags.length || selectedYears.length
@@ -583,6 +416,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     </div>
                 }>
                     <Folders
+                        key={refreshFoldersKey}
                         onFolderClick={handleFolderClick}
                         onDocumentClick={handleDocumentClick}
                         onUploadClick={handleFolderUploadClick}
@@ -628,7 +462,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     onTagSelect={handleTagSelect}
                     isLoading={false}
                     processingDocs={processingDocs}
-                    onToggleFavorite={handleToggleFavorite}
+
                     lang={lang}
                     t={t}
                 />
@@ -649,7 +483,6 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     return (
         <>
             <HtmlLangUpdater lang={lang} />
-            <HtmlThemeUpdater theme={theme} />
             <div className={`flex flex-col h-screen ${rtlMainClass}`}>
                 <Header
                     onSearch={handleSearch}
@@ -657,18 +490,11 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     apiURL={API_PROXY_URL}
                     onOpenUploadModal={() => setIsUploadModalOpen(true)}
                     isProcessing={processingDocs.length > 0}
-                    onLogout={handleLogout}
                     isEditor={user.security_level === 'Editor'}
-                    lang={lang}
-                    setLang={setLang}
                     t={t}
                     isSidebarOpen={isSidebarOpen}
                     toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                    theme={theme}
-                    onThemeChange={handleThemeChange}
                     activeSection={activeSection}
-                    quota={user?.quota}
-                    remainingQuota={user?.remaining_quota}
                 />
 
                 <div className={`flex flex-1 overflow-hidden ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>
@@ -765,11 +591,11 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     </main>
                 </div>
 
-                {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} onToggleFavorite={handleToggleFavorite} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+                {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+                {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+                {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+                {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+                {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
 
                 {selectedExcel && (
                     <ExcelModal
@@ -777,7 +603,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         onClose={() => setSelectedExcel(null)}
                         apiURL={API_PROXY_URL}
                         onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
-                        onToggleFavorite={handleToggleFavorite}
+
                         isEditor={user?.security_level === 'Editor'}
                         t={t}
                         lang={lang}
@@ -791,7 +617,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         onClose={() => setSelectedPPT(null)}
                         apiURL={API_PROXY_URL}
                         onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
-                        onToggleFavorite={handleToggleFavorite}
+
                         isEditor={user?.security_level === 'Editor'}
                         t={t}
                         lang={lang}
@@ -805,7 +631,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         onClose={() => setSelectedWord(null)}
                         apiURL={API_PROXY_URL}
                         onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
-                        onToggleFavorite={handleToggleFavorite}
+
                         isEditor={user?.security_level === 'Editor'}
                         t={t}
                         lang={lang}

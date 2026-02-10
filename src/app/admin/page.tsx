@@ -4,30 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "../context/ToastContext";
 import QuotaPieChart from "../components/QuotaPieChart";
-
-interface EdmsUser {
-    username: string;
-    people_system_id: number;
-    edms_user_id: number;
-    user_ref_id: number;
-    security_level: string;
-    security_level_id: number;
-    lang: string;
-    theme: string;
-    remaining_quota: number;
-    quota: number;
-}
-
-interface SecurityLevel {
-    id: number;
-    name: string;
-}
-
-interface PersonResult {
-    system_id: number;
-    user_id: string;
-    name: string;
-}
+import { useAdmin, EdmsUser, SecurityLevel, PersonResult } from "../../hooks/useAdmin";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -44,26 +21,46 @@ const THEMES = [
 export default function AdminPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasAccess, setHasAccess] = useState(false);
-    const [users, setUsers] = useState<EdmsUser[]>([]);
-    const [securityLevels, setSecurityLevels] = useState<SecurityLevel[]>([]);
+
+    // Queries & Mutations from hook
+    const {
+        useCheckAccess,
+        useUsers,
+        useSecurityLevels,
+        useSearchPeople,
+        addUser,
+        isAddingUser,
+        updateUser,
+        isUpdatingUser,
+        deleteUser,
+        isDeletingUser
+    } = useAdmin();
+
+    const { data: accessData, isLoading: checkingAccess } = useCheckAccess();
 
     // Server-side pagination and search
     const [userFilter, setUserFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const [totalUsers, setTotalUsers] = useState(0);
-    const [hasMore, setHasMore] = useState(false);
-    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+    // Users Query
+    const { data: usersData, isLoading: isLoadingUsers } = useUsers(currentPage, userFilter, !!hasAccess);
+    const users = usersData?.users || [];
+    const totalUsers = usersData?.total || 0;
+    const hasMore = usersData?.has_more || false;
+
+    // Security Levels Query
+    const { data: securityLevels = [] } = useSecurityLevels(!!hasAccess);
 
     // Add user modal
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [searchResults, setSearchResults] = useState<PersonResult[]>([]);
     const [selectedPerson, setSelectedPerson] = useState<PersonResult | null>(null);
     const [selectedSecurityLevel, setSelectedSecurityLevel] = useState<number | null>(null);
     const [selectedLang, setSelectedLang] = useState("en");
     const [selectedTheme, setSelectedTheme] = useState("light");
-    const [isSearching, setIsSearching] = useState(false);
-    const [isAdding, setIsAdding] = useState(false);
+
+    // People Search Query
+    const { data: searchResults = [], isLoading: isSearching } = useSearchPeople(searchQuery, showAddModal);
 
     // Edit user modal
     const [editTarget, setEditTarget] = useState<EdmsUser | null>(null);
@@ -72,7 +69,6 @@ export default function AdminPage() {
     const [editTheme, setEditTheme] = useState("light");
     const [editQuota, setEditQuota] = useState<number | null>(null);
     const [editTotalQuota, setEditTotalQuota] = useState<number | null>(null);
-    const [isEditing, setIsEditing] = useState(false);
 
     // Format quota helper
     const formatQuota = (bytes: number) => {
@@ -85,7 +81,6 @@ export default function AdminPage() {
 
     // Delete confirmation
     const [deleteTarget, setDeleteTarget] = useState<EdmsUser | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
 
     const router = useRouter();
     const { showToast } = useToast();
@@ -93,109 +88,29 @@ export default function AdminPage() {
     // Calculate total pages
     const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
 
-    // Check access on mount
+    // Check access side effect
     useEffect(() => {
-        const checkAccess = async () => {
-            try {
-                const response = await fetch("/api/admin/check-access");
-                if (response.status === 401) {
-                    router.push("/login");
-                    return;
-                }
-                if (response.ok) {
-                    const data = await response.json();
-                    setHasAccess(data.has_access);
-                    if (data.has_access) {
-                        loadSecurityLevels();
-                    }
-                }
-            } catch (err) {
-                console.error("Access check failed:", err);
-            } finally {
-                setIsLoading(false);
+        if (accessData) {
+            setHasAccess(accessData.has_access);
+            setIsLoading(false);
+            if (!accessData.has_access) {
+                // Optional: redirect logic could go here, but let's keep the error UI
             }
-        };
-        checkAccess();
-    }, [router]);
-
-    // Load users with pagination and search
-    const loadUsers = useCallback(async (search: string, page: number) => {
-        setIsLoadingUsers(true);
-        try {
-            const params = new URLSearchParams({
-                search,
-                page: String(page),
-                limit: String(ITEMS_PER_PAGE)
-            });
-            const response = await fetch(`/api/admin/users?${params}`);
-            if (response.ok) {
-                const data = await response.json();
-                setUsers(data.users);
-                setTotalUsers(data.total);
-                setHasMore(data.has_more);
-            }
-        } catch (err) {
-            console.error("Failed to load users:", err);
-        } finally {
-            setIsLoadingUsers(false);
+        } else if (!checkingAccess && !accessData) {
+            setIsLoading(false); // Finished checking, no data (error handled by query)
         }
-    }, []);
+    }, [accessData, checkingAccess]);
 
-    // Debounced search effect - reset to page 1 when search changes
+    // Handle Access Error Redirect (optional, based on requirement)
+    // useEffect(() => { ... }, [accessError]); 
+
+    // Debounced search for user list - reset to page 1
     useEffect(() => {
-        if (!hasAccess) return;
         const timer = setTimeout(() => {
             setCurrentPage(1);
-            loadUsers(userFilter, 1);
         }, 300);
         return () => clearTimeout(timer);
-    }, [userFilter, hasAccess, loadUsers]);
-
-    // Load users when page changes (but not search - that's handled above)
-    useEffect(() => {
-        if (!hasAccess) return;
-        loadUsers(userFilter, currentPage);
-    }, [currentPage, hasAccess]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const loadSecurityLevels = async () => {
-        try {
-            const response = await fetch("/api/admin/security-levels");
-            if (response.ok) {
-                const data = await response.json();
-                setSecurityLevels(data);
-            }
-        } catch (err) {
-            console.error("Failed to load security levels:", err);
-        }
-    };
-
-    const searchPeople = useCallback(async (query: string) => {
-        if (query.length < 2) {
-            setSearchResults([]);
-            return;
-        }
-        setIsSearching(true);
-        try {
-            const response = await fetch(`/api/admin/search-people?search=${encodeURIComponent(query)}`);
-            if (response.ok) {
-                const data = await response.json();
-                setSearchResults(data);
-            }
-        } catch (err) {
-            console.error("Search failed:", err);
-        } finally {
-            setIsSearching(false);
-        }
-    }, []);
-
-    // Debounced search for add user modal
-    useEffect(() => {
-        if (!showAddModal) return;
-        const timer = setTimeout(() => {
-            searchPeople(searchQuery);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchQuery, searchPeople, showAddModal]);
+    }, [userFilter]);
 
     const handleAddUser = async () => {
         if (!selectedPerson || !selectedSecurityLevel) {
@@ -203,31 +118,18 @@ export default function AdminPage() {
             return;
         }
 
-        setIsAdding(true);
         try {
-            const response = await fetch("/api/admin/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_system_id: selectedPerson.system_id,
-                    security_level_id: selectedSecurityLevel,
-                    lang: selectedLang,
-                    theme: selectedTheme,
-                }),
+            await addUser({
+                user_system_id: selectedPerson.system_id,
+                security_level_id: selectedSecurityLevel,
+                lang: selectedLang,
+                theme: selectedTheme,
             });
 
-            if (response.ok) {
-                showToast("User added successfully", "success");
-                closeAddModal();
-                loadUsers(userFilter, currentPage);
-            } else {
-                const data = await response.json();
-                showToast(data.detail || "Failed to add user", "error");
-            }
-        } catch (err) {
-            showToast("Failed to add user", "error");
-        } finally {
-            setIsAdding(false);
+            showToast("User added successfully", "success");
+            closeAddModal();
+        } catch (err: any) {
+            showToast(err.message || "Failed to add user", "error");
         }
     };
 
@@ -238,7 +140,7 @@ export default function AdminPage() {
         setSelectedLang("en");
         setSelectedTheme("light");
         setSearchQuery("");
-        setSearchResults([]);
+        // searchResults is derived from query, so clearing query clears results
     };
 
     const openEditModal = (user: EdmsUser) => {
@@ -266,56 +168,33 @@ export default function AdminPage() {
             return;
         }
 
-        setIsEditing(true);
         try {
-            const response = await fetch(`/api/admin/users/${editTarget.edms_user_id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    security_level_id: editSecurityLevel,
-                    lang: editLang,
-                    theme: editTheme,
-                    remaining_quota: editQuota,
-                    quota: editTotalQuota,
-                }),
+            await updateUser({
+                edms_user_id: editTarget.edms_user_id,
+                security_level_id: editSecurityLevel,
+                lang: editLang,
+                theme: editTheme,
+                remaining_quota: editQuota,
+                quota: editTotalQuota,
             });
 
-            if (response.ok) {
-                showToast("User updated successfully", "success");
-                closeEditModal();
-                loadUsers(userFilter, currentPage);
-            } else {
-                const data = await response.json();
-                showToast(data.detail || "Failed to update user", "error");
-            }
-        } catch (err) {
-            showToast("Failed to update user", "error");
-        } finally {
-            setIsEditing(false);
+            showToast("User updated successfully", "success");
+            closeEditModal();
+        } catch (err: any) {
+            showToast(err.message || "Failed to update user", "error");
         }
     };
 
     const handleDeleteUser = async () => {
         if (!deleteTarget) return;
 
-        setIsDeleting(true);
         try {
-            const response = await fetch(`/api/admin/users/${deleteTarget.edms_user_id}`, {
-                method: "DELETE",
-            });
+            await deleteUser(deleteTarget.edms_user_id);
 
-            if (response.ok) {
-                showToast("User deleted successfully", "success");
-                setDeleteTarget(null);
-                loadUsers(userFilter, currentPage);
-            } else {
-                const data = await response.json();
-                showToast(data.detail || "Failed to delete user", "error");
-            }
-        } catch (err) {
-            showToast("Failed to delete user", "error");
-        } finally {
-            setIsDeleting(false);
+            showToast("User deleted successfully", "success");
+            setDeleteTarget(null);
+        } catch (err: any) {
+            showToast(err.message || "Failed to delete user", "error");
         }
     };
 
@@ -589,7 +468,7 @@ export default function AdminPage() {
                                                 key={person.system_id}
                                                 onClick={() => {
                                                     setSelectedPerson(person);
-                                                    setSearchResults([]);
+                                                    setSearchQuery(""); // Clear query to hide results
                                                 }}
                                                 className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-600 last:border-0"
                                             >
@@ -687,17 +566,17 @@ export default function AdminPage() {
                         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-lg">
                             <button
                                 onClick={closeAddModal}
-                                disabled={isAdding}
+                                disabled={isAddingUser}
                                 className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleAddUser}
-                                disabled={!selectedPerson || !selectedSecurityLevel || isAdding}
+                                disabled={!selectedPerson || !selectedSecurityLevel || isAddingUser}
                                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium flex items-center gap-2"
                             >
-                                {isAdding ? (
+                                {isAddingUser ? (
                                     <>
                                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -832,17 +711,17 @@ export default function AdminPage() {
                         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-lg">
                             <button
                                 onClick={closeEditModal}
-                                disabled={isEditing}
+                                disabled={isUpdatingUser}
                                 className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleEditUser}
-                                disabled={!editSecurityLevel || isEditing}
+                                disabled={!editSecurityLevel || isUpdatingUser}
                                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium flex items-center gap-2"
                             >
-                                {isEditing ? (
+                                {isUpdatingUser ? (
                                     <>
                                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -874,17 +753,17 @@ export default function AdminPage() {
                             <div className="flex justify-end gap-3">
                                 <button
                                     onClick={() => setDeleteTarget(null)}
-                                    disabled={isDeleting}
+                                    disabled={isDeletingUser}
                                     className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleDeleteUser}
-                                    disabled={isDeleting}
+                                    disabled={isDeletingUser}
                                     className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
                                 >
-                                    {isDeleting ? "Deleting..." : "Delete"}
+                                    {isDeletingUser ? "Deleting..." : "Delete"}
                                 </button>
                             </div>
                         </div>

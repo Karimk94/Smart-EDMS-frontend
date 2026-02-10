@@ -3,7 +3,8 @@ import { Document } from '../../models/Document';
 import { TagEditor } from './TagEditor';
 import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
-
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useDownload } from '../../hooks/useDownload';
 import { PdfModalProps } from '../../interfaces/PropsInterfaces';
 
 const safeParseDate = (dateString: string): Date | null => {
@@ -41,7 +42,7 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
   const [isEditingDate, setIsEditingDate] = useState(false);
@@ -54,8 +55,9 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
+
+  const { download, isDownloading } = useDownload();
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -109,6 +111,8 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
     setIsEditingAbstract(false);
   };
 
+  const { updateMetadata, toggleFavorite } = useDocumentMutations();
+
   const handleUpdateMetadata = async () => {
     const payload: { doc_id: number; abstract?: string; date_taken?: string | null } = {
       doc_id: doc.doc_id,
@@ -135,13 +139,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
     }
 
     try {
-      const response = await fetch(`${apiURL}/update_metadata`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || 'Failed to update metadata');
-      const resultMessage = await response.json();
+      await updateMetadata(payload);
 
       if (payload.abstract !== undefined) setInitialAbstract(payload.abstract);
       if (payload.date_taken !== undefined) setInitialDate(documentDate);
@@ -150,39 +148,28 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
       setIsEditingAbstract(false);
       onUpdateAbstractSuccess();
     } catch (err: any) {
+      // Error handling is managed by the hook or globally, but we can keep local state integrity if needed
     }
   };
 
-  const handleToggleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
-    onToggleFavorite(doc.doc_id, newFavoriteStatus);
+
+    try {
+      await toggleFavorite({ docId: doc.doc_id, isFavorite: newFavoriteStatus });
+    } catch (error) {
+      setIsFavorite(!newFavoriteStatus);
+    }
   };
 
   const handleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
   };
 
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      const response = await fetch(`${apiURL}/download_watermarked/${doc.doc_id}`);
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', doc.docname || 'download');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download error:', error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleDownload = () => {
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
   };
 
   return (

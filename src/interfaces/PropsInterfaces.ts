@@ -60,7 +60,7 @@ export interface PdfModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -72,7 +72,7 @@ export interface ImageModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -84,7 +84,7 @@ export interface VideoModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -132,7 +132,7 @@ export interface TxtModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -144,7 +144,7 @@ export interface FileModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -163,7 +163,7 @@ export interface ExcelModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -175,7 +175,7 @@ export interface WordModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -187,7 +187,7 @@ export interface PowerPointModalProps {
     onClose: () => void;
     apiURL: string;
     onUpdateAbstractSuccess: () => void;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     isEditor: boolean;
     t: Function;
     lang: 'en' | 'ar';
@@ -278,7 +278,7 @@ export interface DocumentListProps {
     onTagSelect: (tag: string) => void;
     isLoading: boolean;
     processingDocs: number[];
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     lang: 'en' | 'ar';
     t: Function;
 }
@@ -289,7 +289,7 @@ export interface DocumentItemProps {
     apiURL: string;
     onTagSelect: (tag: string) => void;
     isProcessing: boolean;
-    onToggleFavorite: (docId: number, isFavorite: boolean) => void;
+
     lang: 'en' | 'ar';
     t: Function;
 }
@@ -309,21 +309,14 @@ export interface PaginationProps {
 export interface HeaderProps {
     onSearch: (searchTerm: string) => void;
     onClearCache: () => void;
-    lang: 'en' | 'ar';
-    setLang: (lang: 'en' | 'ar') => void;
-    theme: 'light' | 'dark';
-    onThemeChange: (theme: 'light' | 'dark') => void;
     t: Function;
     apiURL: string;
     onOpenUploadModal: () => void;
     isProcessing: boolean;
-    onLogout: () => void;
     isEditor: boolean;
     isSidebarOpen: boolean;
     toggleSidebar: () => void;
     activeSection?: 'recent' | 'favorites' | 'folders';
-    quota?: number;
-    remainingQuota?: number;
 }
 
 export interface SidebarProps {

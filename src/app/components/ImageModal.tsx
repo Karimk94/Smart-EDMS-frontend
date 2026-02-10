@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Document } from '../../models/Document';
-import { AnalysisView } from './AnalysisView';
-import { TagEditor } from './TagEditor';
-import { CollapsibleSection } from './CollapsibleSection';
+import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
-import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
-
+import { useAnalysis } from '../../hooks/useAnalysis';
+import { useDocumentContent } from '../../hooks/useDocumentContent';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useDownload } from '../../hooks/useDownload';
 import { ImageModalProps } from '../../interfaces/PropsInterfaces';
+import { AnalysisView } from './AnalysisView';
+import { CollapsibleSection } from './CollapsibleSection';
+import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
+import { TagEditor } from './TagEditor';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -44,11 +46,10 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
   const [view, setView] = useState<'image' | 'analysis'>('image');
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,37 +67,37 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  useEffect(() => {
-    const fetchImage = async () => {
-      setIsLoading(true);
-      setError(null);
-      setView('image');
-      setAnalysisResult(null);
-      originalImageBlob.current = null;
-      if (imageSrc) {
-        URL.revokeObjectURL(imageSrc);
-        setImageSrc(null);
-      }
-      try {
-        const response = await fetch(`${apiURL}/image/${doc.doc_id}`);
-        if (!response.ok) throw new Error('Image not found in EDMS.');
-        const blob = await response.blob();
-        originalImageBlob.current = blob;
-        setImageSrc(URL.createObjectURL(blob));
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchImage();
+  const { download, isDownloading } = useDownload();
 
-    return () => {
-      if (imageSrc) {
-        URL.revokeObjectURL(imageSrc);
-      }
-    };
-  }, [doc.doc_id, apiURL]);
+  useEffect(() => {
+    setView('image');
+    setAnalysisResult(null);
+    originalImageBlob.current = null;
+    if (imageSrc) {
+      URL.revokeObjectURL(imageSrc);
+      setImageSrc(null);
+    }
+  }, [doc.doc_id]);
+
+  const { data: imageBlob, isLoading: isFetchingImage, error: imageError } = useDocumentContent(doc.doc_id, {
+    responseType: 'blob',
+    enabled: !!doc.doc_id
+  });
+
+  useEffect(() => {
+    setIsLoading(isFetchingImage);
+    if (imageError) {
+      setError(imageError.message || 'Failed to load image');
+    }
+    if (imageBlob) {
+      originalImageBlob.current = imageBlob as Blob;
+      const newUrl = URL.createObjectURL(imageBlob as Blob);
+      setImageSrc(newUrl);
+      return () => {
+        URL.revokeObjectURL(newUrl);
+      };
+    }
+  }, [isFetchingImage, imageError, imageBlob]);
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -126,17 +127,19 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, isFullScreen]);
 
+  const { analyzeImage } = useAnalysis();
+
   const handleAnalyze = async () => {
     if (!originalImageBlob.current) return;
     setIsAnalyzing(true);
     setError(null);
-    const formData = new FormData();
-    formData.append('image_file', originalImageBlob.current, `${doc.doc_id}.jpg`);
+
+    // Create a File object from the blob
+    const file = new File([originalImageBlob.current], `${doc.doc_id}.jpg`, { type: 'image/jpeg' });
 
     try {
-      const response = await fetch(`${apiURL}/analyze_image`, { method: 'POST', body: formData });
-      if (!response.ok) throw new Error((await response.json()).error || 'Analysis failed.');
-      setAnalysisResult(await response.json());
+      const data = await analyzeImage({ imageFile: file, docId: doc.doc_id });
+      setAnalysisResult(data);
       setView('analysis');
     } catch (err: any) {
       setError(`Face Service Error: ${err.message}`);
@@ -170,6 +173,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
     setIsEditingAbstract(false);
   };
 
+  const { updateMetadata, toggleFavorite } = useDocumentMutations();
+
   const handleUpdateMetadata = async () => {
     const payload: { doc_id: number; abstract?: string; date_taken?: string | null } = {
       doc_id: doc.doc_id,
@@ -196,13 +201,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
     }
 
     try {
-      const response = await fetch(`${apiURL}/update_metadata`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || 'Failed to update metadata');
-      const resultMessage = await response.json();
+      await updateMetadata(payload);
 
       if (payload.abstract !== undefined) setInitialAbstract(payload.abstract);
       if (payload.date_taken !== undefined) setInitialDate(documentDate);
@@ -211,39 +210,28 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
       setIsEditingAbstract(false);
       onUpdateAbstractSuccess();
     } catch (err: any) {
+      // Error handling managed by hook/global
     }
   };
 
-  const handleToggleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
-    onToggleFavorite(doc.doc_id, newFavoriteStatus);
+
+    try {
+      await toggleFavorite({ docId: doc.doc_id, isFavorite: newFavoriteStatus });
+    } catch (error) {
+      setIsFavorite(!newFavoriteStatus);
+    }
   };
 
   const handleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
   };
 
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      const response = await fetch(`${apiURL}/download_watermarked/${doc.doc_id}`);
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', doc.docname || 'download');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download error:', error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleDownload = () => {
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';

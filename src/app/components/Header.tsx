@@ -4,34 +4,33 @@ import QuotaPieChart from './QuotaPieChart';
 
 import { HeaderProps } from '../../interfaces/PropsInterfaces';
 
+import { useAuth } from '../../hooks/useAuth';
+import { useUserPreferences } from '../../hooks/useUserPreferences';
+
 export const Header: React.FC<HeaderProps> = ({
   onSearch,
   onClearCache,
   apiURL,
   onOpenUploadModal,
   isProcessing,
-  onLogout,
   isEditor,
-  lang,
-  setLang,
-  theme,
-  onThemeChange,
   t,
   isSidebarOpen,
   toggleSidebar,
   activeSection,
-  quota,
-  remainingQuota,
 }) => {
+  const { user, logout } = useAuth();
+  const { updateLanguage, updateTheme } = useUserPreferences();
+
+  const lang = user?.lang || 'en';
+  const theme = user?.theme || 'light';
+  const quota = user?.quota;
+  const remainingQuota = user?.remaining_quota;
+
   const handleLanguageChange = async () => {
     const newLang = lang === 'en' ? 'ar' : 'en';
     try {
-      await fetch('/api/user/language', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lang: newLang }),
-      });
-      setLang(newLang);
+      await updateLanguage(newLang);
     } catch (error) {
       console.error('Failed to update language', error);
     }
@@ -82,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
           {/* Theme Toggle Button */}
           <button
-            onClick={() => onThemeChange(theme === 'light' ? 'dark' : 'light')}
+            onClick={() => updateTheme(theme === 'light' ? 'dark' : 'light')}
             className={`p-2 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 ${logoMargin}`}
             aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
           >
@@ -139,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
           <button
-            onClick={onLogout}
+            onClick={() => logout()}
             className="px-4 py-2 bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-white text-sm font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-700 transition flex items-center gap-2"
           >
             <img src="/logout.svg" alt="Logout" className="h-5 w-5 dark:brightness-0 dark:invert" />

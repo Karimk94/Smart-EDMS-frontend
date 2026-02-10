@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Document } from '../../models/Document';
 import { TagEditor } from './TagEditor';
-import { CollapsibleSection } from './CollapsibleSection';
 import DatePicker from 'react-datepicker';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useDownload } from '../../hooks/useDownload';
+import { useDocumentContent } from '../../hooks/useDocumentContent';
+import { CollapsibleSection } from './CollapsibleSection';
 import JSZip from 'jszip';
 
 import { PowerPointModalProps, SlideData } from '../../interfaces/PropsInterfaces';
@@ -40,10 +43,10 @@ const formatToApiDate = (date: Date | null): string | null => {
   const hours = pad(date.getHours());
   const minutes = pad(date.getMinutes());
   const seconds = pad(date.getSeconds());
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return `${year} -${month} -${day} ${hours}:${minutes}:${seconds} `;
 };
 
-export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
   // Content State
@@ -62,7 +65,8 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const { download, isDownloading } = useDownload();
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);
@@ -80,14 +84,21 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
     setThumbnailUrl(null);
     setParseError(null);
 
-    // Fetch and Parse PPTX
-    const fetchPPTX = async () => {
+    setThumbnailUrl(null);
+    setParseError(null);
+  }, [doc.title, doc.date, doc.docname, doc.doc_id]);
+
+  const { data: arrayBuffer, isLoading: isFetchingContent } = useDocumentContent(doc.doc_id, {
+    responseType: 'arraybuffer',
+    enabled: !!doc.doc_id
+  });
+
+  useEffect(() => {
+    // Parse PPTX
+    const parsePPTX = async () => {
+      if (!arrayBuffer) return;
       setIsLoadingContent(true);
       try {
-        const response = await fetch(`${apiURL}/document/${doc.doc_id}`);
-        if (!response.ok) throw new Error("Failed to fetch document content");
-
-        const arrayBuffer = await response.arrayBuffer();
         const zip = await JSZip.loadAsync(arrayBuffer);
 
         // 1. Try to find a thumbnail
@@ -135,7 +146,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
             if (slideContent.length > 0) {
               extractedSlides.push({
                 id: i + 1,
-                title: `Slide ${i + 1}`,
+                title: `Slide ${i + 1} `,
                 content: slideContent
               });
             }
@@ -155,13 +166,13 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
       }
     };
 
-    fetchPPTX();
+    parsePPTX();
 
     return () => {
       if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
     };
 
-  }, [doc.title, doc.date, doc.docname, doc.doc_id, apiURL]);
+  }, [arrayBuffer]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -197,6 +208,8 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
     setIsEditingAbstract(false);
   };
 
+  const { updateMetadata, toggleFavorite } = useDocumentMutations();
+
   const handleUpdateMetadata = async () => {
     const payload: { doc_id: number; abstract?: string; date_taken?: string | null } = {
       doc_id: doc.doc_id,
@@ -223,12 +236,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
     }
 
     try {
-      const response = await fetch(`${apiURL}/update_metadata`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || 'Failed to update metadata');
+      await updateMetadata(payload);
 
       if (payload.abstract !== undefined) setInitialAbstract(payload.abstract);
       if (payload.date_taken !== undefined) setInitialDate(documentDate);
@@ -241,32 +249,20 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
     }
   };
 
-  const handleToggleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
-    onToggleFavorite(doc.doc_id, newFavoriteStatus);
+
+    try {
+      await toggleFavorite({ docId: doc.doc_id, isFavorite: newFavoriteStatus });
+    } catch (error) {
+      setIsFavorite(!newFavoriteStatus);
+    }
   };
 
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      const response = await fetch(`${apiURL}/download_watermarked/${doc.doc_id}`);
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', doc.docname || 'download');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download error:', error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleDownload = () => {
+    download({ docId: doc.doc_id, docname: doc.docname, apiURL });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';
@@ -275,7 +271,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" onClick={onClose}>
-      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-6xl h-[90vh] flex flex-col`} onClick={e => e.stopPropagation()}>
+      <div className={`${modalBg} ${textPrimary} rounded - xl w - full max - w - 6xl h - [90vh] flex flex - col`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
 
@@ -286,7 +282,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
               className="text-gray-600 dark:text-white hover:text-yellow-400 p-1 flex-shrink-0 mt-0.5"
               title={isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
-              <svg className={`w-6 h-6 ${isFavorite ? 'text-yellow-400' : 'text-gray-400 dark:text-gray-300'}`} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w - 6 h - 6 ${isFavorite ? 'text-yellow-400' : 'text-gray-400 dark:text-gray-300'} `} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isFavorite ? 1 : 2} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z" />
               </svg>
             </button>
@@ -316,19 +312,19 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
               </svg>
             </button>
 
-            <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2 ${closeButtonColor}`}>
+            <button onClick={onClose} className={`p - 2 rounded - full hover: bg - gray - 100 dark: hover: bg - gray - 700 transition - colors ml - 2 ${closeButtonColor} `}>
               <span className="text-3xl leading-none">&times;</span>
             </button>
           </div>
         </div>
 
         {/* Content Area */}
-        <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>
+        <div className={`flex - grow p - 4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap - 4 min - h - 0 transition - all duration - 300`}>
 
           {/* Main Viewer (PowerPoint Text) */}
-          <div className={`md:col-span-2 col-span-1 h-full bg-white dark:bg-[#1a1a1a] rounded-lg flex flex-col relative overflow-hidden border border-gray-200 dark:border-gray-700`}>
+          <div className={`md: col - span - 2 col - span - 1 h - full bg - white dark: bg - [#1a1a1a] rounded - lg flex flex - col relative overflow - hidden border border - gray - 200 dark: border - gray - 700`}>
 
-            {isLoadingContent ? (
+            {isFetchingContent || isLoadingContent ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-3"></div>
                 <span className="text-gray-500">Parsing presentation...</span>
@@ -385,7 +381,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
           </div>
 
           {/* Details Panel */}
-          <div className={`transition-all duration-300 ${isDetailsVisible ? 'md:col-span-1 opacity-100' : 'hidden opacity-0'} p-4 bg-gray-50 dark:bg-[#1f1f1f] rounded-lg overflow-y-auto`}>
+          <div className={`transition - all duration - 300 ${isDetailsVisible ? 'md:col-span-1 opacity-100' : 'hidden opacity-0'} p - 4 bg - gray - 50 dark: bg - [#1f1f1f] rounded - lg overflow - y - auto`}>
             {/* Abstract Section */}
             {(isEditor || abstract) && (
               <div className="mb-4">

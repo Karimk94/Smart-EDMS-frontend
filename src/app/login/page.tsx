@@ -6,12 +6,11 @@ import { useTranslations } from '../hooks/useTranslations';
 import HtmlLangUpdater from '../components/HtmlLangUpdater';
 import HtmlThemeUpdater from '../components/HtmlThemeUpdater';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../../hooks/useAuth';
 
 function LoginContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
 
   const searchParams = useSearchParams();
   const initialLang = (searchParams.get('lang') as 'en' | 'ar') || 'en';
@@ -23,51 +22,27 @@ function LoginContent() {
 
   const router = useRouter();
   const { showToast } = useToast();
+  const { login, isLoggingIn, isAuthenticated, isLoadingUser } = useAuth();
 
+  // Redirect if already authenticated
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const response = await fetch('/api/auth/user');
-        if (response.ok) {
-          const redirectPath = searchParams.get('redirect') || '/folders';
-          router.push(redirectPath);
-        } else {
-          setIsChecking(false);
-        }
-      } catch (err) {
-        setIsChecking(false);
-      }
-    };
-
-    checkSession();
-  }, [router]);
+    if (isAuthenticated && !isLoadingUser) {
+      const redirectPath = searchParams.get('redirect') || '/folders';
+      router.push(redirectPath);
+    }
+  }, [isAuthenticated, isLoadingUser, router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (response.ok) {
-        const redirectPath = searchParams.get('redirect') || '/folders';
-        router.push(redirectPath);
-      } else {
-        const data = await response.json();
-        console.log('Login error response:', data);
-        showToast(data.detail || data.error || t('loginFailed'), 'error');
-      }
-    } catch (err) {
+      await login({ username, password });
+      // Redirect handled by useEffect or onSuccess of mutation, but let's ensure it here too or just wait for effect
+      const redirectPath = searchParams.get('redirect') || '/folders';
+      router.push(redirectPath);
+    } catch (err: any) {
       console.error('Login exception:', err);
-      showToast(t('errorOccurred'), 'error');
-    } finally {
-      setIsLoading(false);
+      showToast(err.message || t('loginFailed'), 'error');
     }
   };
 
@@ -79,10 +54,20 @@ function LoginContent() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  if (isChecking) {
+  // If we are checking auth status, show loading
+  if (isLoadingUser) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
         <div>{t('loading')}</div>
+      </div>
+    );
+  }
+
+  // If authenticated, we are redirecting, so maybe show loading or nothing
+  if (isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
+        <div>{t('loading')}...</div>
       </div>
     );
   }
@@ -156,10 +141,10 @@ function LoginContent() {
             </div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoggingIn}
               className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded-md font-semibold text-white disabled:bg-red-800"
             >
-              {isLoading ? t('loggingIn') : t('login')}
+              {isLoggingIn ? t('loggingIn') : t('login')}
             </button>
           </form>
         </div>

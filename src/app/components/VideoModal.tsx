@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Document } from '../../models/Document';
-import { TagEditor } from './TagEditor';
-import { CollapsibleSection } from './CollapsibleSection';
 import DatePicker from 'react-datepicker';
-import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
-
 import { VideoModalProps } from '../../interfaces/PropsInterfaces';
+import { CollapsibleSection } from './CollapsibleSection';
+import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
+import { TagEditor } from './TagEditor';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useDocumentContent } from '../../hooks/useDocumentContent';
+import { useDownload } from '../../hooks/useDownload';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -52,10 +53,10 @@ const formatToApiDate = (date: Date | null): string | null => {
   const hours = pad(date.getHours());
   const minutes = pad(date.getMinutes());
   const seconds = pad(date.getSeconds());
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return `${year} -${month} -${day} ${hours}:${minutes}:${seconds} `;
 };
 
-export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [documentDate, setDocumentDate] = useState<Date | null>(safeParseDate(doc.date));
   const [initialDate, setInitialDate] = useState<Date | null>(safeParseDate(doc.date));
@@ -66,7 +67,8 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+
+  const { download, isDownloading } = useDownload();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -121,6 +123,8 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
     setIsEditingAbstract(false);
   };
 
+  const { updateMetadata, toggleFavorite } = useDocumentMutations();
+
   const handleUpdateMetadata = async () => {
     const payload: { doc_id: number; abstract?: string; date_taken?: string | null } = {
       doc_id: doc.doc_id,
@@ -148,12 +152,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
     }
 
     try {
-      const response = await fetch(`${apiURL}/update_metadata`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || 'Failed to update metadata');
+      await updateMetadata(payload);
 
       if (payload.abstract !== undefined) setInitialAbstract(payload.abstract);
       if (payload.date_taken !== undefined) setInitialDate(documentDate);
@@ -166,36 +165,24 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
     }
   };
 
-  const handleToggleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
-    onToggleFavorite(doc.doc_id, newFavoriteStatus);
+
+    try {
+      await toggleFavorite({ docId: doc.doc_id, isFavorite: newFavoriteStatus });
+    } catch (error) {
+      setIsFavorite(!newFavoriteStatus);
+    }
   };
 
   const handleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
   };
 
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      const response = await fetch(`${apiURL}/download_watermarked/${doc.doc_id}`);
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', doc.docname || 'download');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download error:', error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleDownload = () => {
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';
@@ -212,7 +199,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+      <div className={`${modalBg} ${textPrimary} rounded - xl w - full max - w - 4xl max - h - [90vh] overflow - y - auto`} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
@@ -222,10 +209,10 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
             {/* Favorite Button */}
             <button
               onClick={handleToggleFavorite}
-              className={`p-2 rounded-full transition-colors ${isFavorite ? 'bg-black bg-opacity-10' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} flex-shrink-0 mt-0.5`}
+              className={`p - 2 rounded - full transition - colors ${isFavorite ? 'bg-black bg-opacity-10' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} flex - shrink - 0 mt - 0.5`}
               title={isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
-              <svg className={`w-6 h-6 ${isFavorite ? 'text-yellow-400' : 'text-gray-300'}`} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w - 6 h - 6 ${isFavorite ? 'text-yellow-400' : 'text-gray-300'} `} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -234,7 +221,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
                 />
               </svg>
             </button>
-            <h2 className={`text-xl font-bold ${textHeader} break-words pt-1 mt-0.5`}>
+            <h2 className={`text - xl font - bold ${textHeader} break-words pt - 1 mt - 0.5`}>
               {doc.docname.replace(/\.[^/.]+$/, "")}
               <span className="ml-2 text-sm font-normal text-gray-400">File preview</span>
             </h2>
@@ -243,7 +230,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
           {/* Right: Actions */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {/* Download Button */}
-            <button onClick={handleDownload} disabled={isDownloading} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Download">
+            <button onClick={handleDownload} disabled={isDownloading} className={`p - 2 rounded - full hover: bg - gray - 100 dark: hover: bg - gray - 700 transition - colors`} title="Download">
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
               ) : (
@@ -252,21 +239,21 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
             </button>
 
             {/* Full Screen Button */}
-            <button onClick={handleFullScreen} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Full Screen">
+            <button onClick={handleFullScreen} className={`p - 2 rounded - full hover: bg - gray - 100 dark: hover: bg - gray - 700 transition - colors`} title="Full Screen">
               <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
             </button>
 
             {/* Close Button */}
-            <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2`}>
-              <span className={`text-3xl leading-none ${closeButtonColor}`}>&times;</span>
+            <button onClick={onClose} className={`p - 2 rounded - full hover: bg - gray - 100 dark: hover: bg - gray - 700 transition - colors ml - 2`}>
+              <span className={`text - 3xl leading - none ${closeButtonColor} `}>&times;</span>
             </button>
           </div>
         </div>
 
         <div className="p-6">
-          <div className={`relative ${isFullScreen ? 'fixed inset-0 z-[60] bg-black flex items-center justify-center' : ''}`}>
+          <div className={`relative ${isFullScreen ? 'fixed inset-0 z-[60] bg-black flex items-center justify-center' : ''} `}>
             <video ref={videoRef} controls autoPlay className={isFullScreen ? 'w-full h-full' : 'w-full max-h-[70vh] rounded-lg bg-black'}>
-              <source src={`${apiURL}/video/${doc.doc_id}`} type="video/mp4" />
+              <source src={`${apiURL} /video/${doc.doc_id} `} type="video/mp4" />
               Your browser does not support the video tag.
             </video>
             {isFullScreen && (
@@ -285,14 +272,14 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
               {/* Abstract Section */}
               {(isEditor || abstract) && (
                 <div className="mb-4">
-                  <h3 className={`font-semibold ${textSecondary} mb-1`}>{t('aiDescription')}</h3>
+                  <h3 className={`font - semibold ${textSecondary} mb - 1`}>{t('aiDescription')}</h3>
                   {isEditor ? (
                     isEditingAbstract ? (
                       <div className="flex flex-col gap-2">
                         <textarea
                           value={abstract}
                           onChange={(e) => setAbstract(e.target.value)}
-                          className={`w-full h-24 px-3 py-2 ${inputBg} ${textPrimary} border ${borderSecondary} rounded-md focus:ring-2 focus:ring-red-500 focus:outline-none`}
+                          className={`w - full h - 24 px - 3 py - 2 ${inputBg} ${textPrimary} border ${borderSecondary} rounded - md focus: ring - 2 focus: ring - red - 500 focus: outline - none`}
                         />
                         <div className="flex justify-end gap-2">
                           <button onClick={handleUpdateMetadata} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">{t('save')}</button>
@@ -301,19 +288,19 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
                       </div>
                     ) : (
                       <div className="flex items-start justify-between">
-                        <p className={`text-sm ${textMuted} mt-1 pr-4 whitespace-pre-wrap`}>{abstract || t('noAbstract')}</p>
-                        <button onClick={handleEditAbstract} className={`px-4 py-1 ${buttonBg} ${buttonText} text-xs rounded-md ${buttonHoverBg} flex-shrink-0`}>{t('edit')}</button>
+                        <p className={`text - sm ${textMuted} mt - 1 pr - 4 whitespace - pre - wrap`}>{abstract || t('noAbstract')}</p>
+                        <button onClick={handleEditAbstract} className={`px - 4 py - 1 ${buttonBg} ${buttonText} text - xs rounded - md ${buttonHoverBg} flex - shrink - 0`}>{t('edit')}</button>
                       </div>
                     )
                   ) : (
-                    <p className={`text-sm ${textMuted} mt-1 pr-4 whitespace-pre-wrap`}>{abstract}</p>
+                    <p className={`text - sm ${textMuted} mt - 1 pr - 4 whitespace - pre - wrap`}>{abstract}</p>
                   )}
                 </div>
               )}
 
               {/* Date Taken Section */}
               <div className="mb-4">
-                <h3 className={`font-semibold ${textSecondary} mb-1`}>{t('dateTaken')}</h3>
+                <h3 className={`font - semibold ${textSecondary} mb - 1`}>{t('dateTaken')}</h3>
                 {isEditor ? (
                   isEditingDate ? (
                     <div className="flex items-center gap-2">
@@ -321,7 +308,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
                         selected={documentDate}
                         onChange={handleDateChange}
                         dateFormat="dd/MM/yyyy"
-                        className={`w-full px-3 py-2 ${inputBg} ${textPrimary} border ${borderSecondary} rounded-md focus:ring-2 focus:ring-red-500 focus:outline-none`}
+                        className={`w - full px - 3 py - 2 ${inputBg} ${textPrimary} border ${borderSecondary} rounded - md focus: ring - 2 focus: ring - red - 500 focus: outline - none`}
                         wrapperClassName="w-full"
                         isClearable
                         placeholderText="Click to select date"
@@ -333,14 +320,14 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm ${textMuted} p-2 flex-grow`}>
+                      <p className={`text - sm ${textMuted} p - 2 flex - grow`}>
                         {documentDate ? documentDate.toLocaleDateString('en-GB') : t('noDateSet')}
                       </p>
-                      <button onClick={handleEditDate} className={`px-4 py-1 ${buttonBg} ${buttonText} text-xs rounded-md ${buttonHoverBg} flex-shrink-0`}>{t('edit')}</button>
+                      <button onClick={handleEditDate} className={`px - 4 py - 1 ${buttonBg} ${buttonText} text - xs rounded - md ${buttonHoverBg} flex - shrink - 0`}>{t('edit')}</button>
                     </div>
                   )
                 ) : (
-                  <p className={`text-sm ${textMuted} p-2 flex-grow`}>
+                  <p className={`text - sm ${textMuted} p - 2 flex - grow`}>
                     {documentDate ? documentDate.toLocaleDateString('en-GB') : t('noDateSet')}
                   </p>
                 )}

@@ -1,18 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Document } from '../../models/Document';
+import React, { useEffect, useRef, useState } from 'react';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useTags } from '../../hooks/useTags';
 import { useToast } from '../context/ToastContext';
-
 import { DocumentItemProps } from '../../interfaces/PropsInterfaces';
 
-export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, onToggleFavorite, lang, t }) => {
+export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, lang, t }) => {
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [imageError, setImageError] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [itemTags, setItemTags] = useState<string[]>([]);
-  const [isLoadingTags, setIsLoadingTags] = useState(true);
+  const { documentTags: itemTags, isLoadingDocumentTags: isLoadingTags } = useTags({ lang, docId: doc.doc_id });
+  const { toggleFavorite } = useDocumentMutations();
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
 
   const { showToast } = useToast();
@@ -21,42 +21,25 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
     setIsFavorite(doc.is_favorite);
   }, [doc.is_favorite]);
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
+    // Optimistic update locally
     setIsFavorite(newFavoriteStatus);
-    onToggleFavorite(doc.doc_id, newFavoriteStatus);
 
-    if (newFavoriteStatus) {
-      showToast(t('AddedToFavorites'), 'success');
-    } else {
-      showToast('Removed from favorites', 'info');
+    try {
+      await toggleFavorite({ docId: doc.doc_id, isFavorite: newFavoriteStatus });
+
+      if (newFavoriteStatus) {
+        showToast(t('AddedToFavorites'), 'success');
+      } else {
+        showToast('Removed from favorites', 'info');
+      }
+    } catch (error) {
+      setIsFavorite(!newFavoriteStatus); // Revert on error
+      showToast(t('FailedToUpdateFavoriteStatus'), 'error');
     }
   };
-
-  useEffect(() => {
-    const fetchTags = async () => {
-      setIsLoadingTags(true);
-      try {
-        const response = await fetch(`${apiURL}/tags/${doc.doc_id}?lang=${lang}`);
-        if (response.ok) {
-          const data = await response.json();
-          const tagStrings = (data.tags || []).map((t: any) => t.text);
-          setItemTags(tagStrings);
-        } else {
-          setItemTags([]);
-        }
-      } catch (error) {
-        console.error(`Failed to fetch tags for doc ${doc.doc_id}`, error);
-        setItemTags([]);
-      } finally {
-        setIsLoadingTags(false);
-      }
-    };
-    if (!isProcessing) {
-      fetchTags();
-    }
-  }, [doc.doc_id, apiURL, isProcessing, lang]);
 
   const MAX_VISIBLE_TAGS = 3;
   const hasOverflow = itemTags.length > MAX_VISIBLE_TAGS;
@@ -214,11 +197,11 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
                   {visibleTags.map((tag, index) => (
                     <button
                       key={index}
-                      onClick={(e) => handleTagClick(e, tag)}
+                      onClick={(e) => handleTagClick(e, tag.text)}
                       className="truncate min-w-0 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs font-medium px-2 py-0.5 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
-                      title={tag}
+                      title={tag.text}
                     >
-                      {tag}
+                      {tag.text}
                     </button>
                   ))}
                   {hasOverflow && (
@@ -242,9 +225,9 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
                     className="absolute bottom-full left-0 mb-2 w-auto min-w-[150px] max-w-xs bg-white dark:bg-gray-800 rounded-md shadow-lg p-2 z-10 border border-gray-100 dark:border-gray-700"
                   >
                     <div className="flex flex-wrap gap-1">
-                      {itemTags.map((tag, index) => (
-                        <button key={index} onClick={(e) => handleTagClick(e, tag)} className="bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs font-medium px-2 py-0.5 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600">
-                          {tag}
+                      {itemTags.map((tagObject, index) => (
+                        <button key={index} onClick={(e) => handleTagClick(e, tagObject.text)} className="bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs font-medium px-2 py-0.5 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                          {tagObject.text}
                         </button>
                       ))}
                     </div>

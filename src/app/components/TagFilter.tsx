@@ -4,34 +4,22 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 import { TagFilterProps } from '../../interfaces/PropsInterfaces';
 
+import { useTags } from '../../hooks/useTags';
+
 export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setSelectedTags, t, lang }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [allTags, setAllTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [tagsFetched, setTagsFetched] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Use the new hook
+  const { allTags, isLoadingAllTags } = useTags({ lang });
+
   const TAG_CHUNK_SIZE = 50;
   const [visibleTagCount, setVisibleTagCount] = useState(TAG_CHUNK_SIZE);
 
-  const handleOpen = async () => {
+  const handleOpen = () => {
     setIsOpen(true);
-    if (!tagsFetched) {
-      setIsLoading(true);
-      try {
-        const response = await fetch(`${apiURL}/tags?lang=${lang}`);
-        if (!response.ok) throw new Error('Failed to fetch tags');
-        const data = await response.json();
-        setAllTags(data);
-        setTagsFetched(true);
-      } catch (error) {
-        console.error("Failed to fetch tags:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
   };
 
   useEffect(() => {
@@ -46,10 +34,6 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
     };
   }, [wrapperRef]);
 
-  useEffect(() => {
-    setTagsFetched(false);
-    setAllTags([]);
-  }, [lang]);
 
   const handleTagClick = (tag: string) => {
     const newSelectedTags = selectedTags.includes(tag)
@@ -64,7 +48,7 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
   };
 
   const filteredTags = useMemo(() => {
-    return allTags.filter(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+    return (allTags || []).filter(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [allTags, searchTerm]);
 
   const sortedTags = useMemo(() => {
@@ -125,7 +109,7 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
               className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] text-gray-900 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-red-500 focus:outline-none"
             />
           </div>
-          {isLoading ? (
+          {isLoadingAllTags ? (
             <p className="text-gray-500 dark:text-gray-400">{t('loadingTags')}</p>
           ) : (
             <div
@@ -138,8 +122,8 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
                   key={tag}
                   onClick={() => handleTagClick(tag)}
                   className={`px-2 py-1 text-xs font-medium rounded-md transition ${selectedTags.includes(tag)
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500'
                     }`}
                 >
                   {tag}

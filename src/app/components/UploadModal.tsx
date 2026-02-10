@@ -60,12 +60,15 @@ const removeExtension = (filename: string) => {
 
 import { UploadModalProps } from '../../interfaces/PropsInterfaces';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme, t }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileIdCounter = useRef(0);
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -246,8 +249,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
 
     if (errorCount === 0 && successCount > 0) {
       showToast(`${t('SuccessfullyUploaded')} ${successCount} ${t('file(s)')}`, 'success');
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     } else if (errorCount > 0 && successCount > 0) {
       showToast(`${t('uploadCompletedWith')} ${errorCount} ${t('error(s)')} `, 'warning');
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     } else if (errorCount > 0 && successCount === 0) {
       showToast(t('AllUploadsFailed'), 'error');
     }

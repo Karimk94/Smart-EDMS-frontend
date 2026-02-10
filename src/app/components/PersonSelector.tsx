@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AsyncPaginate } from 'react-select-async-paginate';
 import Creatable from 'react-select/creatable';
 import { GroupBase, OptionsOrGroups } from 'react-select';
 import { PersonOption } from '../../models/PersonOption';
+import { fetchGroups, fetchGroupMembers } from '../../hooks/usePersons';
 
 const AnyAsyncPaginate: any = AsyncPaginate;
 
@@ -45,19 +46,19 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
   const selectStyles = getSelectStyles(theme);
   const [selectedGroup, setSelectedGroup] = useState<{ id: string, name: string } | null>(null);
 
+
+
+
   const loadPersonOptions = async (
     search: string,
     loadedOptions: OptionsOrGroups<PersonOption, GroupBase<PersonOption>>,
     additional: { page: number } | undefined
   ): Promise<{ options: any[]; hasMore: boolean; additional?: { page: number } }> => {
 
+
     if (!selectedGroup) {
       try {
-        const response = await fetch(`${apiURL}/groups`, {
-          headers: headers || { 'X-Session-ID': localStorage.getItem('dms_session') || '' }
-        });
-        if (!response.ok) throw new Error('Failed to fetch groups');
-        const groups = await response.json();
+        const groups = await fetchGroups();
 
         const filtered = groups.filter((g: any) =>
           g.group_name.toLowerCase().includes(search.toLowerCase())
@@ -77,15 +78,11 @@ export const PersonSelector: React.FC<PersonSelectorProps> = ({ apiURL, value, o
       }
     }
 
+
     const page = additional?.page || 1;
-    const url = `${apiURL}/groups/search_members?page=${page}&search=${encodeURIComponent(search)}&group_id=${selectedGroup.id}`;
 
     try {
-      const response = await fetch(url, {
-        headers: headers || (fetchUrl ? { 'X-Session-ID': localStorage.getItem('dms_session') || '' } : {})
-      });
-      if (!response.ok) throw new Error('Failed to fetch persons');
-      const data = await response.json();
+      const data = await fetchGroupMembers(selectedGroup.id, page, search);
 
       const options = data.options.map((person: any) => {
         const label = (lang === 'ar' && person.name_arabic)

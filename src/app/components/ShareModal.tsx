@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useToast } from '../context/ToastContext';
+import { useSecurityMutation } from '../../hooks/useSecurity';
 
 import { ShareModalProps } from '../../interfaces/PropsInterfaces';
 
@@ -20,6 +21,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const { showToast } = useToast();
+  const { generateShareLink, isGeneratingLink } = useSecurityMutation();
 
   const [shareMode, setShareMode] = useState<ShareMode>('open');
   const [targetEmail, setTargetEmail] = useState('');
@@ -49,40 +51,17 @@ const ShareModal: React.FC<ShareModalProps> = ({
       }
     }
 
-    setLoading(true);
     setError(null);
     try {
-      const payload: any = {
-        expiry_date: expiryDate ? new Date(expiryDate).toISOString() : null,
-        share_type: itemType,
-        item_name: documentName
-      };
-
-      // Set appropriate ID based on item type
-      if (itemType === 'folder') {
-        payload.folder_id = folderId;
-      } else {
-        payload.document_id = parseInt(documentId || '0');
-      }
-
-      if (shareMode === 'restricted' && targetEmail.trim()) {
-        payload.target_email = targetEmail.trim().toLowerCase();
-      }
-
-      const response = await fetch('/api/share/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+      const data = await generateShareLink({
+        itemType,
+        documentId,
+        folderId,
+        documentName,
+        expiryDate,
+        shareMode,
+        targetEmail
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to generate link');
-      }
-
-      const data = await response.json();
 
       const origin = window.location.origin;
       const fullLink = `${origin}/shared/${data.token}`;
@@ -90,8 +69,6 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
     } catch (err: any) {
       setError(err.message || 'Could not generate share link. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -159,8 +136,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   type="button"
                   onClick={() => setShareMode('open')}
                   className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${shareMode === 'open'
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                      : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                 >
                   <div className="font-medium">{t('openAccess')}</div>
@@ -170,8 +147,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   type="button"
                   onClick={() => setShareMode('restricted')}
                   className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${shareMode === 'restricted'
-                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300'
-                      : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                 >
                   <div className="font-medium">{t('restrictedAccess') || 'Specific Person'}</div>
@@ -193,8 +170,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   onChange={(e) => setTargetEmail(e.target.value)}
                   placeholder={`name${ALLOWED_DOMAIN}`}
                   className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm ${targetEmail && !validateEmail(targetEmail)
-                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                    : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
                     }`}
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -243,18 +220,18 @@ const ShareModal: React.FC<ShareModalProps> = ({
               </button>
               <button
                 onClick={handleGenerateLink}
-                disabled={loading || (shareMode === 'restricted' && !validateEmail(targetEmail))}
+                disabled={isGeneratingLink || (shareMode === 'restricted' && !validateEmail(targetEmail))}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (t('generating')) : (t('generateLink'))}
+                {isGeneratingLink ? (t('generating')) : (t('generateLink'))}
               </button>
             </div>
           </>
         ) : (
           <div className="space-y-4">
             <div className={`p-3 rounded-md text-sm ${shareMode === 'restricted'
-                ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
-                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+              ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+              : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
               }`}>
               {shareMode === 'restricted'
                 ? `${t('restrictedTo')} ${targetEmail}`
@@ -264,8 +241,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
             {/* Share type indicator */}
             <div className={`p-3 rounded-md text-sm flex items-center gap-2 ${isFolder
-                ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'
-                : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+              ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'
+              : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
               }`}>
               {isFolder ? (
                 <>

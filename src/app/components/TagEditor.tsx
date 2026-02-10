@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../context/ToastContext';
+import { useTags } from '../../hooks/useTags';
 
 const getSelectStyles = (theme: 'light' | 'dark') => ({
   control: (base: any) => ({
@@ -29,11 +30,18 @@ import { TagObject } from '../../interfaces/TagObject';
 import { TagEditorProps } from '../../interfaces/PropsInterfaces';
 
 export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme, t }) => {
-  const [tags, setTags] = useState<TagObject[]>([]);
-  const [allTags, setAllTags] = useState<string[]>([]);
+  // Use the new hook
+  const {
+    documentTags: tags,
+    allTags,
+    isLoadingDocumentTags: isLoading,
+    addTag,
+    removeTag,
+    toggleShortlist
+  } = useTags({ lang, docId });
+
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isSuggestionVisible, setIsSuggestionVisible] = useState(false);
   const [suggestionDirection, setSuggestionDirection] = useState<'down' | 'up'>('down');
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -42,35 +50,12 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
   const { showToast } = useToast();
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      setIsLoading(true);
-      try {
-        const [docTagsRes, allTagsRes] = await Promise.all([
-          fetch(`${apiURL}/tags/${docId}?lang=${lang}`),
-          fetch(`${apiURL}/tags?lang=${lang}`),
-        ]);
-        const docTagsData = docTagsRes.ok ? await docTagsRes.json() : { tags: [] };
-        const allTagsData = allTagsRes.ok ? await allTagsRes.json() : [];
-
-        setTags(docTagsData.tags || []);
-
-        setAllTags((allTagsData || []).sort((a: string, b: string) => a.localeCompare(b)));
-      } catch (error) {
-        console.error('Failed to fetch tags:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchInitialData();
-  }, [docId, apiURL, lang]);
-
-  useEffect(() => {
     if (!isSuggestionVisible || !inputRef.current) {
       setSuggestions([]);
       return;
     }
 
-    const availableTags = allTags.filter(
+    const availableTags = (allTags || []).filter(
       (tag) => !tags.some(t => t.text.toLowerCase() === tag.toLowerCase())
     );
 
@@ -100,7 +85,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [wrapperRef]);
 
-  const handleAddTag = async (tagToAdd: string) => {
+  const handleAddTagClick = async (tagToAdd: string) => {
     const trimmedTag = tagToAdd.trim();
     if (trimmedTag === '' || tags.some(t => t.text.toLowerCase() === trimmedTag.toLowerCase())) {
       setInputValue('');
@@ -108,82 +93,38 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
       return;
     };
 
-    const newTagObj: TagObject = { text: trimmedTag, shortlisted: 0, type: 'keyword' };
-    const newTags = [...tags, newTagObj].sort((a, b) => a.text.localeCompare(b.text));
-
-    setTags(newTags);
-
-    if (!allTags.some(t => t.toLowerCase() === trimmedTag.toLowerCase())) {
-      setAllTags([...allTags, trimmedTag].sort((a, b) => a.localeCompare(b)));
-    }
-    setInputValue('');
-    setIsSuggestionVisible(false);
-
     try {
-      const response = await fetch(`${apiURL}/tags/${docId}?lang=${lang}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tag: trimmedTag }),
-      });
-      if (!response.ok) {
-        setTags(tags);
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add tag');
-      }
+      setInputValue('');
+      setIsSuggestionVisible(false);
+      await addTag(trimmedTag);
     } catch (error: any) {
       console.error('Failed to add tag:', error);
       showToast(`${t('errorAddingTag')}: ${error.message}`, 'error');
-      setTags(tags);
     }
   };
 
-  const handleRemoveTag = async (tagToRemove: string) => {
-    const originalTags = [...tags];
-    setTags(tags.filter((tag) => tag.text.toLowerCase() !== tagToRemove.toLowerCase()));
-
+  const handleRemoveTagClick = async (tagToRemove: string) => {
     try {
-      const response = await fetch(`${apiURL}/tags/${docId}/${encodeURIComponent(tagToRemove)}`, { method: 'DELETE' });
-      if (!response.ok) {
-        setTags(originalTags);
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete tag');
-      }
+      await removeTag(tagToRemove);
     } catch (error: any) {
       console.error('Failed to delete tag:', error);
       showToast(`${t('errorDeletingTag')}: ${error.message}`, 'error');
-      setTags(originalTags);
     }
   };
 
-  const handleToggleShortlist = async (tag: TagObject) => {
+  const handleToggleShortlistClick = async (tag: TagObject) => {
     if (tag.type === 'person') return;
 
-    const updatedTags = tags.map(t =>
-      t.text === tag.text ? { ...t, shortlisted: t.shortlisted === 1 ? 0 : 1 } : t
-    );
-    setTags(updatedTags);
-
     try {
-      const response = await fetch(`${apiURL}/tags/shortlist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag: tag.text })
-      });
-
-      if (!response.ok) throw new Error('Failed to toggle shortlist');
-      const data = await response.json();
-
-      setTags(currentTags => currentTags.map(t =>
-        t.text === tag.text ? { ...t, shortlisted: data.new_status } : t
-      ));
-
+      await toggleShortlist(tag.text);
     } catch (error) {
       console.error('Error toggling shortlist:', error);
-      setTags(tags);
       showToast(t("failedUpdateShortlist"), 'error');
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') { e.preventDefault(); handleAddTag(inputValue); }
+    if (e.key === 'Enter') { e.preventDefault(); handleAddTagClick(inputValue); }
     else if (e.key === 'Escape') { setIsSuggestionVisible(false); }
   };
 
@@ -193,7 +134,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    handleAddTag(suggestion);
+    handleAddTagClick(suggestion);
   };
 
   return (
@@ -207,7 +148,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
                 {/* Shortlist Star Button (Only for Keywords) */}
                 {tag.type === 'keyword' && (
                   <button
-                    onClick={() => handleToggleShortlist(tag)}
+                    onClick={() => handleToggleShortlistClick(tag)}
                     className="mr-1.5 text-yellow-500 hover:text-yellow-400 focus:outline-none"
                     title={tag.shortlisted ? "Remove from shortlist" : "Add to shortlist"}
                   >
@@ -225,7 +166,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
 
                 <span>{tag.text}</span>
 
-                <button onClick={() => handleRemoveTag(tag.text)} className="ml-2 -mr-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white focus:outline-none" aria-label={`Remove ${tag.text}`} >
+                <button onClick={() => handleRemoveTagClick(tag.text)} className="ml-2 -mr-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white focus:outline-none" aria-label={`Remove ${tag.text}`} >
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"> <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /> </svg>
                 </button>
               </div>

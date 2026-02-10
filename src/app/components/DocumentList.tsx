@@ -1,6 +1,5 @@
 import React from 'react';
 import { DocumentItem } from './DocumentItem';
-import { Document } from '../../models/Document';
 import { DocumentItemSkeleton } from './DocumentItemSkeleton';
 
 import { DocumentListProps } from '../../interfaces/PropsInterfaces';
@@ -12,7 +11,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   onTagSelect,
   isLoading,
   processingDocs,
-  onToggleFavorite,
+
   lang,
   t
 }) => (
@@ -27,7 +26,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
           apiURL={apiURL}
           onTagSelect={onTagSelect}
           isProcessing={processingDocs.includes(doc.doc_id)}
-          onToggleFavorite={onToggleFavorite}
+
           lang={lang}
           t={t}
         />

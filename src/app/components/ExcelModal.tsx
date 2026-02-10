@@ -2,9 +2,12 @@ import { ExcelModalProps } from '@/interfaces/PropsInterfaces';
 import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import * as XLSX from 'xlsx';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useDocumentContent } from '../../hooks/useDocumentContent';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
+import { useDownload } from '../../hooks/useDownload';
 
 
 const safeParseDate = (dateString: string): Date | null => {
@@ -42,12 +45,12 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, onToggleFavorite, isEditor, t, lang, theme }) => {
+export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
   const [excelData, setExcelData] = useState<any[][]>([]);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheet, setActiveSheet] = useState<string>('');
-  const [isLoadingContent, setIsLoadingContent] = useState(false);
+
 
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [documentDate, setDocumentDate] = useState<Date | null>(safeParseDate(doc.date));
@@ -58,7 +61,9 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
   const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const { download, isDownloading } = useDownload();
   const workbookRef = useRef<XLSX.WorkBook | null>(null);
 
   useEffect(() => {
@@ -73,16 +78,17 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
     setInitialDate(newDate);
     setIsEditingAbstract(false);
     setIsEditingDate(false);
+  }, [doc.title, doc.date]);
 
-    // Fetch and Parse Excel
-    const fetchExcel = async () => {
-      setIsLoadingContent(true);
+  const { data: arrayBuffer, isLoading: isLoadingContent } = useDocumentContent(doc.doc_id, {
+    responseType: 'arraybuffer',
+    enabled: !!doc.doc_id
+  });
+
+  useEffect(() => {
+    const parseExcel = async () => {
+      if (!arrayBuffer) return;
       try {
-        // Use the document endpoint to get the raw file bytes
-        const response = await fetch(`${apiURL}/document/${doc.doc_id}`);
-        if (!response.ok) throw new Error("Failed to fetch document content");
-
-        const arrayBuffer = await response.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         workbookRef.current = workbook;
 
@@ -96,14 +102,11 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
         }
       } catch (error) {
         console.error("Error parsing Excel file:", error);
-      } finally {
-        setIsLoadingContent(false);
       }
     };
 
-    fetchExcel();
-
-  }, [doc.title, doc.date, doc.docname, doc.doc_id, apiURL]);
+    parseExcel();
+  }, [arrayBuffer]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -148,6 +151,8 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
     setIsEditingAbstract(false);
   };
 
+  const { updateMetadata, toggleFavorite } = useDocumentMutations();
+
   const handleUpdateMetadata = async () => {
     const payload: { doc_id: number; abstract?: string; date_taken?: string | null } = {
       doc_id: doc.doc_id,
@@ -174,12 +179,7 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
     }
 
     try {
-      const response = await fetch(`${apiURL}/update_metadata`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || 'Failed to update metadata');
+      await updateMetadata(payload);
 
       if (payload.abstract !== undefined) setInitialAbstract(payload.abstract);
       if (payload.date_taken !== undefined) setInitialDate(documentDate);
@@ -192,32 +192,20 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
     }
   };
 
-  const handleToggleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const newFavoriteStatus = !isFavorite;
     setIsFavorite(newFavoriteStatus);
-    onToggleFavorite(doc.doc_id, newFavoriteStatus);
+
+    try {
+      await toggleFavorite({ docId: doc.doc_id, isFavorite: newFavoriteStatus });
+    } catch (error) {
+      setIsFavorite(!newFavoriteStatus);
+    }
   };
 
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      const response = await fetch(`${apiURL}/download_watermarked/${doc.doc_id}`);
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', doc.docname || 'download');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download error:', error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleDownload = () => {
+    download({ docId: doc.doc_id, docname: doc.docname, apiURL });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { GlobalSecurity } from './components/GlobalSecurity';
 import { ToastProvider } from "./context/ToastContext";
+import { UserProvider } from "./context/UserContext";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Smart EDMS",
@@ -18,7 +20,11 @@ export default function RootLayout({
       <body className="font-sans">
         <GlobalSecurity />
         <ToastProvider>
-          {children}
+          <Providers>
+            <UserProvider>
+              {children}
+            </UserProvider>
+          </Providers>
         </ToastProvider>
       </body>
     </html>

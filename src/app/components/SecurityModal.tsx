@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../context/ToastContext';
 
 import { SecurityModalProps, Trustee } from '../../interfaces/PropsInterfaces';
+import { useGroups, fetchGroupMembers } from '../../hooks/usePersons';
+import { useTrustees, useSecurityMutation } from '../../hooks/useSecurity';
 
 const InfiniteSelect = ({
   options,
@@ -94,8 +96,8 @@ const InfiniteSelect = ({
               <div
                 key={index}
                 className={`relative cursor-pointer select-none py-2 pl-3 pr-9 ${option.value === value
-                    ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100'
-                    : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600'
+                  ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100'
+                  : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600'
                   }`}
                 onClick={() => {
                   onChange(option.value);
@@ -129,18 +131,18 @@ const InfiniteSelect = ({
   );
 };
 
+
 export default function SecurityModal({ isOpen, onClose, docId, library, itemName, t }: SecurityModalProps) {
+  const { data: trusteesData, isLoading: isLoadingTrustees } = useTrustees(parseInt(docId));
   const [trustees, setTrustees] = useState<Trustee[]>([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Groups State
-  const [groups, setGroups] = useState<any[]>([]);
+  // Groups and Members - Using hooks / fetchers
+  // We'll keep local state for component logic but fetch using our new functions
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
-  const [groupsPage, setGroupsPage] = useState(1);
-  const [hasMoreGroups, setHasMoreGroups] = useState(true);
-  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
+
+  const { data: groups, isLoading: isLoadingGroups } = useGroups({ search: groupSearch });
 
   // Members State
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
@@ -151,6 +153,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   const [hasMoreMembers, setHasMoreMembers] = useState(true);
 
   const { showToast } = useToast();
+  const { updateSecurity, isUpdatingSecurity } = useSecurityMutation();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -169,40 +172,31 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (isOpen && docId) {
-      fetchTrustees();
-    } else {
-      setTrustees([]);
-      setGroups([]);
-      setGroupMembers([]);
+    if (trusteesData) {
+      setTrustees(trusteesData);
+    }
+  }, [trusteesData]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset local state on close
       setSelectedGroupId('');
       setSelectedMemberId('');
       setMemberPage(1);
       setMemberSearch('');
       setHasMoreMembers(true);
-      setGroupsPage(1);
       setGroupSearch('');
-      setHasMoreGroups(true);
     }
-  }, [isOpen, docId]);
+  }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen) {
-      const delayDebounceFn = setTimeout(() => {
-        setGroupsPage(1);
-        fetchGroups(1, groupSearch);
-      }, 300);
-
-      return () => clearTimeout(delayDebounceFn);
-    }
-  }, [isOpen, groupSearch]);
+  // No need for separate fetchGroups effect as useGroups handles it
 
   useEffect(() => {
     if (selectedGroupId) {
       const delayDebounceFn = setTimeout(() => {
         setMemberPage(1);
         setHasMoreMembers(true);
-        fetchGroupMembers(selectedGroupId, 1, memberSearch);
+        loadGroupMembers(selectedGroupId, 1, memberSearch);
       }, 300);
 
       return () => clearTimeout(delayDebounceFn);
@@ -212,77 +206,24 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     }
   }, [selectedGroupId, memberSearch]);
 
-  const fetchTrustees = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/document/${docId}/trustees`);
-      if (res.ok) {
-        const data = await res.json();
-        setTrustees(Array.isArray(data) ? data : []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch trustees', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchGroups = async (page: number, search: string) => {
-    setIsLoadingGroups(true);
-    try {
-      const res = await fetch(`/api/groups?page=${page}&search=${encodeURIComponent(search)}`);
-      if (res.ok) {
-        const data = await res.json();
-        const newGroups = (data && Array.isArray(data.options)) ? data.options : [];
-
-        setHasMoreGroups(data.hasMore || false);
-
-        if (page === 1) {
-          setGroups(newGroups);
-        } else {
-          setGroups(prev => [...prev, ...newGroups]);
-        }
-      } else {
-        if (page === 1) setGroups([]);
-      }
-    } catch (err) {
-      console.error('Failed to fetch groups', err);
-      if (page === 1) setGroups([]);
-    } finally {
-      setIsLoadingGroups(false);
-    }
-  };
-
-  const loadMoreGroups = () => {
-    if (hasMoreGroups && !isLoadingGroups) {
-      const nextPage = groupsPage + 1;
-      setGroupsPage(nextPage);
-      fetchGroups(nextPage, groupSearch);
-    }
-  };
-
-  const fetchGroupMembers = async (groupId: string, page: number, search: string = '') => {
+  const loadGroupMembers = async (groupId: string, page: number, search: string = '') => {
     setIsLoadingMembers(true);
     try {
-      const res = await fetch(`/api/groups/search_members?page=${page}&search=${encodeURIComponent(search)}&group_id=${groupId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const newMembers = (data && Array.isArray(data.options)) ? data.options : [];
+      const data = await fetchGroupMembers(groupId, page, search);
+      const newMembers = (data && Array.isArray(data.options)) ? data.options : [];
 
-        if (newMembers.length === 0) {
-          setHasMoreMembers(false);
-        } else {
-          setHasMoreMembers(data.hasMore);
-        }
-
-        if (page === 1) {
-          setGroupMembers(newMembers);
-        } else {
-          setGroupMembers(prev => [...prev, ...newMembers]);
-        }
+      if (newMembers.length === 0) {
+        setHasMoreMembers(false);
       } else {
-        if (page === 1) setGroupMembers([]);
+        setHasMoreMembers(data.hasMore);
       }
+
+      if (page === 1) {
+        setGroupMembers(newMembers);
+      } else {
+        setGroupMembers(prev => [...prev, ...newMembers]);
+      }
+
     } catch (err) {
       console.error('Failed to fetch group members', err);
       if (page === 1) setGroupMembers([]);
@@ -295,7 +236,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     if (hasMoreMembers && !isLoadingMembers && selectedGroupId) {
       const nextPage = memberPage + 1;
       setMemberPage(nextPage);
-      fetchGroupMembers(selectedGroupId, nextPage, memberSearch);
+      loadGroupMembers(selectedGroupId, nextPage, memberSearch);
     }
   };
 
@@ -340,19 +281,13 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`/api/document/${docId}/security`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          library: library || 'RTA_MAIN',
-          trustees: trustees,
-          security_enabled: '1'
-        })
+      await updateSecurity({
+        docId: parseInt(docId),
+        library: library || 'RTA_MAIN',
+        trustees: trustees,
+        security_enabled: '1'
       });
 
-      if (!response.ok) throw new Error('Failed to update security');
       showToast(t('permissionsUpdated'), 'success');
       onClose();
     } catch (error) {
@@ -402,7 +337,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
               {/* Group Selector */}
               <div className="flex-1">
                 <InfiniteSelect t={t}
-                  options={groups.map((g: any) => ({
+                  options={(groups || []).map((g: any) => ({
                     label: g.group_name || g.name,
                     value: g.group_id || g.id
                   }))}
@@ -412,7 +347,6 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                     setMemberSearch('');
                   }}
                   placeholder={t('selectGroup') || "Select Group..."}
-                  onLoadMore={loadMoreGroups}
                   isLoading={isLoadingGroups}
                   onSearch={setGroupSearch}
                   searchValue={groupSearch}
@@ -470,7 +404,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {loading ? (
+                {isLoadingTrustees ? (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
                       <svg className="animate-spin h-5 w-5 mx-auto text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -533,10 +467,10 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || isUpdatingSecurity}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
-            {saving && (
+            {(saving || isUpdatingSecurity) && (
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

@@ -14,7 +14,11 @@ import { useTranslations } from '../../hooks/useTranslations';
 
 registerLocale('en-GB', enGB);
 
-const SESSION_KEY_PREFIX = 'share_session_';
+import { useSharedAuth } from '../../../hooks/useSharedAuth';
+import { useSharedContent } from '../../../hooks/useSharedContent';
+import { useSharedFileDownload, useSharedFileRestore, useSharedFolderItemDownload } from '../../../hooks/useSharedFileDownload';
+
+registerLocale('en-GB', enGB);
 
 export default function SharedDocumentPage() {
   const params = useParams();
@@ -25,34 +29,59 @@ export default function SharedDocumentPage() {
   const t = useTranslations(lang);
   const { showToast } = useToast();
 
-  // Share Info State
-  const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
-  const [isLoadingShareInfo, setIsLoadingShareInfo] = useState(true);
-  const [shareInfoError, setShareInfoError] = useState<string | null>(null);
+  // Shared Auth Hook
+  const {
+    shareInfo,
+    isLoadingShareInfo,
+    shareInfoError,
+    requestAccess,
+    verifyAccess,
+    isRequestingAccess,
+    isVerifyingAccess,
+    saveSession,
+    getStoredSession
+  } = useSharedAuth(token);
 
-  // Session Restoration State
-  const [isRestoringSession, setIsRestoringSession] = useState(true);
-
-  // Use useRef instead of useState to prevent double-firing in Strict Mode
-  const autoOtpSentRef = useRef(false);
-
-  // Flow State
+  // Local state for auth flow
   const [step, setStep] = useState<'email_input' | 'otp_input' | 'success'>('email_input');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  // Persisted state for folder navigation (can be partially derived but keeping local for now)
+  const [viewerEmail, setViewerEmail] = useState<string | null>(null);
+  const [rootFolderId, setRootFolderId] = useState<string | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+  // Shared Content Hook
+  const { data: folderData, isLoading: isLoadingFolder } = useSharedContent({
+    token,
+    folderId: currentFolderId,
+    viewerEmail,
+    isEnabled: step === 'success' && shareInfo?.share_type === 'folder',
+    rootFolderId
+  });
+
+  const folderContents = folderData?.contents || [];
+  const breadcrumbs = folderData?.breadcrumbs || [];
+  const currentFolderName = folderData?.folder_name || 'Shared Folder';
+
+  // Shared File Download Hooks
+  const { downloadFileAsync, isDownloading: isDownloadingFile } = useSharedFileDownload();
+  const { restoreFileAsync, isRestoring } = useSharedFileRestore();
+  const { downloadItem, isDownloading: isDownloadingItem } = useSharedFolderItemDownload();
+
+  // Derived loading states
+  const isAuthLoading = isLoadingShareInfo || isVerifyingAccess;
 
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [documentData, setDocumentData] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Folder State (for folder shares)
-  const [folderContents, setFolderContents] = useState<FolderItem[]>([]);
-  const [rootFolderId, setRootFolderId] = useState<string | null>(null);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [currentFolderName, setCurrentFolderName] = useState<string>('Shared Folder');
-  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
-  const [isLoadingFolder, setIsLoadingFolder] = useState(false);
+
   const [selectedFile, setSelectedFile] = useState<FolderItem | null>(null);
+
+  // Use useRef instead of useState to prevent double-firing in Strict Mode
+  const autoOtpSentRef = useRef(false);
+
 
   // File URL for displaying/downloading the actual file
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -84,379 +113,153 @@ export default function SharedDocumentPage() {
     setLang(prev => prev === 'en' ? 'ar' : 'en');
   };
 
-  // Session Storage Helpers
-  const getSessionKey = () => `${SESSION_KEY_PREFIX}${token}`;
 
-  const saveSession = (email: string, shareType: 'file' | 'folder', folderId?: string) => {
-    const session: StoredSession = {
-      email,
-      verifiedAt: Date.now(),
-      shareType,
-      folderId
-    };
-    try {
-      localStorage.setItem(getSessionKey(), JSON.stringify(session));
-    } catch (e) {
-      console.warn('Could not save session to localStorage:', e);
-    }
-  };
 
-  const getStoredSession = (): StoredSession | null => {
-    try {
-      const stored = localStorage.getItem(getSessionKey());
-      if (stored) {
-        const session: StoredSession = JSON.parse(stored);
-        // Session valid for 24 hours
-        const sessionAge = Date.now() - session.verifiedAt;
-        const maxAge = 24 * 60 * 60 * 1000;
-        if (sessionAge < maxAge) {
-          return session;
-        }
-        // Session expired, remove it
-        localStorage.removeItem(getSessionKey());
+  // Initialize Auth
+  const initializeAuth = async () => {
+    if (!token || !shareInfo || autoOtpSentRef.current) return;
+
+    // 1. Try restore session
+    const storedSession = getStoredSession();
+    if (storedSession) {
+      setViewerEmail(storedSession.email);
+      setEmail(storedSession.email);
+
+      if (storedSession.shareType === 'folder') {
+        setRootFolderId(storedSession.folderId || null);
+        setCurrentFolderId(storedSession.folderId || null);
+        setStep('success');
+        return;
+      } else {
+        // File restore logic - simplified to just re-verify or trust session
+        // For security, let's re-verify seamlessly if possible, or just set success if we trust local storage
+        // A better approach is to set viewer email and let the component logic handle file download url generation
+        setStep('success');
+        await restoreFileSession(storedSession.email);
+        return;
       }
-    } catch (e) {
-      console.warn('Could not read session from localStorage:', e);
     }
-    return null;
-  };
 
-  const clearSession = () => {
-    try {
-      localStorage.removeItem(getSessionKey());
-    } catch (e) {
-      console.warn('Could not clear session from localStorage:', e);
-    }
-  };
+    // 2. Handle restricted shares (Auto OTP or Skip OTP)
+    if (shareInfo.is_restricted && shareInfo.target_email) {
+      autoOtpSentRef.current = true;
+      setEmail(shareInfo.target_email);
 
-  // Try to restore session and load content
-  const tryRestoreSession = async (session: StoredSession, shareInfoData: ShareInfo) => {
-    setEmail(session.email);
-
-    try {
-      if (shareInfoData.share_type === 'folder') {
-        // For folder shares, try to load folder contents directly
-        const params = new URLSearchParams({ viewer_email: session.email });
-        const response = await fetch(`/api/share/folder-contents/${token}?${params.toString()}`);
-
-        if (response.ok) {
-          const data = await response.json();
-          setFolderContents(data.contents || []);
-          setCurrentFolderName(data.folder_name || 'Shared Folder');
-          setBreadcrumbs(data.breadcrumbs || []);
-          setCurrentFolderId(data.folder_id);
-          setRootFolderId(data.root_folder_id);
-          setStep('success');
-          return true;
+      if (shareInfo.skip_otp) {
+        // Direct access
+        try {
+          const verifyData = await verifyAccess({
+            token,
+            viewer_email: shareInfo.target_email,
+            skip_otp: true
+          });
+          handleAuthSuccess(shareInfo.target_email, verifyData);
+        } catch (e: any) {
+          console.error("Direct access failed", e);
+          setErrorMessage(e.message);
         }
       } else {
-        // For file shares, try to download or stream the file
-        const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(session.email)}`;
-
-        let isVideoFile = false;
-        let pFileName = 'document';
-        let pContentType = 'application/octet-stream';
-        let initialResponse: Response | null = null;
-        let fullDownloadNeeded = true;
-
+        // Auto send OTP
         try {
-          // Use GET with Range instead of HEAD to avoid 502 errors and still peek at headers
-          initialResponse = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: { 'Range': 'bytes=0-0' }
-          });
-
-          if (initialResponse.ok || initialResponse.status === 206) {
-            pContentType = initialResponse.headers.get('Content-Type') || 'application/octet-stream';
-            const contentDisposition = initialResponse.headers.get('Content-Disposition');
-            if (contentDisposition) {
-              const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
-              if (match && match[1]) {
-                pFileName = match[1];
-              }
-            }
-
-            // Check if it is a video
-            if (pContentType.startsWith('video/')) {
-              isVideoFile = true;
-            }
-
-            // If it's not a video, checking if we already have the full response (status 200)
-            // If status is 206, we only have partial content, so we need to re-fetch full
-            if (!isVideoFile && initialResponse.status === 200) {
-              fullDownloadNeeded = false; // We can use initialResponse
-            }
-          }
-        } catch (e) {
-          console.warn('Range request failed, falling back to full download', e);
-        }
-
-        if (isVideoFile) {
-          // It's a video! Use stream URL
-          const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(session.email)}`;
-          setFileUrl(streamUrl);
-          setFileName(pFileName);
-          setFileType(pContentType);
-          setStep('success');
-          return true;
-        }
-
-        // Not a video - proceed with full download
-        let downloadResponse;
-        if (!fullDownloadNeeded && initialResponse) {
-          downloadResponse = initialResponse;
-        } else {
-          downloadResponse = await fetch(downloadUrl);
-        }
-
-        if (downloadResponse.ok) {
-          // Get filename from Content-Disposition header
-          const contentDisposition = downloadResponse.headers.get('Content-Disposition');
-          let downloadFileName = 'document';
-          if (contentDisposition) {
-            const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
-            if (match && match[1]) {
-              downloadFileName = match[1];
-            }
-          }
-
-          const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
-          const blob = await downloadResponse.blob();
-          const blobUrl = URL.createObjectURL(blob);
-
-          setFileUrl(blobUrl);
-          setFileName(downloadFileName);
-          setFileType(contentType);
-
-          // Parse Excel/PowerPoint if needed
-          if (isExcel(contentType, downloadFileName)) {
-            await parseExcelFile(blob);
-          }
-          if (isPowerPoint(contentType, downloadFileName)) {
-            await parsePowerPointFile(blob);
-          }
-
-          setStep('success');
-          return true;
+          await requestAccess({ token, viewer_email: shareInfo.target_email });
+          setStep('otp_input');
+          showToast(t('OtpSentAutomatically'), 'success');
+        } catch (e: any) {
+          console.error("Auto OTP failed", e);
+          setErrorMessage(e.message);
         }
       }
-    } catch (err) {
-      console.warn('Session restoration failed:', err);
-    }
-
-    clearSession();
-    return false;
-  };
-
-  const autoSendOtp = async (targetEmail: string) => {
-    if (autoOtpSentRef.current) return;
-
-    autoOtpSentRef.current = true;
-
-    setEmail(targetEmail);
-    setStatus('loading');
-    setErrorMessage(null);
-
-    try {
-      const response = await fetch(`/api/share/request-access/${token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewer_email: targetEmail })
-      });
-
-      const data = await parseResponse(response);
-
-      if (!response.ok) {
-        throw new Error(JSON.stringify(data));
-      }
-
-      setStep('otp_input');
-      setStatus('idle');
-      showToast(t('OtpSentAutomatically'), 'success');
-    } catch (err: any) {
-      console.error("Auto OTP Request Error:", err);
-
-      setErrorMessage(extractErrorMessage(err));
-      setStatus('error');
-      setStep('email_input');
     }
   };
 
-  // Direct access for restricted shares (skip OTP verification)
-  const directAccessForRestrictedShare = async (targetEmail: string, shareInfoData: ShareInfo) => {
-    if (autoOtpSentRef.current) return;
-
-    autoOtpSentRef.current = true;
-
-    setEmail(targetEmail);
-    setStatus('loading');
-    setErrorMessage(null);
-
-    try {
-      // For restricted shares with skip_otp, call verify endpoint directly without OTP
-      const verifyResponse = await fetch(`/api/share/verify-access/${token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          viewer_email: targetEmail,
-          skip_otp: true  // Signal to backend that this is a direct access for restricted share
-        })
-      });
-
-      const verifyData = await parseResponse(verifyResponse);
-
-      if (!verifyResponse.ok) {
-        throw new Error(JSON.stringify(verifyData));
-      }
-
-      // Check if this is a folder share
-      if (verifyData.share_type === 'folder') {
-        // Save session for future visits
-        saveSession(targetEmail, 'folder', verifyData.folder_id);
-
-        // Set folder ID and fetch contents
-        setRootFolderId(verifyData.folder_id);
-        setCurrentFolderId(verifyData.folder_id);
-        setStep('success');
-        setStatus('idle');
-
-        // Fetch folder contents
-        await fetchFolderContents(verifyData.folder_id, targetEmail);
-        return;
-      }
-
-      // Handle file share
-      setDocumentData(verifyData.document);
-
-      // Download the file or set up streaming
-      const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(targetEmail)}`;
-
-      // Check if video - if so, stream it
-      if (verifyData.document?.media_type === 'video' ||
-        verifyData.document?.mime_type?.startsWith('video/') ||
-        (verifyData.document?.docname && (verifyData.document.docname.endsWith('.mp4') || verifyData.document.docname.endsWith('.mov')))) {
-
-        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(targetEmail)}`;
-        setFileUrl(streamUrl);
-        setFileName(verifyData.document.docname || 'video.mp4');
-        setFileType('video/mp4');
-        saveSession(targetEmail, 'file');
-        setStep('success');
-        setStatus('idle');
-        return;
-      }
-
-      // Normal download for non-video files
-      const downloadResponse = await fetch(downloadUrl);
-
-      if (!downloadResponse.ok) {
-        const errorData = await parseResponse(downloadResponse);
-        throw new Error(JSON.stringify(errorData));
-      }
-
-      // Get filename from Content-Disposition header
-      const contentDisposition = downloadResponse.headers.get('Content-Disposition');
-      let downloadFileName = 'document';
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
-        if (match && match[1]) {
-          downloadFileName = match[1];
-        }
-      }
-
-      // Get content type
-      const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
-
-      // Convert response to blob and create URL
-      const blob = await downloadResponse.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      setFileUrl(blobUrl);
-      setFileName(downloadFileName);
-      setFileType(contentType);
-
-      // Parse Excel files
-      if (isExcel(contentType, downloadFileName)) {
-        await parseExcelFile(blob);
-      }
-
-      // Parse PowerPoint files
-      if (isPowerPoint(contentType, downloadFileName)) {
-        await parsePowerPointFile(blob);
-      }
-
-      // Save session for future visits
-      saveSession(targetEmail, 'file');
-
-      setStep('success');
-      setStatus('idle');
-
-    } catch (err: any) {
-      console.error("Direct Access Error:", err);
-      setErrorMessage(extractErrorMessage(err));
-      setStatus('error');
-      setStep('email_input');
-    }
-  };
-
-  // Main initialization effect
   useEffect(() => {
-    const initialize = async () => {
-      if (!token) return;
+    if (shareInfo && !isLoadingShareInfo) {
+      initializeAuth();
+    }
+  }, [shareInfo, isLoadingShareInfo]);
 
-      setIsLoadingShareInfo(true);
-      setIsRestoringSession(true);
+  // Handle successful auth (stores session and sets state)
+  const handleAuthSuccess = async (email: string, verifyData: any) => {
+    setViewerEmail(email);
+    setStep('success');
 
-      try {
-        // Step 1: Fetch share info
-        const response = await fetch(`/api/share/info/${token}`);
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          setShareInfoError(errData.detail || t('linkExpired') || 'This link is invalid or has expired.');
-          setIsLoadingShareInfo(false);
-          setIsRestoringSession(false);
-          return;
-        }
+    if (verifyData.share_type === 'folder') {
+      setRootFolderId(verifyData.folder_id);
+      setCurrentFolderId(verifyData.folder_id);
+    } else {
+      // It's a file, similar to directAccessForRestrictedShare logic
+      setDocumentData(verifyData.document);
+      await prepareFileView(email, verifyData.document);
+    }
+  };
 
-        const shareInfoData = await response.json();
-        setShareInfo(shareInfoData);
-        setIsLoadingShareInfo(false);
+  const restoreFileSession = async (email: string) => {
+    try {
+      const result = await restoreFileAsync({ token, viewerEmail: email });
 
-        // Step 2: Check for existing session
-        const storedSession = getStoredSession();
-        if (storedSession) {
-          const restored = await tryRestoreSession(storedSession, shareInfoData);
-          if (restored) {
-            setIsRestoringSession(false);
-            return;
-          }
-        }
-        // Step 3: If restricted share with skip_otp, access directly without OTP
-        if (shareInfoData.is_restricted && shareInfoData.target_email) {
-          setIsRestoringSession(false);
+      setFileUrl(result.fileUrl);
+      setFileType(result.fileType);
+      setFileName(result.fileName);
 
-          // For restricted shares, skip OTP and access directly
-          if (shareInfoData.skip_otp) {
-            await directAccessForRestrictedShare(shareInfoData.target_email, shareInfoData);
-          } else {
-            // Fallback to OTP flow if skip_otp is not enabled
-            await autoSendOtp(shareInfoData.target_email);
-          }
-          return;
-        }
-
-        setIsRestoringSession(false);
-
-      } catch (err) {
-        console.error('Error during initialization:', err);
-        setShareInfoError(t('errorLoadingShare') || 'Error loading share information.');
-        setIsLoadingShareInfo(false);
-        setIsRestoringSession(false);
+      // run parsers if blob is available
+      if (result.blob) {
+        if (isExcel(result.fileType, result.fileName)) await parseExcelFile(result.blob);
+        if (isPowerPoint(result.fileType, result.fileName)) await parsePowerPointFile(result.blob);
       }
-    };
+    } catch (e) {
+      console.error("Restore file session failed", e);
+    }
+  };
 
-    initialize();
-  }, [token]);
+  const prepareFileView = async (email: string, document: any) => {
+    try {
+      const result = await downloadFileAsync({ token, viewerEmail: email, document });
+
+      setFileUrl(result.fileUrl);
+      setFileName(result.fileName);
+      setFileType(result.fileType);
+
+      // run parsers if blob is available
+      if (result.blob) {
+        if (isExcel(result.fileType, result.fileName)) await parseExcelFile(result.blob);
+        if (isPowerPoint(result.fileType, result.fileName)) await parsePowerPointFile(result.blob);
+      }
+    } catch (error) {
+      console.error('Failed to prepare file view:', error);
+    }
+  };
+
+  // Manual OTP Send
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    try {
+      await requestAccess({ token, viewer_email: email });
+      await requestAccess({ token, viewer_email: email });
+      setStep('otp_input');
+      showToast(t('OtpSentMessage' as any), 'success');
+    } catch (e: any) {
+      setErrorMessage(e.message);
+    }
+  };
+
+  // Verify OTP
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    try {
+      const verifyData = await verifyAccess({
+        token,
+        viewer_email: email,
+        otp
+      });
+      handleAuthSuccess(email, verifyData);
+    } catch (e: any) {
+      setErrorMessage(e.message);
+    }
+  };
+
+
 
   const parseResponse = async (response: Response) => {
     const text = await response.text();
@@ -707,52 +510,18 @@ export default function SharedDocumentPage() {
     }
   };
 
-  // Fetch folder contents
-  const fetchFolderContents = async (folderId: string | null, emailOverride?: string) => {
-    if (!folderId) return;
 
-    setIsLoadingFolder(true);
-    try {
-      const params = new URLSearchParams({
-        viewer_email: emailOverride || email,
-        ...(folderId !== rootFolderId && { parent_id: folderId })
-      });
-
-      const response = await fetch(`/api/share/folder-contents/${token}?${params.toString()}`);
-
-      if (!response.ok) {
-        const errData = await parseResponse(response);
-        throw new Error(errData.detail || 'Failed to load folder contents');
-      }
-
-      const data = await response.json();
-
-      setFolderContents(data.contents || []);
-      setCurrentFolderName(data.folder_name || 'Shared Folder');
-      setBreadcrumbs(data.breadcrumbs || []);
-      setCurrentFolderId(data.folder_id);
-
-      if (!rootFolderId) {
-        setRootFolderId(data.root_folder_id);
-      }
-    } catch (err: any) {
-      console.error('Error loading folder contents:', err);
-      showToast(extractErrorMessage(err), 'error');
-    } finally {
-      setIsLoadingFolder(false);
-    }
-  };
 
   // Navigate to a folder
   const navigateToFolder = (folder: FolderItem) => {
     setCurrentFolderId(folder.id);
-    fetchFolderContents(folder.id);
+    setCurrentFolderId(folder.id);
   };
 
   // Handle breadcrumb click
   const handleBreadcrumbClick = (item: BreadcrumbItem) => {
     setCurrentFolderId(item.id);
-    fetchFolderContents(item.id);
+    setCurrentFolderId(item.id);
   };
 
   // Go back to parent folder
@@ -764,51 +533,39 @@ export default function SharedDocumentPage() {
   };
 
   // Open file from folder
-  const openFileFromFolder = async (file: FolderItem) => {
+  const handleFileClick = async (file: FolderItem) => {
+    if (!viewerEmail) return;
     setSelectedFile(file);
-    setIsLoadingFolder(true);
 
     try {
+      // Create a document-like object for the hook
+      const documentObj = {
+        docname: file.name,
+        media_type: resolveMediaType(file),
+        mime_type: file.type || 'application/octet-stream',
+        id: file.id
+      };
+
       const isVideo = resolveMediaType(file) === 'video';
 
       if (isVideo) {
-        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(email)}&doc_id=${file.id}`;
+        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&doc_id=${file.id}`;
         setFileUrl(streamUrl);
         setFileName(file.name);
-        setFileType('video/mp4'); // Approximate
-        setIsLoadingFolder(false);
+        setFileType('video/mp4');
         return;
       }
 
-      const downloadResponse = await fetch(
-        `/api/share/download/${token}?viewer_email=${encodeURIComponent(email)}&doc_id=${file.id}`
-      );
+      // Use the download hook for non-video files
+      const result = await downloadFileAsync({
+        token,
+        viewerEmail,
+        document: documentObj
+      });
 
-      if (!downloadResponse.ok) {
-        const errorData = await parseResponse(downloadResponse);
-        throw new Error(errorData.detail || 'Failed to download file');
-      }
-
-      // Get filename from Content-Disposition header
-      const contentDisposition = downloadResponse.headers.get('Content-Disposition');
-      let downloadFileName = file.name;
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
-        if (match && match[1]) {
-          downloadFileName = match[1];
-        }
-      }
-
-      // Get content type
-      const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
-
-      // Convert response to blob and create URL
-      const blob = await downloadResponse.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      setFileUrl(blobUrl);
-      setFileName(downloadFileName);
-      setFileType(contentType);
+      setFileUrl(result.fileUrl);
+      setFileName(result.fileName);
+      setFileType(result.fileType);
 
       // Reset previous preview data
       setExcelData([]);
@@ -817,24 +574,20 @@ export default function SharedDocumentPage() {
       setPptThumbnailUrl(null);
       setPptParseError(null);
 
-      // Parse Excel files
-      if (isExcel(contentType, downloadFileName)) {
-        await parseExcelFile(blob);
+      // Run parsers if blob is available
+      if (result.blob) {
+        if (isExcel(result.fileType, result.fileName)) await parseExcelFile(result.blob);
+        if (isPowerPoint(result.fileType, result.fileName)) await parsePowerPointFile(result.blob);
       }
-
-      // Parse PowerPoint files
-      if (isPowerPoint(contentType, downloadFileName)) {
-        await parsePowerPointFile(blob);
-      }
-
-    } catch (err: any) {
-      console.error('Error opening file:', err);
-      showToast(extractErrorMessage(err), 'error');
+    } catch (error: any) {
+      console.error('File click error:', error);
+      showToast(error.message || 'Failed to load file', 'error');
       setSelectedFile(null);
-    } finally {
-      setIsLoadingFolder(false);
     }
   };
+
+  // Alias for backward compatibility
+  const openFileFromFolder = handleFileClick;
 
   // Close file preview and go back to folder view
   const closeFilePreview = () => {
@@ -854,137 +607,40 @@ export default function SharedDocumentPage() {
   // Step 1: Request OTP
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus('loading');
+    // setStatus('loading'); // Use mutation state instead if possible, or local
     setErrorMessage(null);
 
     try {
-      const response = await fetch(`/api/share/request-access/${token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewer_email: email.trim().toLowerCase() })
-      });
-
-      const data = await parseResponse(response);
-
-      if (!response.ok) {
-        throw new Error(JSON.stringify(data));
-      }
-
+      await requestAccess({ token, viewer_email: email.trim().toLowerCase() });
       setStep('otp_input');
-      setStatus('idle');
+      // setStatus('idle');
     } catch (err: any) {
       console.error("OTP Request Error:", err);
       setErrorMessage(extractErrorMessage(err));
-      setStatus('error');
+      // setStatus('error');
     }
   };
 
   // Step 2: Verify OTP and Load Content
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus('loading');
+    // setStatus('loading');
     setErrorMessage(null);
 
     try {
       // First verify the OTP
-      const verifyResponse = await fetch(`/api/share/verify-access/${token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewer_email: email.trim().toLowerCase(), otp: otp })
+      const verifyData = await verifyAccess({
+        token,
+        viewer_email: email.trim().toLowerCase(),
+        otp: otp
       });
 
-      const verifyData = await parseResponse(verifyResponse);
-
-      if (!verifyResponse.ok) {
-        throw new Error(JSON.stringify(verifyData));
-      }
-
-      // Check if this is a folder share
-      if (verifyData.share_type === 'folder') {
-        // Save session for future visits
-        saveSession(email.trim().toLowerCase(), 'folder', verifyData.folder_id);
-
-        // Set folder ID and fetch contents
-        setRootFolderId(verifyData.folder_id);
-        setCurrentFolderId(verifyData.folder_id);
-        setStep('success');
-        setStatus('idle');
-
-        // Fetch folder contents
-        await fetchFolderContents(verifyData.folder_id);
-        return;
-      }
-
-      // Handle file share (existing logic)
-      setDocumentData(verifyData.document);
-
-      // Now download the actual file, or prepare for streaming
-      const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(email.trim().toLowerCase())}`;
-
-      // Check if video - if so, stream it
-      if (verifyData.document?.media_type === 'video' ||
-        verifyData.document?.mime_type?.startsWith('video/') ||
-        (verifyData.document?.docname && (verifyData.document.docname.endsWith('.mp4') || verifyData.document.docname.endsWith('.mov')))) {
-
-        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(email.trim().toLowerCase())}`;
-        setFileUrl(streamUrl);
-        setFileName(verifyData.document.docname || 'video.mp4');
-        setFileType('video/mp4');
-
-        saveSession(email.trim().toLowerCase(), 'file');
-        setStep('success');
-        setStatus('idle');
-        return;
-      }
-
-      const downloadResponse = await fetch(downloadUrl);
-
-      if (!downloadResponse.ok) {
-        const errorData = await parseResponse(downloadResponse);
-        throw new Error(JSON.stringify(errorData));
-      }
-
-      // Get filename from Content-Disposition header
-      const contentDisposition = downloadResponse.headers.get('Content-Disposition');
-      let downloadFileName = 'document';
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
-        if (match && match[1]) {
-          downloadFileName = match[1];
-        }
-      }
-
-      // Get content type
-      const contentType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
-
-      // Convert response to blob and create URL
-      const blob = await downloadResponse.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      setFileUrl(blobUrl);
-      setFileName(downloadFileName);
-      setFileType(contentType);
-
-      // Parse Excel files
-      if (isExcel(contentType, downloadFileName)) {
-        await parseExcelFile(blob);
-      }
-
-      // Parse PowerPoint files
-      if (isPowerPoint(contentType, downloadFileName)) {
-        await parsePowerPointFile(blob);
-      }
-
-      // Save session for future visits
-      saveSession(email.trim().toLowerCase(), 'file');
-
-      setStep('success');
-      setStatus('idle');
+      handleAuthSuccess(email.trim().toLowerCase(), verifyData);
 
     } catch (err: any) {
       console.error("OTP Verify/Download Error:", err);
       setErrorMessage(extractErrorMessage(err));
-      setStatus('error');
+      // setStatus('error');
     }
   };
 
@@ -1413,7 +1069,7 @@ export default function SharedDocumentPage() {
             <svg className="w-5 h-5 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
               <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
             </svg>
-            {breadcrumbs.map((crumb, index) => (
+            {breadcrumbs.map((crumb: BreadcrumbItem, index: number) => (
               <React.Fragment key={crumb.id}>
                 {index > 0 && <span className="text-gray-400">/</span>}
                 <button
@@ -1468,7 +1124,7 @@ export default function SharedDocumentPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {folderContents.map((item) => (
+              {folderContents.map((item: FolderItem) => (
                 <div
                   key={item.id}
                   onClick={() => {
@@ -1505,7 +1161,7 @@ export default function SharedDocumentPage() {
     );
   };
 
-  if (isLoadingShareInfo || isRestoringSession) {
+  if (isLoadingShareInfo) {
     return (
       <>
         <HtmlLangUpdater lang={lang} />
@@ -1513,9 +1169,7 @@ export default function SharedDocumentPage() {
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600 dark:text-gray-400">
-              {isRestoringSession
-                ? (t('restoringSession'))
-                : (t('loading') || 'Loading...')}
+              {t('loading') || 'Loading...'}
             </p>
           </div>
         </div>
@@ -1546,7 +1200,7 @@ export default function SharedDocumentPage() {
               {t('linkInvalid') || 'Link Invalid'}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {shareInfoError}
+              {shareInfoError instanceof Error ? shareInfoError.message : String(shareInfoError)}
             </p>
           </div>
         </div>
@@ -1743,7 +1397,7 @@ export default function SharedDocumentPage() {
 
               {/* Email Input Step */}
               {step === 'email_input' && (
-                <form onSubmit={handleRequestOTP} className="space-y-3">
+                <form onSubmit={handleSendOtp} className="space-y-3">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('OrgEmail')}
                   </label>
@@ -1754,7 +1408,7 @@ export default function SharedDocumentPage() {
                     className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={status === 'loading'}
+                    disabled={isAuthLoading}
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
@@ -1762,9 +1416,9 @@ export default function SharedDocumentPage() {
                   <button
                     type="submit"
                     className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
-                    disabled={status === 'loading'}
+                    disabled={isAuthLoading}
                   >
-                    {status === 'loading' ? (
+                    {isAuthLoading ? (
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     ) : (
                       t('SendVerificationCode')
@@ -1775,7 +1429,7 @@ export default function SharedDocumentPage() {
 
               {/* OTP Input Step */}
               {step === 'otp_input' && (
-                <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {t('EnterOtp')}
@@ -1788,15 +1442,15 @@ export default function SharedDocumentPage() {
                       className="w-full px-4 py-3 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none tracking-[0.5em] text-center text-xl font-mono"
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      disabled={status === 'loading'}
+                      disabled={isAuthLoading}
                     />
                   </div>
                   <button
                     type="submit"
                     className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
-                    disabled={status === 'loading'}
+                    disabled={isAuthLoading}
                   >
-                    {status === 'loading' ? (
+                    {isAuthLoading ? (
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     ) : (
                       t('VerifyAccess')
@@ -1811,7 +1465,7 @@ export default function SharedDocumentPage() {
                       setOtp('');
                     }}
                     className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mt-2"
-                    disabled={status === 'loading'}
+                    disabled={isAuthLoading}
                   >
                     {t('ChangeEmail')}
                   </button>

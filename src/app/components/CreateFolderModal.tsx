@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useCreateFolder } from '../../hooks/useFolderMutations';
 import { useToast } from '../context/ToastContext';
 
 import { CreateFolderModalProps } from '../../interfaces/PropsInterfaces';
@@ -9,6 +10,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
   const parentId = initialParentId;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showToast } = useToast();
+  const createFolderMutation = useCreateFolder();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -24,31 +26,23 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
 
     setIsSubmitting(true);
 
+    setIsSubmitting(true);
+
     try {
-      const response = await fetch(`${apiURL}/folders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: folderName,
-          description: description,
-          parent_id: parentId.trim() || null,
-        }),
+      await createFolderMutation.mutateAsync({
+        name: folderName,
+        description: description,
+        parent_id: parentId.trim() || null,
+        apiURL
       });
 
-      const data = await response.json();
+      showToast(t('folderCreated'), 'success');
+      onFolderCreated();
+      onClose();
 
-      if (response.ok) {
-        showToast(t('folderCreated'), 'success');
-        onFolderCreated();
-        onClose();
-      } else {
-        showToast(data.error || t('errorCreatingFolder'), 'error');
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showToast(t('errorCreatingFolder'), 'error');
+      showToast(err.message || t('errorCreatingFolder'), 'error');
     } finally {
       setIsSubmitting(false);
     }

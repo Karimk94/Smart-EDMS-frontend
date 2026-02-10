@@ -66,7 +66,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [renameValue, setRenameValue] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
 
-  const { showToast } = useToast();
+  const { showToast, removeToast } = useToast();
 
   useEffect(() => {
     fetchContents(currentFolderId);
@@ -359,6 +359,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   };
 
   const handleNavigate = (folder: FolderItem) => {
+    if (folder.name.toLowerCase().endsWith('.zip') || folder.media_type === 'file') {
+      showToast(t('contentCannotBeDisplayed') || "Content cannot be displayed", 'info');
+      return;
+    }
     if (folder.is_standard) {
       // For standard folders (images, videos, files), use internal state update
       setCurrentFolderId(folder.id);
@@ -488,6 +492,32 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     else if (action === 'share') {
       setItemToShare(targetItem);
       setIsShareModalOpen(true);
+    }
+    else if (action === 'download') {
+      handleDownload(targetItem);
+    }
+  };
+
+  const handleDownload = async (item: FolderItem) => {
+    let toastId = '';
+    try {
+      toastId = showToast(t('downloading') || "Downloading...", 'info', 'subtle', 0);
+      const response = await fetch(`${apiURL}/download_watermarked/${item.id}`);
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', item.name);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      showToast(t('errorDownloading') || "Error downloading file.", 'error');
+    } finally {
+      if (toastId) removeToast(toastId);
     }
   };
 
@@ -802,6 +832,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
           {contextMenu.item && (
             <>
+              {contextMenu.item.type !== 'folder' && (
+                <button
+                  onClick={() => handleContextMenuAction('download')}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                >
+                  <img src="/download.svg" className="w-4 h-4 dark:invert" alt="" />
+                  {t('download') || 'Download'}
+                </button>
+              )}
+
               <button
                 onClick={() => handleContextMenuAction('share')}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"

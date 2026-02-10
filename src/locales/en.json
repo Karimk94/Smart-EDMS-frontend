@@ -220,5 +220,6 @@
   "rightsReserved": "RTA. All rights reserved.",
   "switchToDark": "Switch to dark mode",
   "switchToLight": "Switch to light mode",
-  "foldersDesc": "Browse all your files and folders"
+  "foldersDesc": "Browse all your files and folders",
+  "contentCannotBeDisplayed": "Content cannot be displayed"
 }

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from '../hooks/useTranslations';
 import HtmlLangUpdater from '../components/HtmlLangUpdater';
 import HtmlThemeUpdater from '../components/HtmlThemeUpdater';
 import { useToast } from '../context/ToastContext';
 
-export default function LoginPage() {
+function LoginContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -165,5 +165,17 @@ export default function LoginPage() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

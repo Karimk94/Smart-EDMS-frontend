@@ -51,7 +51,9 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
 
   useEffect(() => {
     if (!isSuggestionVisible || !inputRef.current) {
-      setSuggestions([]);
+      if (suggestions.length > 0) {
+        setSuggestions([]);
+      }
       return;
     }
 

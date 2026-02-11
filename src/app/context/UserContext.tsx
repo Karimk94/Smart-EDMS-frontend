@@ -42,6 +42,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
     }, [user?.theme]);
 
+    // Apply language globally when user is loaded
+    useEffect(() => {
+        if (user?.lang) {
+            document.documentElement.lang = user.lang;
+            document.documentElement.dir = user.lang === 'ar' ? 'rtl' : 'ltr';
+        }
+    }, [user?.lang]);
+
     const value = {
         user,
         isLoading: isLoadingUser,

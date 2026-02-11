@@ -22,7 +22,6 @@ import { FileModal } from './FileModal';
 import { Folders } from './Folders';
 import { FolderUploadModal } from './FolderUploadModal';
 import { Header } from './Header';
-import HtmlLangUpdater from './HtmlLangUpdater';
 import { ImageModal } from './ImageModal';
 import { Pagination } from './Pagination';
 import { PdfModal } from './PdfModal';
@@ -482,7 +481,6 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     return (
         <>
-            <HtmlLangUpdater lang={lang} />
             <div className={`flex flex-col h-screen ${rtlMainClass}`}>
                 <Header
                     onSearch={handleSearch}

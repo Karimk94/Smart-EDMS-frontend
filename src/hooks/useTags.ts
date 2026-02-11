@@ -10,6 +10,14 @@ interface TagsResponse {
     tags: TagObject[];
 }
 
+const EMPTY_ARRAY: any[] = [];
+
+const selectAllTags = (data: string[]) => data || EMPTY_ARRAY;
+const selectDocumentTags = (data: TagsResponse) => {
+    const tags = data.tags || EMPTY_ARRAY;
+    return [...tags].sort((a, b) => a.text.localeCompare(b.text));
+};
+
 export function useTags({ lang, docId }: UseTagsParams) {
     const queryClient = useQueryClient();
 
@@ -24,22 +32,23 @@ export function useTags({ lang, docId }: UseTagsParams) {
             return response.json();
         },
         staleTime: 1000 * 60 * 5, // 5 minutes
+        select: selectAllTags,
     });
 
     // 2. Fetch Document Tags (if docId is provided)
     const documentTagsQuery = useQuery({
         queryKey: ['documentTags', docId, lang],
-        queryFn: async (): Promise<TagObject[]> => {
-            if (!docId) return [];
+        queryFn: async (): Promise<TagsResponse> => {
+            if (!docId) return { tags: [] };
             const response = await fetch(`/api/tags/${docId}?lang=${lang}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch document tags');
             }
-            const data: TagsResponse = await response.json();
-            return (data.tags || []).sort((a, b) => a.text.localeCompare(b.text));
+            return response.json();
         },
         enabled: !!docId,
         staleTime: 1000 * 60, // 1 minute
+        select: selectDocumentTags,
     });
 
     // 3. Add Tag Mutation
@@ -176,10 +185,12 @@ export function useTags({ lang, docId }: UseTagsParams) {
         },
     });
 
+
+
     return {
-        allTags: allTagsQuery.data || [],
+        allTags: allTagsQuery.data || EMPTY_ARRAY,
         isLoadingAllTags: allTagsQuery.isLoading,
-        documentTags: documentTagsQuery.data || [],
+        documentTags: documentTagsQuery.data || EMPTY_ARRAY,
         isLoadingDocumentTags: documentTagsQuery.isLoading,
         addTag: addTagMutation.mutateAsync,
         isAddingTag: addTagMutation.isPending,

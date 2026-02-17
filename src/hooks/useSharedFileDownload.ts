@@ -16,11 +16,23 @@ interface SharedFileResult {
 export function useSharedFileDownload() {
     const downloadMutation = useMutation<SharedFileResult, Error, SharedFileDownloadParams>({
         mutationFn: async ({ token, viewerEmail, document }) => {
-            const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
+            console.log('useSharedFileDownload:', { token, viewerEmail, document });
+            let downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
+
+            // Append doc_id if available (crucial for folder shares)
+            if (document?.id || document?.doc_id) {
+                downloadUrl += `&doc_id=${document.id || document.doc_id}`;
+            }
+
+            console.log('Generated downloadUrl:', downloadUrl);
 
             // Handle video streaming
             if (document?.media_type === 'video' || document?.mime_type?.startsWith('video/')) {
-                const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
+                let streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
+                if (document?.id || document?.doc_id) {
+                    streamUrl += `&doc_id=${document.id || document.doc_id}`;
+                }
+
                 return {
                     fileUrl: streamUrl,
                     fileName: document.docname || 'video.mp4',
@@ -31,16 +43,26 @@ export function useSharedFileDownload() {
             // Handle regular file download
             const downloadResponse = await fetch(downloadUrl);
             if (!downloadResponse.ok) {
+                console.error('Download failed response:', downloadResponse.status, downloadResponse.statusText);
                 throw new Error('Download failed');
             }
 
             const blob = await downloadResponse.blob();
             const fileUrl = URL.createObjectURL(blob);
 
+            // Determine effective fileType
+            let fileType = downloadResponse.headers.get('Content-Type') || 'application/octet-stream';
+            // Only use document.mime_type if it looks like a valid mime type (contains '/')
+            if (document?.mime_type && document.mime_type.includes('/')) {
+                fileType = document.mime_type;
+            }
+
+            console.log('Final fileType:', fileType);
+
             return {
                 fileUrl,
                 fileName: document?.docname || 'file',
-                fileType: document?.mime_type || downloadResponse.headers.get('Content-Type') || 'application/octet-stream',
+                fileType,
                 blob
             };
         }
@@ -109,7 +131,8 @@ export function useSharedFileRestore() {
 export function useSharedFolderItemDownload() {
     const downloadMutation = useMutation<Blob, Error, { token: string; viewerEmail: string; itemId: string; itemName: string }>({
         mutationFn: async ({ token, viewerEmail, itemId }) => {
-            const downloadUrl = `/api/share/download/${token}/${itemId}?viewer_email=${encodeURIComponent(viewerEmail)}`;
+            // Fix: Use query param for doc_id instead of path param
+            const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&doc_id=${itemId}`;
             const downloadResponse = await fetch(downloadUrl);
 
             if (!downloadResponse.ok) {

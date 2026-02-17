@@ -32,16 +32,16 @@ export function useUserPreferences() {
 
     const updateThemeMutation = useMutation({
         mutationFn: async (theme: 'light' | 'dark') => {
-            // Assuming there is an endpoint for theme, or we just persist locally and rely on user object update if API supports it
-            // For now, let's assume API supports it similar to language, or we mock it if not
-            // Based on Header.tsx, it seems theme might be local state or query param for now, 
-            // but let's standardize on user profile setting if possible.
-            // If no API, we just rely on client side. 
-            // Checking Header.tsx, it just calls onThemeChange.
-            // Let's assume we want to persist it.
-            /*
-            const response = await fetch('/api/user/theme', { method: 'PUT', ... });
-            */
+            const response = await fetch('/api/user/theme', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ theme }),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to update theme');
+            }
             return theme;
         },
         onSuccess: (newTheme) => {

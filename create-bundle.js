@@ -44,7 +44,7 @@ console.log('\nAdding files to the deployment bundle...');
 const files_and_folders_to_bundle = [
   '.next',
   // 'node_modules',
-  'public',
+  // 'public',
   // 'src',
   // 'package.json',
   // 'package-lock.json',

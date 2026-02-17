@@ -22,21 +22,37 @@ function LoginContent() {
 
   const router = useRouter();
   const { showToast } = useToast();
-  const { login, isLoggingIn, isAuthenticated, isLoadingUser } = useAuth();
+  const { login, isLoggingIn, isAuthenticated, isLoadingUser, user } = useAuth();
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoadingUser) {
       const redirectPath = searchParams.get('redirect') || '/folders';
+      // If we have user preferences, apply them before redirecting
+      // This is crucial because the layout/context might be using these values
+      if (user) {
+        if (user.lang && user.lang !== lang) {
+          setLang(user.lang);
+        }
+        if (user.theme && user.theme !== theme) {
+          setTheme(user.theme);
+        }
+      }
       router.push(redirectPath);
     }
-  }, [isAuthenticated, isLoadingUser, router, searchParams]);
+  }, [isAuthenticated, isLoadingUser, router, searchParams, user, lang, theme]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      await login({ username, password });
+      const data = await login({ username, password });
+      // The socket/context might update via query invalidation, but let's try to set local state if we have it
+      if (data?.user) {
+        if (data.user.lang) setLang(data.user.lang);
+        if (data.user.theme) setTheme(data.user.theme);
+      }
+
       // Redirect handled by useEffect or onSuccess of mutation, but let's ensure it here too or just wait for effect
       const redirectPath = searchParams.get('redirect') || '/folders';
       router.push(redirectPath);

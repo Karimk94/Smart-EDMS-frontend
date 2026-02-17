@@ -9,6 +9,7 @@ import { registerLocale } from 'react-datepicker';
 import * as XLSX from 'xlsx';
 import { BreadcrumbItem, FolderItem, ShareInfo, SlideData, StoredSession } from '../../../interfaces';
 import HtmlLangUpdater from '../../components/HtmlLangUpdater';
+import HtmlThemeUpdater from '../../components/HtmlThemeUpdater';
 import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
 
@@ -20,12 +21,165 @@ import { useSharedFileDownload, useSharedFileRestore, useSharedFolderItemDownloa
 
 registerLocale('en-GB', enGB);
 
+// Word Viewer Component
+const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?: string }) => {
+  console.log('WordViewer Component Rendered');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadDoc = async () => {
+      console.log('WordViewer: Effect running', { fileUrl, hasRef: !!containerRef.current });
+      if (!fileUrl || !containerRef.current) {
+        console.warn('WordViewer: Missing prerequisite', { fileUrl, hasRef: !!containerRef.current });
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log('WordViewer: Fetching blob...');
+        const res = await fetch(fileUrl);
+        if (!res.ok) throw new Error(`Failed to fetch file: ${res.statusText}`);
+        const blob = await res.blob();
+        console.log('WordViewer: Blob fetched', { size: blob.size, type: blob.type });
+
+        if (!isMounted) return;
+
+        if (containerRef.current) {
+          console.log('WordViewer: Starting renderAsync...');
+          containerRef.current.innerHTML = ''; // Clear previous
+          await renderAsync(blob, containerRef.current, containerRef.current, {
+            className: "docx_viewer",
+            inWrapper: true,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            breakPages: true,
+            useBase64URL: true,
+          });
+          console.log('WordViewer: renderAsync completed');
+        }
+      } catch (err: any) {
+        console.error("Error rendering Word doc:", err);
+        if (isMounted) setError(`Failed to render document preview: ${err.message}`);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadDoc();
+    return () => { isMounted = false; };
+  }, [fileUrl]);
+
+  return (
+    <div className={`w-full h-full min-h-[500px] flex flex-col bg-white dark:bg-[#1a1a1a] rounded-lg relative overflow-hidden ${className}`}>
+      {loading && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+          <span className="text-gray-500 dark:text-gray-400">Loading document...</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-red-500">
+          {error}
+        </div>
+      )}
+
+      <div className="w-full h-full overflow-y-auto custom-scrollbar p-6 bg-white text-black" ref={containerRef}>
+      </div>
+    </div>
+  );
+};
+
+// Helper Functions
+const getFileExtension = (name: string): string => {
+  return name.split('.').pop()?.toLowerCase() || '';
+};
+
+const isImage = (mimeType: string) => mimeType.startsWith('image/');
+const isPdf = (mimeType: string) => mimeType === 'application/pdf';
+const isVideo = (mimeType: string) => mimeType.startsWith('video/');
+
+const isExcel = (mimeType: string, name: string): boolean => {
+  const ext = getFileExtension(name);
+  const excelMimes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/vnd.oasis.opendocument.spreadsheet'
+  ];
+  const excelExts = ['xls', 'xlsx', 'xlsm', 'ods'];
+  return excelMimes.includes(mimeType) || excelExts.includes(ext);
+};
+
+const isPowerPoint = (mimeType: string, name: string): boolean => {
+  const ext = getFileExtension(name);
+  const pptMimes = [
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.oasis.opendocument.presentation'
+  ];
+  const pptExts = ['ppt', 'pptx', 'pps', 'ppsx', 'odp'];
+  return pptMimes.includes(mimeType) || pptExts.includes(ext);
+};
+
+const isWord = (mimeType: string, name: string): boolean => {
+  const ext = getFileExtension(name);
+  return mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mimeType === 'application/msword' ||
+    ['doc', 'docx'].includes(ext);
+};
+
+const isText = (mimeType: string, name: string): boolean => {
+  const ext = getFileExtension(name);
+  const textExts = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
+  return mimeType.startsWith('text/') || textExts.includes(ext);
+};
+
+const isPreviewable = (mimeType: string, name: string): boolean => {
+  return isImage(mimeType) ||
+    isPdf(mimeType) ||
+    isVideo(mimeType) ||
+    isExcel(mimeType, name) ||
+    isPowerPoint(mimeType, name) ||
+    isWord(mimeType, name) ||
+    isText(mimeType, name);
+};
+
+const resolveMediaType = (item: FolderItem): string => {
+  // If backend already resolved it to a specific type, rely on it
+  // But ignore generic types like 'folder' or 'file' if we want to be more specific based on extension
+  if (item.media_type && item.media_type !== 'folder' && item.media_type !== 'file') {
+    // Normalize docx to word if needed
+    if ((item.media_type as any) === 'docx') return 'word';
+    return item.media_type;
+  }
+
+  const ext = getFileExtension(item.name);
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image';
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
+  if (['pdf'].includes(ext)) return 'pdf';
+  if (['doc', 'docx'].includes(ext)) return 'word';
+  if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) return 'excel';
+  if (['ppt', 'pptx', 'pps', 'ppsx', 'odp'].includes(ext)) return 'powerpoint';
+  if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext)) return 'text';
+
+  // Fallback to media_type if extension unknown
+  return item.media_type || 'file';
+};
+
 export default function SharedDocumentPage() {
   const params = useParams();
   const token = params.token as string;
 
   // Language State
   const [lang, setLang] = useState<'en' | 'ar'>('en');
+  // Theme State
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
   const t = useTranslations(lang);
   const { showToast } = useToast();
 
@@ -88,6 +242,18 @@ export default function SharedDocumentPage() {
   const [fileName, setFileName] = useState<string>('document');
   const [fileType, setFileType] = useState<string>('application/octet-stream');
   const [isDownloading, setIsDownloading] = useState(false); // Add downloading state
+  const [isInitialLoad, setIsInitialLoad] = useState(false); // Initial load state
+
+  // Debug logging
+  console.log('SharedDocumentPage Render:', {
+    fileUrl: !!fileUrl,
+    fileName,
+    fileType,
+    isWord: isWord(fileType, fileName),
+    step,
+    isInitialLoad
+  });
+
 
   // Excel State
   const [excelData, setExcelData] = useState<any[][]>([]);
@@ -103,14 +269,14 @@ export default function SharedDocumentPage() {
   const [isLoadingPpt, setIsLoadingPpt] = useState(false);
   const [pptParseError, setPptParseError] = useState<string | null>(null);
 
-  // Word State
-  const wordContainerRef = useRef<HTMLDivElement>(null);
-  const [isRenderingWord, setIsRenderingWord] = useState(false);
-  const [wordRenderError, setWordRenderError] = useState<string | null>(null);
-
   // Toggle Language Helper
   const toggleLanguage = () => {
     setLang(prev => prev === 'en' ? 'ar' : 'en');
+  };
+
+  // Toggle Theme Helper
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
 
@@ -135,7 +301,12 @@ export default function SharedDocumentPage() {
         // For security, let's re-verify seamlessly if possible, or just set success if we trust local storage
         // A better approach is to set viewer email and let the component logic handle file download url generation
         setStep('success');
-        await restoreFileSession(storedSession.email);
+        setIsInitialLoad(true);
+        try {
+          await restoreFileSession(storedSession.email);
+        } finally {
+          setIsInitialLoad(false);
+        }
         return;
       }
     }
@@ -189,7 +360,12 @@ export default function SharedDocumentPage() {
     } else {
       // It's a file, similar to directAccessForRestrictedShare logic
       setDocumentData(verifyData.document);
-      await prepareFileView(email, verifyData.document);
+      setIsInitialLoad(true);
+      try {
+        await prepareFileView(email, verifyData.document);
+      } finally {
+        setIsInitialLoad(false);
+      }
     }
   };
 
@@ -330,82 +506,6 @@ export default function SharedDocumentPage() {
     return msg;
   };
 
-  const getFileExtension = (name: string): string => {
-    return name.split('.').pop()?.toLowerCase() || '';
-  };
-
-  const isImage = (mimeType: string) => mimeType.startsWith('image/');
-  const isPdf = (mimeType: string) => mimeType === 'application/pdf';
-  const isVideo = (mimeType: string) => mimeType.startsWith('video/');
-
-  const isExcel = (mimeType: string, name: string): boolean => {
-    const ext = getFileExtension(name);
-    const excelMimes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'application/vnd.oasis.opendocument.spreadsheet'
-    ];
-    const excelExts = ['xls', 'xlsx', 'xlsm', 'ods'];
-    return excelMimes.includes(mimeType) || excelExts.includes(ext);
-  };
-
-  const isPowerPoint = (mimeType: string, name: string): boolean => {
-    const ext = getFileExtension(name);
-    const pptMimes = [
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.oasis.opendocument.presentation'
-    ];
-    const pptExts = ['ppt', 'pptx', 'pps', 'ppsx', 'odp'];
-    return pptMimes.includes(mimeType) || pptExts.includes(ext);
-  };
-
-  const isWord = (mimeType: string, name: string): boolean => {
-    const ext = getFileExtension(name);
-    return mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      mimeType === 'application/msword' ||
-      ['doc', 'docx'].includes(ext);
-  };
-
-  const isText = (mimeType: string, name: string): boolean => {
-    const ext = getFileExtension(name);
-    const textExts = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];
-    return mimeType.startsWith('text/') || textExts.includes(ext);
-  };
-
-  const isPreviewable = (mimeType: string, name: string): boolean => {
-    return isImage(mimeType) ||
-      isPdf(mimeType) ||
-      isVideo(mimeType) ||
-      isExcel(mimeType, name) ||
-      isPowerPoint(mimeType, name) ||
-      isWord(mimeType, name) ||
-      isText(mimeType, name);
-  };
-
-  // Resolve media type with fallback to name-based detection (porting logic from Folders.tsx)
-  const resolveMediaType = (item: FolderItem): string => {
-    // If backend already resolved it to a specific type, rely on it
-    // But ignore generic types like 'folder' or 'file' if we want to be more specific based on extension
-    if (item.media_type && item.media_type !== 'folder' && item.media_type !== 'file') {
-      // Normalize docx to word if needed
-      if ((item.media_type as any) === 'docx') return 'word';
-      return item.media_type;
-    }
-
-    const ext = getFileExtension(item.name);
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image';
-    if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
-    if (['pdf'].includes(ext)) return 'pdf';
-    if (['doc', 'docx'].includes(ext)) return 'word';
-    if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) return 'excel';
-    if (['ppt', 'pptx', 'pps', 'ppsx', 'odp'].includes(ext)) return 'powerpoint';
-    if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext)) return 'text';
-
-    // Fallback to media_type if extension unknown
-    return item.media_type || 'file';
-  };
-
   // Excel parsing function
   const parseExcelFile = async (blob: Blob) => {
     setIsLoadingExcel(true);
@@ -542,7 +642,7 @@ export default function SharedDocumentPage() {
       const documentObj = {
         docname: file.name,
         media_type: resolveMediaType(file),
-        mime_type: file.type || 'application/octet-stream',
+        mime_type: undefined, // Let the backend header determine the mime type
         id: file.id
       };
 
@@ -893,62 +993,6 @@ export default function SharedDocumentPage() {
     );
   };
 
-  // Render Word Content
-  const renderWordContent = () => {
-    return (
-      <div className="w-full h-full min-h-[500px] flex flex-col bg-white dark:bg-[#1a1a1a] rounded-lg relative overflow-hidden">
-        {isRenderingWord && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
-            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-            <span className="text-gray-500 dark:text-gray-400">Loading document...</span>
-          </div>
-        )}
-
-        {wordRenderError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-red-500">
-            {wordRenderError}
-          </div>
-        )}
-
-        <div className="w-full h-full overflow-y-auto custom-scrollbar p-6 bg-white text-black" ref={wordContainerRef}>
-          {/* Content injected by docx-preview here */}
-        </div>
-      </div>
-    );
-  };
-
-  // Effect to render Word document
-  useEffect(() => {
-    const loadWordDoc = async () => {
-      if (fileUrl && isWord(fileType, fileName) && wordContainerRef.current) {
-        setIsRenderingWord(true);
-        setWordRenderError(null);
-
-        try {
-          // We need the blob again. Since fileUrl is a blob URL, we can fetch it.
-          const res = await fetch(fileUrl);
-          const blob = await res.blob();
-
-          await renderAsync(blob, wordContainerRef.current, wordContainerRef.current, {
-            className: "docx_viewer",
-            inWrapper: true,
-            ignoreWidth: false,
-            ignoreHeight: false,
-            breakPages: true,
-            useBase64URL: true,
-          });
-        } catch (err) {
-          console.error("Error rendering Word doc:", err);
-          setWordRenderError("Failed to render document preview.");
-        } finally {
-          setIsRenderingWord(false);
-        }
-      }
-    };
-
-    loadWordDoc();
-  }, [fileUrl, fileType, fileName]);
-
   // Render folder contents view
   const renderFolderContents = () => {
     // If a file is selected, show file preview
@@ -1029,9 +1073,7 @@ export default function SharedDocumentPage() {
               )}
 
               {isWord(fileType, fileName) && (
-                <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  {renderWordContent()}
-                </div>
+                <WordViewer fileUrl={fileUrl} />
               )}
 
               {isText(fileType, fileName) && (
@@ -1165,6 +1207,7 @@ export default function SharedDocumentPage() {
     return (
       <>
         <HtmlLangUpdater lang={lang} />
+        <HtmlThemeUpdater theme={theme} />
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -1187,6 +1230,18 @@ export default function SharedDocumentPage() {
             className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded shadow hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium border border-gray-200 dark:border-gray-700"
           >
             {lang === 'en' ? 'عربي' : 'English'}
+          </button>
+
+          <button
+            onClick={toggleTheme}
+            className="ml-2 px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded shadow hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium border border-gray-200 dark:border-gray-700"
+            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            {theme === 'light' ? (
+              <img src="/moon.svg" alt="Dark Mode" className="w-5 h-5" />
+            ) : (
+              <img src="/sun.svg" alt="Light Mode" className="w-5 h-5 invert" />
+            )}
           </button>
         </div>
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
@@ -1211,14 +1266,27 @@ export default function SharedDocumentPage() {
   return (
     <>
       <HtmlLangUpdater lang={lang} />
+      <HtmlThemeUpdater theme={theme} />
 
-      {/* Language Toggle Button (Absolute Position) */}
-      <div className="absolute top-4 right-4 z-50">
+      {/* Language and Theme Toggle Buttons (Absolute Position) */}
+      <div className="absolute top-4 right-4 z-50 flex gap-2">
         <button
           onClick={toggleLanguage}
           className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded shadow hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium border border-gray-200 dark:border-gray-700"
         >
           {lang === 'en' ? 'عربي' : 'English'}
+        </button>
+
+        <button
+          onClick={toggleTheme}
+          className="px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded shadow hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium border border-gray-200 dark:border-gray-700"
+          title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+        >
+          {theme === 'light' ? (
+            <img src="/moon.svg" alt="Dark Mode" className="w-5 h-5" />
+          ) : (
+            <img src="/sun.svg" alt="Light Mode" className="w-5 h-5 invert" />
+          )}
         </button>
       </div>
 
@@ -1229,13 +1297,13 @@ export default function SharedDocumentPage() {
           <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center">
             {renderFolderContents()}
           </div>
-        ) : documentData ? (
+        ) : (shareInfo?.share_type === 'file' || documentData) ? (
           // File Share View (existing behavior)
           <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center">
             <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
-                  {documentData.docname || documentData.title || fileName}
+                  {documentData?.docname || documentData?.title || fileName}
                 </h1>
                 <button
                   onClick={handleDownload}
@@ -1256,6 +1324,13 @@ export default function SharedDocumentPage() {
               <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
                 {/* Document Preview */}
                 <div className="w-full max-h-[600px] overflow-auto mb-6">
+                  {isInitialLoad && (
+                    <div className="flex flex-col items-center justify-center py-20 min-h-[300px]">
+                      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                      <p className="text-gray-500 dark:text-gray-400 font-medium">{t('LoadingDocument') || 'Loading document...'}</p>
+                    </div>
+                  )}
+
                   {/* Image Preview */}
                   {fileUrl && isImage(fileType) && (
                     <img
@@ -1297,6 +1372,11 @@ export default function SharedDocumentPage() {
                     <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                       {renderPowerPointContent()}
                     </div>
+                  )}
+
+                  {/* Word Preview */}
+                  {fileUrl && isWord(fileType, fileName) && (
+                    <WordViewer fileUrl={fileUrl} />
                   )}
 
                   {/* Text Preview */}

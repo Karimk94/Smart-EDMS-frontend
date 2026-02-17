@@ -13,15 +13,24 @@ export function useDownload() {
             if (!response.ok) {
                 throw new Error('Download failed');
             }
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = docname;
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1];
+                }
+            }
+
             const blob = await response.blob();
-            return { blob, docname };
+            return { blob, filename };
         },
-        onSuccess: ({ blob, docname }) => {
+        onSuccess: ({ blob, filename }) => {
             // Create download link
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', docname || 'download');
+            link.setAttribute('download', filename || 'download');
             document.body.appendChild(link);
             link.click();
             link.remove();

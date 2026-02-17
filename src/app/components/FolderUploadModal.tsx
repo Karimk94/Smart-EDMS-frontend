@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useToast } from '../context/ToastContext';
 import { UploadFileItem } from './UploadFileItem';
 import ExifReader from 'exifreader';
 import { UploadStatus, UploadableFile } from '../../interfaces';
@@ -60,6 +61,7 @@ const removeExtension = (filename: string) => {
 import { FolderUploadModalProps } from '../../interfaces/PropsInterfaces';
 
 export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete }) => {
+  const { showToast } = useToast();
   const [files, setFiles] = useState<UploadableFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -225,7 +227,9 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             } catch (e) {
             }
             updateFileStatus(id, 'error', { error: errorMsg });
+            showToast(errorMsg, 'error');
           }
+
           resolve();
         };
 

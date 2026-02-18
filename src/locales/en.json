@@ -209,7 +209,7 @@
   "retry": "Retry",
   "goHome": "Go Home",
   "downloadError": "Failed to download file",
-  "Downloading": "Downloading...",
+  "downloading": "Downloading...",
   "edmsPortal": "EDMS Portal",
   "welcomeToEdms": "Welcome to EDMS Portal",
   "selectSystem": "Select a system below to access your document management tools",

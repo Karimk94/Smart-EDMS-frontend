@@ -16,15 +16,12 @@ interface SharedFileResult {
 export function useSharedFileDownload() {
     const downloadMutation = useMutation<SharedFileResult, Error, SharedFileDownloadParams>({
         mutationFn: async ({ token, viewerEmail, document }) => {
-            console.log('useSharedFileDownload:', { token, viewerEmail, document });
             let downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
 
             // Append doc_id if available (crucial for folder shares)
             if (document?.id || document?.doc_id) {
                 downloadUrl += `&doc_id=${document.id || document.doc_id}`;
             }
-
-            console.log('Generated downloadUrl:', downloadUrl);
 
             // Handle video streaming
             if (document?.media_type === 'video' || document?.mime_type?.startsWith('video/')) {
@@ -56,8 +53,6 @@ export function useSharedFileDownload() {
             if (document?.mime_type && document.mime_type.includes('/')) {
                 fileType = document.mime_type;
             }
-
-            console.log('Final fileType:', fileType);
 
             return {
                 fileUrl,

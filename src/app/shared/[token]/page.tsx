@@ -23,7 +23,6 @@ registerLocale('en-GB', enGB);
 
 // Word Viewer Component
 const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?: string }) => {
-  console.log('WordViewer Component Rendered');
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +30,6 @@ const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?
   useEffect(() => {
     let isMounted = true;
     const loadDoc = async () => {
-      console.log('WordViewer: Effect running', { fileUrl, hasRef: !!containerRef.current });
       if (!fileUrl || !containerRef.current) {
         console.warn('WordViewer: Missing prerequisite', { fileUrl, hasRef: !!containerRef.current });
         return;
@@ -41,16 +39,13 @@ const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?
       setError(null);
 
       try {
-        console.log('WordViewer: Fetching blob...');
         const res = await fetch(fileUrl);
         if (!res.ok) throw new Error(`Failed to fetch file: ${res.statusText}`);
         const blob = await res.blob();
-        console.log('WordViewer: Blob fetched', { size: blob.size, type: blob.type });
 
         if (!isMounted) return;
 
         if (containerRef.current) {
-          console.log('WordViewer: Starting renderAsync...');
           containerRef.current.innerHTML = ''; // Clear previous
           await renderAsync(blob, containerRef.current, containerRef.current, {
             className: "docx_viewer",
@@ -60,7 +55,6 @@ const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?
             breakPages: true,
             useBase64URL: true,
           });
-          console.log('WordViewer: renderAsync completed');
         }
       } catch (err: any) {
         console.error("Error rendering Word doc:", err);
@@ -243,17 +237,6 @@ export default function SharedDocumentPage() {
   const [fileType, setFileType] = useState<string>('application/octet-stream');
   const [isDownloading, setIsDownloading] = useState(false); // Add downloading state
   const [isInitialLoad, setIsInitialLoad] = useState(false); // Initial load state
-
-  // Debug logging
-  console.log('SharedDocumentPage Render:', {
-    fileUrl: !!fileUrl,
-    fileName,
-    fileType,
-    isWord: isWord(fileType, fileName),
-    step,
-    isInitialLoad
-  });
-
 
   // Excel State
   const [excelData, setExcelData] = useState<any[][]>([]);
@@ -1027,7 +1010,7 @@ export default function SharedDocumentPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
               )}
-              {isDownloading ? (t('Downloading') || 'Downloading...') : (t('Download'))}
+              {isDownloading ? (t('downloading') || 'Downloading...') : (t('Download'))}
             </button>
           </div>
 
@@ -1317,7 +1300,7 @@ export default function SharedDocumentPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                   )}
-                  {isDownloading ? (t('Downloading') || 'Downloading...') : (t('Download'))}
+                  {isDownloading ? (t('downloading') || 'Downloading...') : (t('Download'))}
                 </button>
               </div>
 

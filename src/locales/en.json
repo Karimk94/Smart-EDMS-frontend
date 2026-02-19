@@ -222,5 +222,6 @@
   "switchToLight": "Switch to light mode",
   "foldersDesc": "Browse all your files and folders",
   "contentCannotBeDisplayed": "Content cannot be displayed",
-  "LoadingDocument": "Loading document"
+  "LoadingDocument": "Loading document",
+  "generatedLinksSuccess": "Successfully generated links"
 }

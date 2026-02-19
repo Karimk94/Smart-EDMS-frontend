@@ -221,5 +221,6 @@
   "switchToLight": "التبديل إلى الوضع الفاتح",
   "foldersDesc": "تصفح جميع ملفاتك ومجلداتك",
   "contentCannotBeDisplayed": "لا يمكن عرض المحتوى",
-  "LoadingDocument": "جاري تحميل المستند"
+  "LoadingDocument": "جاري تحميل المستند",
+  "generatedLinksSuccess": "تم إنشاء الروابط بنجاح"
 }

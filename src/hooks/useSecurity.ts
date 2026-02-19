@@ -17,10 +17,12 @@ interface GenerateShareLinkParams {
     expiryDate: string | null;
     shareMode: 'open' | 'restricted';
     targetEmail?: string;
+    targetEmails?: string[]; // Multiple emails
 }
 
 interface GenerateShareLinkResponse {
     token: string;
+    links?: Array<{ email: string, link: string, token: string }>;
 }
 
 export function useTrustees(docId: number) {
@@ -66,7 +68,7 @@ export function useSecurityMutation() {
     });
 
     const generateShareLink = useMutation({
-        mutationFn: async ({ itemType, documentId, folderId, documentName, expiryDate, shareMode, targetEmail }: GenerateShareLinkParams) => {
+        mutationFn: async ({ itemType, documentId, folderId, documentName, expiryDate, shareMode, targetEmail, targetEmails }: GenerateShareLinkParams) => {
             const payload: any = {
                 expiry_date: expiryDate ? new Date(expiryDate).toISOString() : null,
                 share_type: itemType,
@@ -79,8 +81,15 @@ export function useSecurityMutation() {
                 payload.document_id = documentId ? parseInt(documentId) : 0;
             }
 
-            if (shareMode === 'restricted' && targetEmail) {
-                payload.target_email = targetEmail.trim().toLowerCase();
+            if (shareMode === 'restricted') {
+                // Support legacy single email
+                if (targetEmail) {
+                    payload.target_email = targetEmail.trim().toLowerCase();
+                }
+                // Support multiple emails
+                if (targetEmails && targetEmails.length > 0) {
+                    payload.target_emails = targetEmails.map(e => e.trim().toLowerCase());
+                }
             }
 
             const response = await fetch('/api/share/generate', {

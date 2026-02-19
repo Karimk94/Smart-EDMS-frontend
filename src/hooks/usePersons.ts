@@ -45,7 +45,29 @@ export const fetchGroups = async (): Promise<Group[]> => {
     if (!response.ok) {
         throw new Error('Failed to fetch groups');
     }
-    return response.json();
+    const data = await response.json();
+
+    // Handle different response formats
+    if (Array.isArray(data)) {
+        return data;
+    }
+
+    if (data.groups && Array.isArray(data.groups)) {
+        return data.groups;
+    }
+
+    if (data.options && Array.isArray(data.options)) {
+        return data.options;
+    }
+
+    // Attempt to find any array property if the expected ones aren't found
+    const arrayProp = Object.values(data).find(val => Array.isArray(val));
+    if (arrayProp) {
+        return arrayProp as Group[];
+    }
+
+    console.warn('fetchGroups: API returned unexpected format, defaulting to empty array', data);
+    return [];
 };
 
 export const fetchGroupMembers = async (groupId: string, page: number, search: string): Promise<PersonsResponse> => {

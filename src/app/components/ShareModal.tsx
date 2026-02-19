@@ -25,6 +25,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
   const [shareMode, setShareMode] = useState<ShareMode>('open');
   const [targetEmail, setTargetEmail] = useState('');
+  const [targetEmails, setTargetEmails] = useState<string[]>([]);
+  const [generatedLinks, setGeneratedLinks] = useState<Array<{ email: string, link: string }>>([]);
 
   const [expiryDate, setExpiryDate] = useState<string>(() => {
     const d = new Date();
@@ -39,14 +41,50 @@ const ShareModal: React.FC<ShareModalProps> = ({
     return trimmed.endsWith(ALLOWED_DOMAIN.toLowerCase()) && trimmed.length >= 8;
   };
 
+  const handleAddEmail = () => {
+    if (!targetEmail.trim()) return;
+
+    if (!validateEmail(targetEmail)) {
+      setError(t('invalidTargetEmail') || `Email must be from ${ALLOWED_DOMAIN} domain`);
+      return;
+    }
+
+    if (targetEmails.includes(targetEmail.trim().toLowerCase())) {
+      setTargetEmail('');
+      return;
+    }
+
+    setTargetEmails([...targetEmails, targetEmail.trim().toLowerCase()]);
+    setTargetEmail('');
+    setError(null);
+  };
+
+  const handleRemoveEmail = (emailToRemove: string) => {
+    setTargetEmails(targetEmails.filter(e => e !== emailToRemove));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddEmail();
+    }
+  };
+
   const handleGenerateLink = async () => {
+    let emailsToProcess = [...targetEmails];
+
     if (shareMode === 'restricted') {
-      if (!targetEmail.trim()) {
-        setError(t('targetEmailRequired'));
-        return;
+      // If there's text in the input, try to add it
+      if (targetEmail.trim()) {
+        if (!validateEmail(targetEmail)) {
+          setError(t('invalidTargetEmail') || `Email must be from ${ALLOWED_DOMAIN} domain`);
+          return;
+        }
+        emailsToProcess.push(targetEmail.trim().toLowerCase());
       }
-      if (!validateEmail(targetEmail)) {
-        setError(t('invalidTargetEmail') || `Email must be from ${ALLOWED_DOMAIN} domain`);
+
+      if (emailsToProcess.length === 0) {
+        setError(t('targetEmailRequired'));
         return;
       }
     }
@@ -60,12 +98,23 @@ const ShareModal: React.FC<ShareModalProps> = ({
         documentName,
         expiryDate,
         shareMode,
-        targetEmail
+        targetEmails: emailsToProcess.length > 0 ? emailsToProcess : undefined
       });
 
-      const origin = window.location.origin;
-      const fullLink = `${origin}/shared/${data.token}`;
-      setGeneratedLink(fullLink);
+      if (data.links && data.links.length > 0) {
+        setGeneratedLinks(data.links);
+        // If only one link, also set the main one for backward compat view
+        if (data.links.length === 1) {
+          setGeneratedLink(data.links[0].link);
+        } else {
+          setGeneratedLink('multiple'); // Logic flag to show multiple view
+        }
+      } else {
+        // Fallback / Open mode
+        const origin = window.location.origin;
+        const fullLink = `${origin}/shared/${data.token}`;
+        setGeneratedLink(fullLink);
+      }
 
     } catch (err: any) {
       setError(err.message || 'Could not generate share link. Please try again.');
@@ -81,9 +130,11 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
   const handleClose = () => {
     setGeneratedLink(null);
+    setGeneratedLinks([]);
     setError(null);
     setShareMode('open');
     setTargetEmail('');
+    setTargetEmails([]);
     onClose();
   };
 
@@ -163,17 +214,50 @@ const ShareModal: React.FC<ShareModalProps> = ({
                 <label htmlFor="target-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('recipientEmail')} <span className="text-red-500">*</span>
                 </label>
-                <input
-                  id="target-email"
-                  type="email"
-                  value={targetEmail}
-                  onChange={(e) => setTargetEmail(e.target.value)}
-                  placeholder={`name${ALLOWED_DOMAIN}`}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm ${targetEmail && !validateEmail(targetEmail)
-                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                    : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                />
+
+                {/* Added Emails List */}
+                {targetEmails.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {targetEmails.map((email) => (
+                      <div key={email} className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs">
+                        <span>{email}</span>
+                        <button
+                          onClick={() => handleRemoveEmail(email)}
+                          className="hover:text-red-500 focus:outline-none"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    id="target-email"
+                    type="email"
+                    value={targetEmail}
+                    onChange={(e) => setTargetEmail(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={`name${ALLOWED_DOMAIN}`}
+                    className={`flex-1 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm ${targetEmail && !validateEmail(targetEmail)
+                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddEmail}
+                    disabled={!targetEmail || !validateEmail(targetEmail)}
+                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {t('targetEmailHint') || `Only emails ending with ${ALLOWED_DOMAIN} are allowed`}
                 </p>
@@ -220,7 +304,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
               </button>
               <button
                 onClick={handleGenerateLink}
-                disabled={isGeneratingLink || (shareMode === 'restricted' && !validateEmail(targetEmail))}
+                disabled={isGeneratingLink || (shareMode === 'restricted' && targetEmails.length === 0 && !validateEmail(targetEmail))}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGeneratingLink ? (t('generating')) : (t('generateLink'))}
@@ -229,41 +313,70 @@ const ShareModal: React.FC<ShareModalProps> = ({
           </>
         ) : (
           <div className="space-y-4">
-            <div className={`p-3 rounded-md text-sm ${shareMode === 'restricted'
-              ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
-              : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-              }`}>
-              {shareMode === 'restricted'
-                ? `${t('restrictedTo')} ${targetEmail}`
-                : (t('openAccessInfo') || `Any ${ALLOWED_DOMAIN} email can access this link`)
-              }
-            </div>
+            {generatedLink === 'multiple' ? (
+              <div className="max-h-[300px] overflow-y-auto pr-1 space-y-3">
+                <p className="text-sm text-green-600 font-medium mb-2">
+                  {t('generatedLinksSuccess') || `Successfully generated ${generatedLinks.length} links:`}
+                </p>
+                {generatedLinks.map((item, idx) => (
+                  <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-700">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{item.email}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(item.link);
+                          showToast(t('LinkCopied'), 'success');
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-xs"
+                      >
+                        {t('copy') || 'Copy'}
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-500 font-mono truncate select-all">
+                      {item.link}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className={`p-3 rounded-md text-sm ${shareMode === 'restricted'
+                  ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+                  : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                  }`}>
+                  {shareMode === 'restricted'
+                    ? `${t('restrictedTo')} ${targetEmail || targetEmails.join(', ')}`
+                    : (t('openAccessInfo') || `Any ${ALLOWED_DOMAIN} email can access this link`)
+                  }
+                </div>
 
-            {/* Share type indicator */}
-            <div className={`p-3 rounded-md text-sm flex items-center gap-2 ${isFolder
-              ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'
-              : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
-              }`}>
-              {isFolder ? (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
-                  {t('folderShareCreated')}
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {t('fileShareCreated')}
-                </>
-              )}
-            </div>
+                {/* Share type indicator */}
+                <div className={`p-3 rounded-md text-sm flex items-center gap-2 ${isFolder
+                  ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'
+                  : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+                  }`}>
+                  {isFolder ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      {t('folderShareCreated')}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {t('fileShareCreated')}
+                    </>
+                  )}
+                </div>
 
-            <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600 break-all text-sm text-gray-800 dark:text-gray-200">
-              {generatedLink}
-            </div>
+                <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600 break-all text-sm text-gray-800 dark:text-gray-200">
+                  {generatedLink}
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end space-x-3">
               <button
@@ -272,12 +385,14 @@ const ShareModal: React.FC<ShareModalProps> = ({
               >
                 {t('close')}
               </button>
-              <button
-                onClick={copyToClipboard}
-                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
-              >
-                {t('copyLink')}
-              </button>
+              {generatedLink !== 'multiple' && (
+                <button
+                  onClick={copyToClipboard}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
+                >
+                  {t('copyLink')}
+                </button>
+              )}
             </div>
           </div>
         )}

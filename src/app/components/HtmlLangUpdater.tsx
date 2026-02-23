@@ -10,7 +10,7 @@ const HtmlLangUpdater: React.FC<HtmlLangUpdaterProps> = ({ lang, forceDir }) => 
     if (forceDir) {
       document.documentElement.dir = forceDir;
     } else {
-      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+      document.documentElement.dir = 'ltr';
     }
   }, [lang, forceDir]);
 

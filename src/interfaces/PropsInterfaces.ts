@@ -316,17 +316,17 @@ export interface HeaderProps {
     isEditor: boolean;
     isSidebarOpen: boolean;
     toggleSidebar: () => void;
-    activeSection?: 'recent' | 'favorites' | 'folders';
+    activeSection?: 'recent' | 'favorites' | 'folders' | 'researcher';
 }
 
 export interface SidebarProps {
     isSidebarOpen: boolean;
-    activeSection: 'recent' | 'favorites' | 'folders';
-    handleSectionChange: (section: 'recent' | 'favorites' | 'folders') => void;
+    activeSection: 'recent' | 'favorites' | 'folders' | 'researcher';
+    handleSectionChange: (section: 'recent' | 'favorites' | 'folders' | 'researcher') => void;
     isShowingFullMemories: boolean;
     t: Function;
     lang: 'en' | 'ar';
-    hiddenSections?: ('recent' | 'favorites' | 'folders')[];
+    hiddenSections?: ('recent' | 'favorites' | 'folders' | 'researcher')[];
 }
 
 export interface SearchBarProps {

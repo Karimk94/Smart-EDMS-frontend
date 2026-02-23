@@ -36,6 +36,14 @@ const getSystems = (t: TFunction): SystemCard[] => [
         color: 'from-blue-600 to-blue-800',
     },
     {
+        id: 'researcher',
+        title: t('researcher') || 'Researcher Search',
+        description: t('researcherDesc') || 'Search documents across all forms',
+        icon: '/search-icon.svg',
+        href: '/researcher',
+        color: 'from-indigo-600 to-indigo-800',
+    },
+    {
         id: 'pta-edms',
         title: t('ptaEdmsTitle'),
         description: t('ptaEdmsDesc'),
@@ -170,7 +178,7 @@ export function PortalLanding() {
 
                                 {/* Arrow */}
                                 <div className="flex-shrink-0 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 group-hover:translate-x-1 transition-transform rtl:group-hover:-translate-x-1 rtl:rotate-180`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 group-hover:translate-x-1 transition-transform`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                                     </svg>
                                 </div>

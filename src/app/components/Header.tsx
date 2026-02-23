@@ -36,9 +36,9 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const rtlClass = lang === 'ar' ? 'flex-row-reverse' : '';
-  const searchBarMargin = lang === 'ar' ? 'mr-auto' : 'ml-auto';
-  const logoMargin = lang === 'ar' ? 'mr-4' : 'ml-4';
+  const rtlClass = '';
+  const searchBarMargin = 'ml-auto';
+  const logoMargin = 'ml-4';
 
   return (
     <header
@@ -95,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Center: Search Bar */}
         <div className="flex-1 flex justify-center px-4 items-center">
-          {activeSection !== 'folders' && (
+          {activeSection !== 'folders' && activeSection !== 'researcher' && (
             <div className="w-full max-w-md">
               <SearchBar onSearch={onSearch} t={t} lang={lang} />
             </div>
@@ -117,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{t('processing')}</span>
             </div>
           )}
-          {isEditor && activeSection !== 'folders' && (
+          {isEditor && activeSection !== 'folders' && activeSection !== 'researcher' && (
             <button
               onClick={onOpenUploadModal}
               className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition flex items-center gap-2"

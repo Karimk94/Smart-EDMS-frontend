@@ -15,6 +15,8 @@ import { useUser } from '../context/UserContext';
 import { useTranslations } from '../hooks/useTranslations';
 import { useClearCache, useProcessDocuments } from '../../hooks/useSystemOperations';
 import { AdvancedFilters } from './AdvancedFilters';
+import HtmlThemeUpdater from './HtmlThemeUpdater';
+import HtmlLangUpdater from './HtmlLangUpdater';
 import { DocumentItemSkeleton } from './DocumentItemSkeleton';
 import { DocumentList } from './DocumentList';
 import { ExcelModal } from './ExcelModal';
@@ -34,7 +36,7 @@ import { VideoModal } from './VideoModal';
 import { WordModal } from './WordModal';
 import { YearFilter } from './YearFilter';
 
-type ActiveSection = 'recent' | 'favorites' | 'folders';
+type ActiveSection = 'recent' | 'favorites' | 'folders' | 'researcher';
 
 const formatToApiDateTime = (date: Date | null): string => {
     if (!date) return '';
@@ -51,7 +53,7 @@ registerLocale('en-GB', enGB);
 interface MainDashboardProps {
     initialSection?: ActiveSection;
     initialFolderId?: string | null;
-    hiddenSections?: ('recent' | 'favorites' | 'folders')[];
+    hiddenSections?: ('recent' | 'favorites' | 'folders' | 'researcher')[];
 }
 
 export function MainDashboard({ initialSection = 'recent', initialFolderId = null, hiddenSections = [] }: MainDashboardProps) {
@@ -129,7 +131,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     const [isClearCacheModalOpen, setIsClearCacheModalOpen] = useState(false);
 
-    const [refreshFoldersKey, setRefreshFoldersKey] = useState(0);
+    // const [refreshFoldersKey, setRefreshFoldersKey] = useState(0);
 
     const clearCacheMutation = useClearCache();
     const processDocumentsMutation = useProcessDocuments();
@@ -219,7 +221,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                                 queryClient.invalidateQueries({ queryKey: ['documents'] });
                             }
                             if (activeSection === 'folders' && !activeFolder) {
-                                setRefreshFoldersKey(prev => prev + 1);
+                                queryClient.invalidateQueries({ queryKey: ['folders'] });
                             }
                         }
                     } else if (stillProcessing.length === 0) {
@@ -279,7 +281,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     const handleFolderUploadComplete = () => {
         setIsFolderUploadModalOpen(false);
         queryClient.invalidateQueries({ queryKey: ['folders'] });
-        setRefreshFoldersKey(prev => prev + 1);
+        // setRefreshFoldersKey(prev => prev + 1);
     };
 
     const handlePageChange = (newPage: number) => {
@@ -295,6 +297,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
             router.push('/favorites');
         } else if (section === 'folders') {
             router.push('/folders');
+        } else if (section === 'researcher') {
+            router.push('/researcher');
         }
     };
 
@@ -363,7 +367,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
         setProcessingDocs(newProcessingDocs);
 
         if (activeSection === 'folders' && !activeFolder) {
-            setRefreshFoldersKey(prev => prev + 1);
+            queryClient.invalidateQueries({ queryKey: ['folders'] });
         } else if (activeSection === 'recent') {
             setCurrentPage(1);
             queryClient.invalidateQueries({ queryKey: ['documents'] });
@@ -415,7 +419,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     </div>
                 }>
                     <Folders
-                        key={refreshFoldersKey}
+                        // key={refreshFoldersKey}
                         onFolderClick={handleFolderClick}
                         onDocumentClick={handleDocumentClick}
                         onUploadClick={handleFolderUploadClick}
@@ -477,10 +481,12 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
         );
     }
 
-    const rtlMainClass = lang === 'ar' ? 'rtl' : 'ltr';
+    const rtlMainClass = 'ltr';
 
     return (
         <>
+            <HtmlThemeUpdater theme={theme} />
+            <HtmlLangUpdater lang={lang} />
             <div className={`flex flex-col h-screen ${rtlMainClass}`}>
                 <Header
                     onSearch={handleSearch}
@@ -495,7 +501,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     activeSection={activeSection}
                 />
 
-                <div className={`flex flex-1 overflow-hidden ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>
+                <div className={`flex flex-1 overflow-hidden`}>
                     <Sidebar
                         isSidebarOpen={isSidebarOpen}
                         activeSection={activeSection}
@@ -509,7 +515,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-w-0">
 
                         {(activeSection !== 'folders' || activeFolder) && (
-                            <div className={`flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700 justify-end ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>
+                            <div className={`flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700 justify-end`}>
                                 <TagFilter
                                     apiURL={API_PROXY_URL}
                                     selectedTags={selectedTags}

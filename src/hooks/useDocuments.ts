@@ -2,7 +2,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Document } from '../models/Document';
 import { PersonOption } from '../models/PersonOption';
 
-type ActiveSection = 'recent' | 'favorites' | 'folders';
+type ActiveSection = 'recent' | 'favorites' | 'folders' | 'researcher';
 
 interface UseDocumentsParams {
     activeSection: ActiveSection;
@@ -109,6 +109,9 @@ export function useDocuments({
 
             let endpoint = '';
             let dataKey = 'documents';
+            if (activeSection === 'researcher') {
+                return { documents: [], total_pages: 1 };
+            }
 
             switch (activeSection) {
                 case 'recent':

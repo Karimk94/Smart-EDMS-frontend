@@ -37,7 +37,7 @@ function ErrorContent() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-[#121212] p-4 text-center" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-[#121212] p-4 text-center" dir="ltr">
             <div className="bg-white dark:bg-[#1e1e1e] p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-800">
                 <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

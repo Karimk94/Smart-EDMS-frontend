@@ -14,7 +14,7 @@ const NavLink: React.FC<{
 }> = ({ icon, label, isActive, isSidebarOpen, onClick, lang }) => {
   const activeClass = 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white';
   const inactiveClass = 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white';
-  const rtlClass = lang === 'ar' ? 'flex-row-reverse' : '';
+  const rtlClass = '';
 
   return (
     <button
@@ -57,13 +57,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   lang,
 
 }) => {
-  const getIsActive = (section: 'recent' | 'favorites' | 'folders') => {
+  const getIsActive = (section: 'recent' | 'favorites' | 'folders' | 'researcher') => {
     return section === activeSection;
   };
 
   const sidebarWidth = isSidebarOpen ? 'w-60' : 'w-20';
   const padding = isSidebarOpen ? 'p-4' : 'p-3';
-  const borderClass = lang === 'ar' ? 'border-l' : 'border-r';
+  const borderClass = 'border-r';
 
 
 
@@ -95,6 +95,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isActive={getIsActive('folders')}
           isSidebarOpen={isSidebarOpen}
           onClick={() => handleSectionChange('folders')}
+          lang={lang}
+        />
+        <NavLink
+          icon="/search-icon.svg"
+          label={t('researcher')}
+          isActive={getIsActive('researcher')}
+          isSidebarOpen={isSidebarOpen}
+          onClick={() => handleSectionChange('researcher')}
           lang={lang}
         />
 

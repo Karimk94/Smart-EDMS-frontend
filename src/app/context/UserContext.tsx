@@ -46,7 +46,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (user?.lang) {
             document.documentElement.lang = user.lang;
-            document.documentElement.dir = user.lang === 'ar' ? 'rtl' : 'ltr';
+            document.documentElement.dir = 'ltr';
         }
     }, [user?.lang]);
 

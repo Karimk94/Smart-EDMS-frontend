@@ -112,6 +112,10 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
         return '/file-excel.svg';
       case 'powerpoint':
         return '/file-powerpoint.svg';
+      case 'word':
+        return '/file-word.svg';
+      case 'zip':
+        return '/file-zip.svg';
       case 'text':
         return '/file-document.svg';
       default:

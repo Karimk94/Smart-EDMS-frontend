@@ -99,7 +99,7 @@ export default function ResearcherPage() {
     };
 
     const handleDocumentClick = (doc: Document) => {
-        // Logic copied from MainDashboard
+        if (doc.media_type === 'zip') return; // Do not open preview for zip files
         if (doc.media_type === 'video') setSelectedVideo(doc);
         else if (doc.media_type === 'image') setSelectedDoc(doc);
         else if (doc.media_type === 'pdf') setSelectedPdf(doc);
@@ -188,9 +188,9 @@ export default function ResearcherPage() {
                                             className="p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#444] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                                             value={searchScope}
                                             onChange={(e) => setSearchScope(e.target.value)}
-                                            title={t('searchScopeHint') || "Leave as 'Auto (Intelligent)' to use the default optimized table"}
+                                            title={t('searchScopeHint') || "Leave as 'Auto' to use the default optimized table"}
                                         >
-                                            <option value="">{t('scopeAuto') || 'Auto (Intelligent)'}</option>
+                                            <option value="">{t('scopeAuto') || 'Auto'}</option>
                                             <option value="0">{t('scopeGlobal') || 'Global (All Tables)'}</option>
                                             <option value="3799">Form 3799 (Vehicles & General)</option>
                                             <option value="2572">Form 2572 (Files)</option>
@@ -307,7 +307,7 @@ export default function ResearcherPage() {
                                 </p>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                                    <img src="/file-document.svg" className="w-16 h-16 mb-4 opacity-50 dark:invert" alt="" />
+                                    <img src="/search-icon.svg" className="w-16 h-16 mb-4 opacity-50 dark:invert" alt="" />
                                     <p>{t('startSearchPrompt') || 'Select a type and enter criteria to search.'}</p>
                                 </div>
                             )}

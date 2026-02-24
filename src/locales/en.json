@@ -239,7 +239,7 @@
   "matchExact": "Exact Match",
   "matchStartsWith": "Starts With",
   "searchScope": "Search Scope",
-  "searchScopeHint": "Leave as 'Auto (Intelligent)' to use the default optimized table",
-  "scopeAuto": "Auto (Intelligent)",
+  "searchScopeHint": "Leave as 'Auto' to use the default optimized table",
+  "scopeAuto": "Auto",
   "scopeGlobal": "Global (All Tables)"
 }

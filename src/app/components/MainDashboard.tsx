@@ -308,6 +308,10 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     };
 
     const handleDocumentClick = (doc: Document) => {
+        if (doc.media_type === 'zip') {
+            return; // Do not open preview for zip files
+        }
+
         if (doc.media_type === 'video') {
             setSelectedVideo(doc);
         } else if (doc.media_type === 'image') {

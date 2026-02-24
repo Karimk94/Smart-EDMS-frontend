@@ -268,6 +268,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         altText = 'Word';
         invertClass = "";
       }
+      else if (type === 'zip') {
+        iconSrc = '/file-zip.svg';
+        altText = 'Zip';
+        invertClass = "";
+      }
       else if (type === 'text' || type === 'file') {
         iconSrc = '/file-document.svg';
         altText = 'File';
@@ -296,6 +301,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '')) return 'video';
     if (['pdf'].includes(ext || '')) return 'pdf';
     if (['doc', 'docx'].includes(ext || '')) return 'word';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) return 'zip';
     if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext || '')) return 'text';
     if (['xls', 'xlsx', 'ods', 'xlsm'].includes(ext || '')) return 'excel';
     if (['ppt', 'pptx', 'odp', 'pps', 'ppsx'].includes(ext || '')) return 'powerpoint';
@@ -340,6 +346,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         else if (detectedType === 'excel') mediaType = 'excel';
         else if (detectedType === 'powerpoint') mediaType = 'powerpoint';
         else if (detectedType === 'word') mediaType = 'word';
+        else if (detectedType === 'zip') mediaType = 'zip';
         else mediaType = 'file';
 
         const doc = new Document({
@@ -558,6 +565,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (type === 'excel') return 'text-green-500 dark:text-green-400';
     if (type === 'powerpoint') return 'text-orange-500 dark:text-orange-400';
     if (type === 'word') return 'text-blue-700 dark:text-blue-500'; // Darker blue for Word
+    if (type === 'zip') return 'text-purple-500 dark:text-purple-400';
     return 'text-yellow-500 dark:text-yellow-400';
   };
 

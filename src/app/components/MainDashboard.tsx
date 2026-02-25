@@ -150,7 +150,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
             const params = new URLSearchParams();
             if (currentLang) params.set('lang', currentLang);
             if (currentTheme) params.set('theme', currentTheme);
-            params.set('redirect', window.location.pathname);
+            params.set('redirect', window.location.pathname + window.location.search);
 
             const queryString = params.toString();
             router.push(queryString ? `/login?${queryString}` : '/login');

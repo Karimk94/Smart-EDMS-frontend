@@ -96,9 +96,17 @@ export default function ResearcherPage() {
     // Authentication Check
     useEffect(() => {
         if (!isAuthenticated && !isLoadingUser) {
-            router.push('/login');
+            const currentLang = searchParams.get('lang');
+            const currentTheme = searchParams.get('theme');
+            const params = new URLSearchParams();
+            if (currentLang) params.set('lang', currentLang);
+            if (currentTheme) params.set('theme', currentTheme);
+            params.set('redirect', window.location.pathname + window.location.search);
+
+            const queryString = params.toString();
+            router.push(queryString ? `/login?${queryString}` : '/login');
         }
-    }, [isAuthenticated, isLoadingUser, router]);
+    }, [isAuthenticated, isLoadingUser, router, searchParams]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();

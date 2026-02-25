@@ -39,7 +39,7 @@ export default function ResearcherPage() {
     const t = useTranslations(lang);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-    // Search State
+    // Search Form State (what the user edits in the form)
     const [selectedType, setSelectedType] = useState<SearchType | null>(null);
     const [keyword, setKeyword] = useState("");
     const [matchType, setMatchType] = useState<"like" | "exact" | "startsWith">("like");
@@ -48,6 +48,20 @@ export default function ResearcherPage() {
     const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
     const [currentPage, setCurrentPage] = useState(1);
     const [isSearchTriggered, setIsSearchTriggered] = useState(false);
+
+    // Committed Search State (only updates on Search click — drives the API query)
+    const [committedParams, setCommittedParams] = useState<{
+        keyword: string;
+        matchType: string;
+        formName: string;
+        fieldName: string;
+        searchForm: string;
+        searchField: string;
+        displayField: string;
+        dateFrom: Date | undefined;
+        dateTo: Date | undefined;
+        page: number;
+    } | null>(null);
 
     // Document Modal State (Copied from MainDashboard)
     const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
@@ -62,22 +76,22 @@ export default function ResearcherPage() {
     // Data Fetching
     const { data: typesData, isLoading: isTypesLoading } = useSearchTypes();
 
-    const { data: searchData, isLoading: isSearchLoading, error: searchError } = useResearcherSearch({
-        keyword: keyword,
-        matchType: matchType,
-        formName: searchScope || selectedType?.value.form || '',
-        fieldName: selectedType?.value.field_name || '',
-        searchForm: selectedType?.value.search_form || '',
-        searchField: selectedType?.value.search_field || '',
-        displayField: selectedType?.value.display_field || '',
-        dateFrom: dateFrom,
-        dateTo: dateTo,
-        page: currentPage,
-        enabled: isSearchTriggered && !!selectedType
+    const { data: searchData, isFetching: isSearchLoading, error: searchError } = useResearcherSearch({
+        keyword: committedParams?.keyword || '',
+        matchType: committedParams?.matchType || 'like',
+        formName: committedParams?.formName || '',
+        fieldName: committedParams?.fieldName || '',
+        searchForm: committedParams?.searchForm || '',
+        searchField: committedParams?.searchField || '',
+        displayField: committedParams?.displayField || '',
+        dateFrom: committedParams?.dateFrom,
+        dateTo: committedParams?.dateTo,
+        page: committedParams?.page || 1,
+        enabled: isSearchTriggered && !!committedParams
     });
 
-    const documents = searchData?.documents || [];
-    const totalPages = searchData?.total_pages || 1;
+    const documents = isSearchTriggered ? (searchData?.documents || []) : [];
+    const totalPages = isSearchTriggered ? (searchData?.total_pages || 1) : 1;
 
     // Authentication Check
     useEffect(() => {
@@ -89,6 +103,18 @@ export default function ResearcherPage() {
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         setCurrentPage(1);
+        setCommittedParams({
+            keyword,
+            matchType,
+            formName: searchScope || selectedType?.value.form || '',
+            fieldName: selectedType?.value.field_name || '',
+            searchForm: selectedType?.value.search_form || '',
+            searchField: selectedType?.value.search_field || '',
+            displayField: selectedType?.value.display_field || '',
+            dateFrom,
+            dateTo,
+            page: 1,
+        });
         setIsSearchTriggered(true);
     };
 
@@ -163,6 +189,10 @@ export default function ResearcherPage() {
                                             className="p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#444] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                                             value={selectedType ? JSON.stringify(selectedType) : ""}
                                             onChange={(e) => {
+                                                if (isSearchLoading) {
+                                                    setIsSearchTriggered(false);
+                                                }
+                                                setCurrentPage(1);
                                                 if (e.target.value) {
                                                     setSelectedType(JSON.parse(e.target.value));
                                                 } else {
@@ -296,7 +326,12 @@ export default function ResearcherPage() {
                                         <Pagination
                                             currentPage={currentPage}
                                             totalPages={totalPages}
-                                            onPageChange={setCurrentPage}
+                                            onPageChange={(page: number) => {
+                                                setCurrentPage(page);
+                                                if (committedParams) {
+                                                    setCommittedParams({ ...committedParams, page });
+                                                }
+                                            }}
                                             t={t}
                                         />
                                     )}

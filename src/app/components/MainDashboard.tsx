@@ -34,7 +34,7 @@ import { VideoModal } from './VideoModal';
 import { WordModal } from './WordModal';
 import { YearFilter } from './YearFilter';
 
-type ActiveSection = 'recent' | 'favorites' | 'folders' | 'researcher';
+type ActiveSection = 'recent' | 'favorites' | 'folders' | 'profilesearch';
 
 const formatToApiDateTime = (date: Date | null): string => {
     if (!date) return '';
@@ -51,7 +51,7 @@ registerLocale('en-GB', enGB);
 interface MainDashboardProps {
     initialSection?: ActiveSection;
     initialFolderId?: string | null;
-    hiddenSections?: ('recent' | 'favorites' | 'folders' | 'researcher')[];
+    hiddenSections?: ('recent' | 'favorites' | 'folders' | 'profilesearch')[];
 }
 
 export function MainDashboard({ initialSection = 'recent', initialFolderId = null, hiddenSections = [] }: MainDashboardProps) {
@@ -300,8 +300,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
             router.push('/favorites');
         } else if (section === 'folders') {
             router.push('/folders');
-        } else if (section === 'researcher') {
-            router.push('/researcher');
+        } else if (section === 'profilesearch') {
+            router.push('/profilesearch');
         }
     };
 

@@ -16,10 +16,10 @@ Abstract Management: Easily update document abstracts with newly identified name
 
 Seamless Data Flow: The application is designed to automatically refresh content after data updates, ensuring a real-time view of your document library.
 
-Researcher & Search Scopes: Advanced semantic and exact-match search capabilities. Features dynamic 'Search Scopes' to control the breadth and speed of database queries:
+Profile Search & Search Scopes: Advanced semantic and exact-match search capabilities. Features dynamic 'Search Scopes' to control the breadth and speed of database queries:
 - Auto (Default): The system automatically routes the query to the most optimized Oracle database table based on the selected "Search Type" form and field configuration.
 - Global (All Tables): Bypasses specific form routing and performs a comprehensive search across all associated tables. Returns a maximum number of records but can be significantly slower.
-- Specific Forms (e.g., Form 3799, Form 2572): Forces the database to only query within that specific form's scope (like "Vehicles", "Files", or "Projects"), drastically improving search speeds when the researcher precisely knows the target category.
+- Specific Forms (e.g., Form 3799, Form 2572): Forces the database to only query within that specific form's scope (like "Vehicles", "Files", or "Projects"), drastically improving search speeds when the profilesearch precisely knows the target category.
 
 🚀 Getting Started
 To run this project locally, ensure you have the required backend services running (the EDMS API and the face recognition service).

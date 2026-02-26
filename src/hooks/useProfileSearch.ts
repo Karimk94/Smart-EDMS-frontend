@@ -26,7 +26,7 @@ export interface SearchCriterion {
     matchType: 'like' | 'exact' | 'startsWith';
 }
 
-interface ResearcherSearchResponse {
+interface ProfileSearchResponse {
     documents: Document[];
     page: number;
     total_pages: number;
@@ -47,11 +47,11 @@ const formatToApiDate = (date: Date | undefined): string => {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 
-export function useSearchScopes() {
+export function useProfileSearchScopes() {
     return useQuery({
-        queryKey: ['researcher', 'scopes'],
+        queryKey: ['profilesearch', 'scopes'],
         queryFn: async (): Promise<SearchScope[]> => {
-            const response = await fetch('/api/researcher/scopes');
+            const response = await fetch('/api/profilesearch/scopes');
             if (!response.ok) {
                 throw new Error('Failed to fetch search scopes');
             }
@@ -62,13 +62,13 @@ export function useSearchScopes() {
     });
 }
 
-export function useSearchTypes(scope?: string) {
+export function useProfileSearchTypes(scope?: string) {
     return useQuery({
-        queryKey: ['researcher', 'types', scope || 'all'],
+        queryKey: ['profilesearch', 'types', scope || 'all'],
         queryFn: async (): Promise<SearchType[]> => {
             const url = scope
-                ? `/api/researcher/types?scope=${encodeURIComponent(scope)}`
-                : '/api/researcher/types';
+                ? `/api/profilesearch/types?scope=${encodeURIComponent(scope)}`
+                : '/api/profilesearch/types';
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Failed to fetch search types');
@@ -80,7 +80,7 @@ export function useSearchTypes(scope?: string) {
     });
 }
 
-export function useResearcherMultiSearch(params: MultiSearchParams & { enabled?: boolean }) {
+export function useProfileMultiSearch(params: MultiSearchParams & { enabled?: boolean }) {
     const { scope, criteria, dateFrom, dateTo, page, enabled = false } = params;
 
     // Build a stable query key from criteria
@@ -92,12 +92,12 @@ export function useResearcherMultiSearch(params: MultiSearchParams & { enabled?:
 
     return useQuery({
         queryKey: [
-            'researcher', 'multi-search',
+            'profilesearch', 'multi-search',
             scope, JSON.stringify(criteriaKey),
             formatToApiDate(dateFrom), formatToApiDate(dateTo),
             page
         ],
-        queryFn: async (): Promise<ResearcherSearchResponse> => {
+        queryFn: async (): Promise<ProfileSearchResponse> => {
             const body = {
                 scope,
                 criteria: criteria
@@ -116,7 +116,7 @@ export function useResearcherMultiSearch(params: MultiSearchParams & { enabled?:
                 page_size: 20,
             };
 
-            const response = await fetch('/api/researcher/search', {
+            const response = await fetch('/api/profilesearch/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),

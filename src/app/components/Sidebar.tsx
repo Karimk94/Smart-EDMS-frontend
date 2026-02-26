@@ -57,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   lang,
 
 }) => {
-  const getIsActive = (section: 'recent' | 'favorites' | 'folders' | 'researcher') => {
+  const getIsActive = (section: 'recent' | 'favorites' | 'folders' | 'profilesearch') => {
     return section === activeSection;
   };
 
@@ -99,10 +99,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
         <NavLink
           icon="/search-icon.svg"
-          label={t('researcher')}
-          isActive={getIsActive('researcher')}
+          label={t('profilesearch')}
+          isActive={getIsActive('profilesearch')}
           isSidebarOpen={isSidebarOpen}
-          onClick={() => handleSectionChange('researcher')}
+          onClick={() => handleSectionChange('profilesearch')}
           lang={lang}
         />
 

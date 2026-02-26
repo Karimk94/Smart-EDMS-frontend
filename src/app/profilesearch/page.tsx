@@ -5,7 +5,7 @@ import { enGB } from 'date-fns/locale/en-GB';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { registerLocale } from 'react-datepicker';
-import { useSearchScopes, useSearchTypes, useResearcherMultiSearch, SearchType, SearchCriterion } from '../../hooks/useResearcher';
+import { useProfileSearchScopes, useProfileSearchTypes, useProfileMultiSearch, SearchType, SearchCriterion } from '../../hooks/useProfileSearch';
 import { Document } from '../../models/Document';
 import { User } from '../../models/User';
 import { useUser } from '../context/UserContext';
@@ -50,7 +50,7 @@ const createEmptyRow = (): SearchCriterion => ({
     matchType: 'like',
 });
 
-function ResearcherPageContent() {
+function ProfileSearchPageContent() {
     const { user, logout, isAuthenticated, isLoading: isLoadingUser, currentLang, currentTheme } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -92,10 +92,10 @@ function ResearcherPageContent() {
     const [selectedWord, setSelectedWord] = useState<Document | null>(null);
 
     // Data Fetching
-    const { data: scopesData, isLoading: isScopesLoading } = useSearchScopes();
-    const { data: typesData, isLoading: isTypesLoading } = useSearchTypes(searchScope || undefined);
+    const { data: scopesData, isLoading: isScopesLoading } = useProfileSearchScopes();
+    const { data: typesData, isLoading: isTypesLoading } = useProfileSearchTypes(searchScope || undefined);
 
-    const { data: searchData, isFetching: isSearchLoading, error: searchError } = useResearcherMultiSearch({
+    const { data: searchData, isFetching: isSearchLoading, error: searchError } = useProfileMultiSearch({
         scope: committedParams?.scope || '',
         criteria: committedParams?.criteria || [],
         dateFrom: committedParams?.dateFrom,
@@ -216,13 +216,13 @@ function ResearcherPageContent() {
                     t={t}
                     isSidebarOpen={isSidebarOpen}
                     toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                    activeSection="researcher"
+                    activeSection="profilesearch"
                 />
 
                 <div className={`flex flex-1 overflow-hidden`}>
                     <Sidebar
                         isSidebarOpen={isSidebarOpen}
-                        activeSection="researcher"
+                        activeSection="profilesearch"
                         handleSectionChange={handleSectionChange}
                         isShowingFullMemories={false}
                         t={t}
@@ -231,7 +231,7 @@ function ResearcherPageContent() {
 
                     <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-w-0">
                         <div dir="ltr">
-                            <h1 className="text-2xl font-bold mb-6">{t('researcher') || 'Profile Search'}</h1>
+                            <h1 className="text-2xl font-bold mb-6">{t('profilesearch') || 'Profile Search'}</h1>
 
                             {/* Search Form */}
                             <div className="bg-white dark:bg-[#333] p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-8">
@@ -462,10 +462,10 @@ function ResearcherPageContent() {
     );
 }
 
-export default function ResearcherPage() {
+export default function ProfileSearchPage() {
     return (
         <Suspense>
-            <ResearcherPageContent />
+            <ProfileSearchPageContent />
         </Suspense>
     );
 }

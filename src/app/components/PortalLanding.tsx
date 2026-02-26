@@ -34,11 +34,11 @@ const getSystems = (t: TFunction): SystemCard[] => [
         color: 'from-blue-600 to-blue-800',
     },
     {
-        id: 'researcher',
-        title: t('researcher') || 'Profile Search',
-        description: t('researcherDesc') || 'Search document profiles across all forms',
+        id: 'profilesearch',
+        title: t('profilesearch') || 'Profile Search',
+        description: t('profilesearchDesc') || 'Search document profiles across all forms',
         icon: '/search-icon.svg',
-        href: '/researcher',
+        href: '/profilesearch',
         color: 'from-indigo-600 to-indigo-800',
     },
     {

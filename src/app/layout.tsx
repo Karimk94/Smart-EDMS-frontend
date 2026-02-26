@@ -17,6 +17,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (localStorage.getItem('theme') === 'dark') {
+                  document.documentElement.classList.add('dark');
+                } else if (localStorage.getItem('theme') === 'light') {
+                  document.documentElement.classList.remove('dark');
+                }
+                
+                const savedLang = localStorage.getItem('lang');
+                if (savedLang) {
+                    document.documentElement.lang = savedLang;
+                }
+                document.documentElement.dir = 'ltr';
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body className="font-sans">
         <GlobalSecurity />
         <ToastProvider>

@@ -21,6 +21,8 @@ export function useUserPreferences() {
             return lang;
         },
         onSuccess: (newLang) => {
+            // Persist to localStorage for instant restore on refresh
+            localStorage.setItem('lang', newLang);
             // Optimistically update user query
             queryClient.setQueryData(['user'], (oldUser: any) => {
                 if (!oldUser) return oldUser;
@@ -45,6 +47,8 @@ export function useUserPreferences() {
             return theme;
         },
         onSuccess: (newTheme) => {
+            // Persist to localStorage for instant restore on refresh
+            localStorage.setItem('theme', newTheme);
             queryClient.setQueryData(['user'], (oldUser: any) => {
                 if (!oldUser) return oldUser;
                 return { ...oldUser, theme: newTheme };

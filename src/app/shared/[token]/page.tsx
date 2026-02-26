@@ -8,8 +8,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { registerLocale } from 'react-datepicker';
 import * as XLSX from 'xlsx';
 import { BreadcrumbItem, FolderItem, ShareInfo, SlideData, StoredSession } from '../../../interfaces';
-import HtmlLangUpdater from '../../components/HtmlLangUpdater';
-import HtmlThemeUpdater from '../../components/HtmlThemeUpdater';
 import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
 
@@ -170,9 +168,19 @@ export default function SharedDocumentPage() {
   const token = params.token as string;
 
   // Language State
-  const [lang, setLang] = useState<'en' | 'ar'>('en');
+  const [lang, setLang] = useState<'en' | 'ar'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
+    }
+    return 'en';
+  });
   // Theme State
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+    }
+    return 'light';
+  });
 
   const t = useTranslations(lang);
   const { showToast } = useToast();
@@ -254,12 +262,24 @@ export default function SharedDocumentPage() {
 
   // Toggle Language Helper
   const toggleLanguage = () => {
-    setLang(prev => prev === 'en' ? 'ar' : 'en');
+    setLang(prev => {
+      const next = prev === 'en' ? 'ar' : 'en';
+      localStorage.setItem('lang', next);
+      document.documentElement.lang = next;
+      document.documentElement.dir = 'ltr';
+      return next;
+    });
   };
 
   // Toggle Theme Helper
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('theme', next);
+      if (next === 'dark') document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
+      return next;
+    });
   };
 
 
@@ -1189,8 +1209,6 @@ export default function SharedDocumentPage() {
   if (isLoadingShareInfo) {
     return (
       <>
-        <HtmlLangUpdater lang={lang} />
-        <HtmlThemeUpdater theme={theme} />
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -1206,7 +1224,6 @@ export default function SharedDocumentPage() {
   if (shareInfoError) {
     return (
       <>
-        <HtmlLangUpdater lang={lang} />
         <div className="absolute top-4 right-4 z-50">
           <button
             onClick={toggleLanguage}
@@ -1248,9 +1265,6 @@ export default function SharedDocumentPage() {
 
   return (
     <>
-      <HtmlLangUpdater lang={lang} />
-      <HtmlThemeUpdater theme={theme} />
-
       {/* Language and Theme Toggle Buttons (Absolute Position) */}
       <div className="absolute top-4 right-4 z-50 flex gap-2">
         <button

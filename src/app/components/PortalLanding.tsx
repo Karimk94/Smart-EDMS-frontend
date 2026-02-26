@@ -3,8 +3,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import HtmlThemeUpdater from './HtmlThemeUpdater';
-import HtmlLangUpdater from './HtmlLangUpdater';
 import { useTranslations } from '../hooks/useTranslations';
 import type { TFunction } from '../hooks/useTranslations';
 
@@ -37,8 +35,8 @@ const getSystems = (t: TFunction): SystemCard[] => [
     },
     {
         id: 'researcher',
-        title: t('researcher') || 'Researcher Search',
-        description: t('researcherDesc') || 'Search documents across all forms',
+        title: t('researcher') || 'Profile Search',
+        description: t('researcherDesc') || 'Search document profiles across all forms',
         icon: '/search-icon.svg',
         href: '/researcher',
         color: 'from-indigo-600 to-indigo-800',
@@ -55,24 +53,44 @@ const getSystems = (t: TFunction): SystemCard[] => [
 ];
 
 export function PortalLanding() {
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [lang, setLang] = useState<'en' | 'ar'>('en');
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+        }
+        return 'light';
+    });
+    const [lang, setLang] = useState<'en' | 'ar'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
+        }
+        return 'en';
+    });
     const t = useTranslations(lang);
 
     const toggleTheme = () => {
-        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+        setTheme(prev => {
+            const next = prev === 'light' ? 'dark' : 'light';
+            localStorage.setItem('theme', next);
+            if (next === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+            return next;
+        });
     };
 
     const toggleLanguage = () => {
-        setLang(prev => prev === 'en' ? 'ar' : 'en');
+        setLang(prev => {
+            const next = prev === 'en' ? 'ar' : 'en';
+            localStorage.setItem('lang', next);
+            document.documentElement.lang = next;
+            document.documentElement.dir = 'ltr';
+            return next;
+        });
     };
 
     const systems = getSystems(t);
 
     return (
         <>
-            <HtmlThemeUpdater theme={theme} />
-            <HtmlLangUpdater lang={lang} forceDir="ltr" />
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col">
                 {/* Header */}
                 <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">

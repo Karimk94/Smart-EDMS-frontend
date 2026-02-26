@@ -15,8 +15,6 @@ import { useUser } from '../context/UserContext';
 import { useTranslations } from '../hooks/useTranslations';
 import { useClearCache, useProcessDocuments } from '../../hooks/useSystemOperations';
 import { AdvancedFilters } from './AdvancedFilters';
-import HtmlThemeUpdater from './HtmlThemeUpdater';
-import HtmlLangUpdater from './HtmlLangUpdater';
 import { DocumentItemSkeleton } from './DocumentItemSkeleton';
 import { DocumentList } from './DocumentList';
 import { ExcelModal } from './ExcelModal';
@@ -57,7 +55,7 @@ interface MainDashboardProps {
 }
 
 export function MainDashboard({ initialSection = 'recent', initialFolderId = null, hiddenSections = [] }: MainDashboardProps) {
-    const { user, logout, isAuthenticated, isLoading: isLoadingUser } = useUser();
+    const { user, logout, isAuthenticated, isLoading: isLoadingUser, currentLang, currentTheme } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -66,6 +64,11 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     // React Query
     const queryClient = useQueryClient();
+
+    const [isClient, setIsClient] = useState(false);
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     // Filters & Pagination State
     const [currentPage, setCurrentPage] = useState<number>(1);
@@ -81,8 +84,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     const [filterMediaType, setFilterMediaType] = useState<'image' | 'video' | 'pdf' | null>(null);
 
     // Lang & Theme (User Prefs)
-    const lang = user?.lang || 'en';
-    const theme = user?.theme || 'light';
+    const lang = currentLang;
+    const theme = currentTheme;
     const t = useTranslations(lang);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -397,6 +400,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     );
 
     const renderContent = () => {
+        if (!isClient) return <div className="min-h-screen bg-gray-50 dark:bg-gray-900" />;
+
         if (isLoading) {
             return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
@@ -479,8 +484,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     if (!user) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
-                <div>{t('loading')}</div>
+            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-300 dark:border-gray-600 border-t-red-600 dark:border-t-red-600" />
             </div>
         );
     }
@@ -489,8 +494,6 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     return (
         <>
-            <HtmlThemeUpdater theme={theme} />
-            <HtmlLangUpdater lang={lang} />
             <div className={`flex flex-col h-screen ${rtlMainClass}`}>
                 <Header
                     onSearch={handleSearch}

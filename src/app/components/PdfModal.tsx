@@ -195,7 +195,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
                 />               </svg>
             </button>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white break-words pt-1 mt-0.5">
-              {doc.docname.replace(/\.[^/.]+$/, "")}
+              {doc.docname ? doc.docname.replace(/\.[^/.]+$/, "") : "Unknown Document"}
               <span className="ml-2 text-sm font-normal text-gray-400">File preview</span>
             </h2>
           </div>
@@ -239,7 +239,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
             <iframe
               src={`${apiURL}/pdf/${doc.doc_id}`}
               className="w-full h-full border-0 rounded-lg"
-              title={doc.docname.replace(/\.[^/.]+$/, "")}
+              title={doc.docname ? doc.docname.replace(/\.[^/.]+$/, "") : "PDF Document"}
             />
             {isFullScreen && (
               <button

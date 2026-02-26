@@ -19,6 +19,8 @@ interface UserContextType {
     isEditor: boolean;
     login: (credentials: any) => Promise<any>;
     logout: () => Promise<void>;
+    currentLang: 'en' | 'ar';
+    currentTheme: 'light' | 'dark';
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -27,13 +29,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const { user, isLoadingUser, login, logout, isAuthenticated } = useAuth();
     const [isClient, setIsClient] = useState(false);
 
+    const [currentLang, setCurrentLang] = useState<'en' | 'ar'>('en');
+    const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>('light');
+
+    // Run once on mount to grab localStorage and avoid hydration mismatch
     useEffect(() => {
         setIsClient(true);
+        const storedLang = localStorage.getItem('lang') as 'en' | 'ar';
+        if (storedLang) {
+            setCurrentLang(storedLang);
+        }
+        const storedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+        if (storedTheme) {
+            setCurrentTheme(storedTheme);
+        }
     }, []);
 
     // Apply theme globally when user is loaded
     useEffect(() => {
         if (user?.theme) {
+            setCurrentTheme(user.theme);
+            localStorage.setItem('theme', user.theme);
             if (user.theme === 'dark') {
                 document.documentElement.classList.add('dark');
             } else {
@@ -45,6 +61,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     // Apply language globally when user is loaded
     useEffect(() => {
         if (user?.lang) {
+            setCurrentLang(user.lang);
+            localStorage.setItem('lang', user.lang);
             document.documentElement.lang = user.lang;
             document.documentElement.dir = 'ltr';
         }
@@ -56,7 +74,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated, // Use the one from useAuth which checks query success
         isEditor: user?.security_level === 'Editor',
         login,
-        logout
+        logout,
+        currentLang,
+        currentTheme
     };
 
     // Prevent hydration mismatch or flash of wrong theme/content by waiting for client and (optionally) user load

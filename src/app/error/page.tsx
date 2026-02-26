@@ -9,14 +9,12 @@ function ErrorContent() {
     const searchParams = useSearchParams();
 
     // Simple language detection (fallback to 'en')
-    const [lang, setLang] = useState<'en' | 'ar'>('en');
-
-    useEffect(() => {
-        const storedLang = localStorage.getItem('language') as 'en' | 'ar';
-        if (storedLang) {
-            setLang(storedLang);
+    const [lang, setLang] = useState<'en' | 'ar'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
         }
-    }, []);
+        return 'en';
+    });
 
     const t = useTranslations(lang);
 

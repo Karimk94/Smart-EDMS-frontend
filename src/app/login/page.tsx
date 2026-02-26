@@ -3,8 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from '../hooks/useTranslations';
-import HtmlLangUpdater from '../components/HtmlLangUpdater';
-import HtmlThemeUpdater from '../components/HtmlThemeUpdater';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -14,10 +12,25 @@ function LoginContent() {
 
   const searchParams = useSearchParams();
   const initialLang = (searchParams.get('lang') as 'en' | 'ar') || 'en';
-  const initialTheme = (searchParams.get('theme') as 'light' | 'dark') || 'light';
 
-  const [lang, setLang] = useState<'en' | 'ar'>(initialLang);
-  const [theme, setTheme] = useState<'light' | 'dark'>(initialTheme);
+  const [lang, setLang] = useState<'en' | 'ar'>(() => {
+    if (typeof window !== 'undefined') {
+      const savedLang = localStorage.getItem('lang') as 'en' | 'ar';
+      const paramLang = searchParams.get('lang') as 'en' | 'ar';
+      return paramLang || savedLang || initialLang;
+    }
+    return initialLang;
+  });
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+      const paramTheme = searchParams.get('theme') as 'light' | 'dark';
+      return paramTheme || savedTheme || 'light';
+    }
+    return 'light';
+  });
+
   const t = useTranslations(lang);
 
   const router = useRouter();
@@ -63,11 +76,23 @@ function LoginContent() {
   };
 
   const toggleLanguage = () => {
-    setLang(prev => prev === 'en' ? 'ar' : 'en');
+    setLang(prev => {
+      const next = prev === 'en' ? 'ar' : 'en';
+      localStorage.setItem('lang', next);
+      document.documentElement.lang = next;
+      document.documentElement.dir = 'ltr';
+      return next;
+    });
   };
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('theme', next);
+      if (next === 'dark') document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
+      return next;
+    });
   };
 
   // If we are checking auth status, show loading
@@ -90,8 +115,6 @@ function LoginContent() {
 
   return (
     <>
-      <HtmlLangUpdater lang={lang} />
-      <HtmlThemeUpdater theme={theme} />
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white relative">
         {/* Toggle Buttons */}
         <div className="absolute top-4 right-4 flex gap-2">

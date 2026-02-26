@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { Document } from '../models/Document';
 
 export interface SearchType {
@@ -15,8 +15,15 @@ export interface SearchType {
     };
 }
 
-interface SearchTypesResponse {
-    types: SearchType[];
+export interface SearchScope {
+    label: string;
+    value: string;
+}
+
+export interface SearchCriterion {
+    type: SearchType | null;
+    keyword: string;
+    matchType: 'like' | 'exact' | 'startsWith';
 }
 
 interface ResearcherSearchResponse {
@@ -26,18 +33,12 @@ interface ResearcherSearchResponse {
     total_documents: number;
 }
 
-interface UseResearcherSearchParams {
-    formName: string;
-    fieldName: string;
-    keyword: string;
-    searchForm: string;
-    searchField: string;
-    displayField: string;
+interface MultiSearchParams {
+    scope: string;
+    criteria: SearchCriterion[];
     dateFrom: Date | undefined;
     dateTo: Date | undefined;
     page: number;
-    enabled?: boolean;
-    matchType?: string;
 }
 
 const formatToApiDate = (date: Date | undefined): string => {
@@ -46,75 +47,86 @@ const formatToApiDate = (date: Date | undefined): string => {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 
-export function useSearchTypes() {
+export function useSearchScopes() {
     return useQuery({
-        queryKey: ['researcher', 'types'],
+        queryKey: ['researcher', 'scopes'],
+        queryFn: async (): Promise<SearchScope[]> => {
+            const response = await fetch('/api/researcher/scopes');
+            if (!response.ok) {
+                throw new Error('Failed to fetch search scopes');
+            }
+            const data = await response.json();
+            return data.scopes || [];
+        },
+        staleTime: 1000 * 60 * 60, // 1 hour
+    });
+}
+
+export function useSearchTypes(scope?: string) {
+    return useQuery({
+        queryKey: ['researcher', 'types', scope || 'all'],
         queryFn: async (): Promise<SearchType[]> => {
-            const response = await fetch('/api/researcher/types');
+            const url = scope
+                ? `/api/researcher/types?scope=${encodeURIComponent(scope)}`
+                : '/api/researcher/types';
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Failed to fetch search types');
             }
             const data = await response.json();
             return data.types || [];
         },
-        staleTime: 1000 * 60 * 60, // 1 hour
+        staleTime: 1000 * 60 * 60,
     });
 }
 
-export function useResearcherSearch({
-    formName,
-    fieldName,
-    keyword,
-    searchForm,
-    searchField,
-    displayField,
-    dateFrom,
-    dateTo,
-    page,
-    enabled = false,
-    matchType = 'like'
-}: UseResearcherSearchParams) {
+export function useResearcherMultiSearch(params: MultiSearchParams & { enabled?: boolean }) {
+    const { scope, criteria, dateFrom, dateTo, page, enabled = false } = params;
+
+    // Build a stable query key from criteria
+    const criteriaKey = criteria.map(c => ({
+        field: c.type?.value.field_name || '',
+        keyword: c.keyword,
+        match: c.matchType,
+    }));
+
     return useQuery({
         queryKey: [
-            'researcher',
-            'search',
-            formName,
-            fieldName,
-            keyword,
-            searchForm,
-            searchField,
-            displayField,
-            formatToApiDate(dateFrom),
-            formatToApiDate(dateTo),
-            page,
-            matchType
+            'researcher', 'multi-search',
+            scope, JSON.stringify(criteriaKey),
+            formatToApiDate(dateFrom), formatToApiDate(dateTo),
+            page
         ],
         queryFn: async (): Promise<ResearcherSearchResponse> => {
-            const params = new URLSearchParams();
-            params.append('form_name', formName);
-            params.append('field_name', fieldName);
-            if (keyword) params.append('keyword', keyword);
-            if (searchForm) params.append('search_form', searchForm);
-            if (searchField) params.append('search_field', searchField);
-            if (displayField) params.append('display_field', displayField);
-            if (matchType) params.append('match_type', matchType);
+            const body = {
+                scope,
+                criteria: criteria
+                    .filter(c => c.type)
+                    .map(c => ({
+                        field_name: c.type!.value.field_name,
+                        keyword: c.keyword,
+                        match_type: c.matchType,
+                        search_form: c.type!.value.search_form,
+                        search_field: c.type!.value.search_field,
+                        display_field: c.type!.value.display_field,
+                    })),
+                date_from: formatToApiDate(dateFrom) || null,
+                date_to: formatToApiDate(dateTo) || null,
+                page,
+                page_size: 20,
+            };
 
-            const formattedDateFrom = formatToApiDate(dateFrom);
-            if (formattedDateFrom) params.append('date_from', formattedDateFrom);
-
-            const formattedDateTo = formatToApiDate(dateTo);
-            if (formattedDateTo) params.append('date_to', formattedDateTo);
-
-            params.append('page', String(page));
-            params.append('pageSize', '20');
-
-            const response = await fetch(`/api/researcher/search?${params.toString()}`);
+            const response = await fetch('/api/researcher/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
             if (!response.ok) {
                 throw new Error('Search failed');
             }
             return await response.json();
         },
-        enabled: enabled && !!formName && !!fieldName, // Only run if form/field selected
+        enabled: enabled && criteria.some(c => c.type !== null),
         placeholderData: keepPreviousData,
     });
 }

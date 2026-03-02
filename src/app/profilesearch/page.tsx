@@ -51,7 +51,7 @@ const createEmptyRow = (): SearchCriterion => ({
 });
 
 function ProfileSearchPageContent() {
-    const { user, logout, isAuthenticated, isLoading: isLoadingUser, currentLang, currentTheme } = useUser();
+    const { user, logout, isAuthenticated, isLoading: isLoadingUser, currentLang, currentTheme, allowedSections, writableSections } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();
     const lang = currentLang;
@@ -59,6 +59,13 @@ function ProfileSearchPageContent() {
     const t = useTranslations(lang);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isClient, setIsClient] = useState(false);
+
+    // Compute hidden sections from allowed sections
+    const allSections: ('recent' | 'favorites' | 'folders' | 'profilesearch')[] = ['recent', 'favorites', 'folders', 'profilesearch'];
+    const hiddenSections = allSections.filter(s => !allowedSections.includes(s));
+
+    // Determine if profilesearch is writable
+    const isEditor = writableSections.includes('profilesearch');
 
     useEffect(() => {
         setIsClient(true);
@@ -120,6 +127,13 @@ function ProfileSearchPageContent() {
             router.push(queryString ? `/login?${queryString}` : '/login');
         }
     }, [isAuthenticated, isLoadingUser, router, searchParams]);
+
+    // Route protection: redirect if user doesn't have access to profilesearch
+    useEffect(() => {
+        if (user && !isLoadingUser && !allowedSections.includes('profilesearch')) {
+            router.push('/dashboard');
+        }
+    }, [user, isLoadingUser, allowedSections, router]);
 
     // When scope changes, reset all rows (types will re-filter automatically)
     const handleScopeChange = (newScope: string) => {
@@ -212,7 +226,7 @@ function ProfileSearchPageContent() {
                     apiURL={API_PROXY_URL}
                     onOpenUploadModal={() => { }}
                     isProcessing={false}
-                    isEditor={user?.security_level === 'Editor'}
+                    isEditor={isEditor}
                     t={t}
                     isSidebarOpen={isSidebarOpen}
                     toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -227,6 +241,7 @@ function ProfileSearchPageContent() {
                         isShowingFullMemories={false}
                         t={t}
                         lang={lang}
+                        hiddenSections={hiddenSections}
                     />
 
                     <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-w-0">
@@ -449,14 +464,14 @@ function ProfileSearchPageContent() {
                 </div>
 
                 {/* Modals */}
-                {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedExcel && <ExcelModal doc={selectedExcel} onClose={() => setSelectedExcel(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedPPT && <PowerPointModal doc={selectedPPT} onClose={() => setSelectedPPT(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedWord && <WordModal doc={selectedWord} onClose={() => setSelectedWord(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+                {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedExcel && <ExcelModal doc={selectedExcel} onClose={() => setSelectedExcel(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedPPT && <PowerPointModal doc={selectedPPT} onClose={() => setSelectedPPT(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedWord && <WordModal doc={selectedWord} onClose={() => setSelectedWord(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
             </div>
         </>
     );

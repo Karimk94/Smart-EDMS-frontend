@@ -3,6 +3,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 
+interface TabPermission {
+    tab_key: string;
+    can_read: boolean;
+    can_write: boolean;
+}
+
 interface User {
     username: string;
     security_level: string;
@@ -10,7 +16,10 @@ interface User {
     theme: 'light' | 'dark';
     quota: number;
     remaining_quota: number;
+    tab_permissions?: TabPermission[];
 }
+
+type SectionKey = 'recent' | 'favorites' | 'folders' | 'profilesearch';
 
 interface UserContextType {
     user: User | undefined;
@@ -21,6 +30,8 @@ interface UserContextType {
     logout: () => Promise<void>;
     currentLang: 'en' | 'ar';
     currentTheme: 'light' | 'dark';
+    allowedSections: SectionKey[];
+    writableSections: SectionKey[];
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -68,15 +79,49 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
     }, [user?.lang]);
 
+    // Compute allowed and writable sections from tab_permissions
+    // 'favorites' is merged with 'recent' (Smart EDMS) — one toggle controls both
+    const allSections: SectionKey[] = ['recent', 'favorites', 'folders', 'profilesearch'];
+
+    const allowedSections: SectionKey[] = user?.tab_permissions
+        ? (() => {
+            const allowed = user.tab_permissions
+                .filter(p => p.can_read)
+                .map(p => p.tab_key as SectionKey)
+                .filter(s => allSections.includes(s));
+            // If 'recent' is allowed, also allow 'favorites' (merged)
+            if (allowed.includes('recent') && !allowed.includes('favorites')) {
+                allowed.push('favorites');
+            }
+            return allowed;
+        })()
+        : allSections; // Default: show all if no permissions data yet
+
+    const writableSections: SectionKey[] = user?.tab_permissions
+        ? (() => {
+            const writable = user.tab_permissions
+                .filter(p => p.can_write)
+                .map(p => p.tab_key as SectionKey)
+                .filter(s => allSections.includes(s));
+            // If 'recent' is writable, also make 'favorites' writable
+            if (writable.includes('recent') && !writable.includes('favorites')) {
+                writable.push('favorites');
+            }
+            return writable;
+        })()
+        : (user?.security_level === 'Editor' || user?.security_level === 'Admin' ? allSections : []);
+
     const value = {
         user,
         isLoading: isLoadingUser,
         isAuthenticated, // Use the one from useAuth which checks query success
-        isEditor: user?.security_level === 'Editor',
+        isEditor: user?.security_level === 'Editor' || user?.security_level === 'Admin',
         login,
         logout,
         currentLang,
-        currentTheme
+        currentTheme,
+        allowedSections,
+        writableSections
     };
 
     // Prevent hydration mismatch or flash of wrong theme/content by waiting for client and (optionally) user load

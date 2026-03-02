@@ -40,7 +40,7 @@ function LoginContent() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoadingUser) {
-      const redirectPath = searchParams.get('redirect') || '/folders';
+      const redirectPath = searchParams.get('redirect') || '/dashboard';
       // If we have user preferences, apply them before redirecting
       // This is crucial because the layout/context might be using these values
       if (user) {
@@ -67,7 +67,7 @@ function LoginContent() {
       }
 
       // Redirect handled by useEffect or onSuccess of mutation, but let's ensure it here too or just wait for effect
-      const redirectPath = searchParams.get('redirect') || '/folders';
+      const redirectPath = searchParams.get('redirect') || '/dashboard';
       router.push(redirectPath);
     } catch (err: any) {
       console.error('Login exception:', err);

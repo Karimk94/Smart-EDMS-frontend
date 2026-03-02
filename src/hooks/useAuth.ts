@@ -9,6 +9,7 @@ interface User {
     theme: 'light' | 'dark';
     quota: number;
     remaining_quota: number;
+    tab_permissions?: { tab_key: string; can_read: boolean; can_write: boolean }[];
 }
 
 interface LoginCredentials {

@@ -8,7 +8,7 @@ export default function FoldersRootPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
         }>
-            <MainDashboard initialSection="folders" hiddenSections={['recent', 'favorites']} />
+            <MainDashboard initialSection="folders" />
         </Suspense>
     );
 }

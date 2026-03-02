@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isShowingFullMemories,
   t,
   lang,
-
+  hiddenSections = [],
 }) => {
   const getIsActive = (section: 'recent' | 'favorites' | 'folders' | 'profilesearch') => {
     return section === activeSection;
@@ -65,47 +65,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const padding = isSidebarOpen ? 'p-4' : 'p-3';
   const borderClass = 'border-r';
 
+  // Define all nav items
+  const navItems: { section: 'recent' | 'favorites' | 'folders' | 'profilesearch'; icon: string; labelKey: string }[] = [
+    { section: 'recent', icon: '/clock.svg', labelKey: 'recentlyAdded' },
+    { section: 'favorites', icon: '/star.svg', labelKey: 'favorites' },
+    { section: 'folders', icon: '/folder.svg', labelKey: 'folders' },
+    { section: 'profilesearch', icon: '/search-icon.svg', labelKey: 'profilesearch' },
+  ];
 
+  // Filter out hidden sections
+  const visibleItems = navItems.filter(item => !hiddenSections.includes(item.section));
 
   return (
     <aside
       className={`flex-shrink-0 bg-[var(--color-bg-sidebar)] ${sidebarWidth} ${padding} transition-all duration-300 ease-in-out flex flex-col ${borderClass} border-[var(--color-border-primary)]`}
     >
       <nav className="flex-1 space-y-2">
-
-        <NavLink
-          icon="/clock.svg"
-          label={t('recentlyAdded')}
-          isActive={getIsActive('recent')}
-          isSidebarOpen={isSidebarOpen}
-          onClick={() => handleSectionChange('recent')}
-          lang={lang}
-        />
-        <NavLink
-          icon="/star.svg"
-          label={t('favorites')}
-          isActive={getIsActive('favorites')}
-          isSidebarOpen={isSidebarOpen}
-          onClick={() => handleSectionChange('favorites')}
-          lang={lang}
-        />
-        <NavLink
-          icon="/folder.svg"
-          label={t('folders')}
-          isActive={getIsActive('folders')}
-          isSidebarOpen={isSidebarOpen}
-          onClick={() => handleSectionChange('folders')}
-          lang={lang}
-        />
-        <NavLink
-          icon="/search-icon.svg"
-          label={t('profilesearch')}
-          isActive={getIsActive('profilesearch')}
-          isSidebarOpen={isSidebarOpen}
-          onClick={() => handleSectionChange('profilesearch')}
-          lang={lang}
-        />
-
+        {visibleItems.map(item => (
+          <NavLink
+            key={item.section}
+            icon={item.icon}
+            label={t(item.labelKey)}
+            isActive={getIsActive(item.section)}
+            isSidebarOpen={isSidebarOpen}
+            onClick={() => handleSectionChange(item.section)}
+            lang={lang}
+          />
+        ))}
       </nav>
     </aside>
   );

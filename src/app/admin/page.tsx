@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "../context/ToastContext";
 import QuotaPieChart from "../components/QuotaPieChart";
-import { useAdmin, EdmsUser, SecurityLevel, PersonResult } from "../../hooks/useAdmin";
+import { useAdmin, EdmsUser, SecurityLevel, PersonResult, TabPermission } from "../../hooks/useAdmin";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -28,12 +28,16 @@ export default function AdminPage() {
         useUsers,
         useSecurityLevels,
         useSearchPeople,
+        useTabPermissions,
         addUser,
         isAddingUser,
         updateUser,
         isUpdatingUser,
         deleteUser,
-        isDeletingUser
+        isDeletingUser,
+        upsertTabPermission,
+        isUpsertingTabPermission,
+        initTabPermissions
     } = useAdmin();
 
     const { data: accessData, isLoading: checkingAccess } = useCheckAccess();
@@ -50,6 +54,7 @@ export default function AdminPage() {
 
     // Security Levels Query
     const { data: securityLevels = [] } = useSecurityLevels(!!hasAccess);
+
 
     // Add user modal
     const [showAddModal, setShowAddModal] = useState(false);
@@ -69,6 +74,11 @@ export default function AdminPage() {
     const [editTheme, setEditTheme] = useState("light");
     const [editQuota, setEditQuota] = useState<number | null>(null);
     const [editTotalQuota, setEditTotalQuota] = useState<number | null>(null);
+
+    // Tab Permissions Query (per-user, only when editing a user)
+    const { data: editUserTabPerms = [] } = useTabPermissions(
+        editTarget?.people_system_id ?? null, !!editTarget
+    );
 
     // Format quota helper
     const formatQuota = (bytes: number) => {
@@ -125,6 +135,14 @@ export default function AdminPage() {
                 lang: selectedLang,
                 theme: selectedTheme,
             });
+
+            // Create default tab permissions for the new user
+            try {
+                await initTabPermissions(selectedPerson.system_id);
+            } catch (permErr) {
+                // Non-critical: user was added, permissions can be set later
+                console.warn('Failed to init tab permissions:', permErr);
+            }
 
             showToast("User added successfully", "success");
             closeAddModal();
@@ -236,7 +254,7 @@ export default function AdminPage() {
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel - User Management</h1>
                     <button
-                        onClick={() => router.push("/folders")}
+                        onClick={() => router.push("/dashboard")}
                         className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                     >
                         ← Back to Dashboard
@@ -613,7 +631,7 @@ export default function AdminPage() {
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                             {/* Security Level Dropdown */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -705,6 +723,78 @@ export default function AdminPage() {
                                 </div>
                             </div>
                             <p className="text-xs text-gray-500 mt-1">Default 1GB = 1073741824 bytes</p>
+
+                            {/* Tab Permissions Toggles */}
+                            {editTarget.security_level !== 'Admin' && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Tab Permissions</h4>
+                                    <div className="space-y-3">
+                                        {[
+                                            { key: 'recent', label: 'Smart EDMS & Favorites' },
+                                            { key: 'folders', label: 'Folders' },
+                                            { key: 'profilesearch', label: 'Profile Search' },
+                                        ].map(({ key, label }) => {
+                                            const perm = editUserTabPerms.find(p => p.tab_key === key);
+                                            const canRead = perm?.can_read ?? true;
+                                            const canWrite = perm?.can_write ?? false;
+
+                                            return (
+                                                <div key={key} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 rounded-lg px-4 py-3">
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+                                                    <div className="flex items-center gap-4">
+                                                        {/* Visible toggle */}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[11px] text-gray-400 dark:text-gray-500 uppercase">Visible</span>
+                                                            <button
+                                                                onClick={() => upsertTabPermission({
+                                                                    user_id: editTarget.people_system_id,
+                                                                    tab_key: key,
+                                                                    can_read: !canRead,
+                                                                    can_write: !canRead ? false : canWrite,
+                                                                })}
+                                                                disabled={isUpsertingTabPermission}
+                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${canRead ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                                                                    } cursor-pointer hover:opacity-80`}
+                                                            >
+                                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${canRead ? 'translate-x-4' : 'translate-x-0.5'
+                                                                    }`} />
+                                                            </button>
+                                                        </div>
+                                                        {/* Editor toggle */}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[11px] text-gray-400 dark:text-gray-500 uppercase">Editor</span>
+                                                            <button
+                                                                onClick={() => upsertTabPermission({
+                                                                    user_id: editTarget.people_system_id,
+                                                                    tab_key: key,
+                                                                    can_read: canRead,
+                                                                    can_write: !canWrite,
+                                                                })}
+                                                                disabled={!canRead || isUpsertingTabPermission}
+                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${canWrite ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                                                                    } ${!canRead ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}`}
+                                                            >
+                                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${canWrite ? 'translate-x-4' : 'translate-x-0.5'
+                                                                    }`} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                            {editTarget.security_level === 'Admin' && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Admin users have full access to all tabs.
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Modal Footer */}
@@ -736,40 +826,38 @@ export default function AdminPage() {
                         </div>
                     </div>
                 </div>
-            )
-            }
+            )}
 
             {/* Delete Confirmation Modal */}
-            {
-                deleteTarget && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                Confirm Delete
-                            </h3>
-                            <p className="text-gray-600 dark:text-gray-300 mb-6">
-                                Are you sure you want to remove <strong>{deleteTarget.username}</strong> from EDMS access?
-                            </p>
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    onClick={() => setDeleteTarget(null)}
-                                    disabled={isDeletingUser}
-                                    className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleDeleteUser}
-                                    disabled={isDeletingUser}
-                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
-                                >
-                                    {isDeletingUser ? "Deleting..." : "Delete"}
-                                </button>
-                            </div>
+            {deleteTarget && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            Confirm Delete
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-300 mb-6">
+                            Are you sure you want to remove <strong>{deleteTarget.username}</strong> from EDMS access?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                disabled={isDeletingUser}
+                                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteUser}
+                                disabled={isDeletingUser}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
+                            >
+                                {isDeletingUser ? "Deleting..." : "Delete"}
+                            </button>
                         </div>
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+        </div>
     );
 }
+

@@ -31,6 +31,14 @@ interface UsersResponse {
     has_more: boolean;
 }
 
+export interface TabPermission {
+    id: number;
+    tab_key: string;
+    can_read: boolean;
+    can_write: boolean;
+    disabled?: boolean;
+}
+
 interface AddUserParams {
     user_system_id: number;
     security_level_id: number;
@@ -163,16 +171,66 @@ export function useAdmin() {
         },
     });
 
+    // Tab Permissions (per-user)
+    const useTabPermissions = (userId: number | null, enabled: boolean = true) => useQuery({
+        queryKey: ['tabPermissions', userId],
+        queryFn: async (): Promise<TabPermission[]> => {
+            if (!userId) return [];
+            const response = await fetch(`/api/admin/tab-permissions/${userId}`);
+            if (!response.ok) {
+                throw new Error("Failed to load tab permissions");
+            }
+            const data = await response.json();
+            return data.permissions;
+        },
+        enabled: enabled && !!userId,
+    });
+
+    const upsertTabPermissionMutation = useMutation({
+        mutationFn: async (params: { user_id: number; tab_key: string; can_read: boolean; can_write: boolean }) => {
+            const response = await fetch("/api/admin/tab-permissions", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(params),
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || "Failed to update tab permission");
+            }
+            return response.json();
+        },
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['tabPermissions', variables.user_id] });
+        },
+    });
+
+    const initTabPermissionsMutation = useMutation({
+        mutationFn: async (userId: number) => {
+            const response = await fetch(`/api/admin/tab-permissions/init/${userId}`, {
+                method: "POST",
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || "Failed to init tab permissions");
+            }
+            return response.json();
+        },
+    });
+
     return {
         useCheckAccess,
         useUsers,
         useSecurityLevels,
         useSearchPeople,
+        useTabPermissions,
         addUser: addUserMutation.mutateAsync,
         isAddingUser: addUserMutation.isPending,
         updateUser: updateUserMutation.mutateAsync,
         isUpdatingUser: updateUserMutation.isPending,
         deleteUser: deleteUserMutation.mutateAsync,
         isDeletingUser: deleteUserMutation.isPending,
+        upsertTabPermission: upsertTabPermissionMutation.mutateAsync,
+        isUpsertingTabPermission: upsertTabPermissionMutation.isPending,
+        initTabPermissions: initTabPermissionsMutation.mutateAsync,
     };
 }

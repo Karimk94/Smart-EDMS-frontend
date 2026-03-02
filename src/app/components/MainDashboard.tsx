@@ -51,11 +51,17 @@ registerLocale('en-GB', enGB);
 interface MainDashboardProps {
     initialSection?: ActiveSection;
     initialFolderId?: string | null;
-    hiddenSections?: ('recent' | 'favorites' | 'folders' | 'profilesearch')[];
 }
 
-export function MainDashboard({ initialSection = 'recent', initialFolderId = null, hiddenSections = [] }: MainDashboardProps) {
-    const { user, logout, isAuthenticated, isLoading: isLoadingUser, currentLang, currentTheme } = useUser();
+export function MainDashboard({ initialSection = 'recent', initialFolderId = null }: MainDashboardProps) {
+    const { user, logout, isAuthenticated, isLoading: isLoadingUser, currentLang, currentTheme, allowedSections, writableSections } = useUser();
+
+    // Compute hidden sections from allowed sections
+    const allSections: ActiveSection[] = ['recent', 'favorites', 'folders', 'profilesearch'];
+    const hiddenSections = allSections.filter(s => !allowedSections.includes(s));
+
+    // Determine if current section is writable (replaces hardcoded isEditor)
+    const isSectionWritable = (section: ActiveSection) => writableSections.includes(section);
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -69,6 +75,13 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     useEffect(() => {
         setIsClient(true);
     }, []);
+
+    // Route guard: redirect if user doesn't have access to this section
+    useEffect(() => {
+        if (user && !isLoadingUser && !allowedSections.includes(initialSection)) {
+            router.push('/dashboard');
+        }
+    }, [user, isLoadingUser, allowedSections, initialSection, router]);
 
     // Filters & Pagination State
     const [currentPage, setCurrentPage] = useState<number>(1);
@@ -434,7 +447,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         onUploadClick={handleFolderUploadClick}
                         t={t}
                         apiURL={API_PROXY_URL}
-                        isEditor={user?.security_level === 'Editor'}
+                        isEditor={isSectionWritable('folders')}
                         initialFolderId={initialFolderId}
                     />
                 </Suspense>
@@ -501,7 +514,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     apiURL={API_PROXY_URL}
                     onOpenUploadModal={() => setIsUploadModalOpen(true)}
                     isProcessing={processingDocs.length > 0}
-                    isEditor={user.security_level === 'Editor'}
+                    isEditor={isSectionWritable(activeSection)}
                     t={t}
                     isSidebarOpen={isSidebarOpen}
                     toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -602,11 +615,11 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     </main>
                 </div>
 
-                {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
-                {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={user?.security_level === 'Editor'} t={t} lang={lang} theme={theme} />}
+                {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={isSectionWritable(activeSection)} t={t} lang={lang} theme={theme} />}
+                {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={isSectionWritable(activeSection)} t={t} lang={lang} theme={theme} />}
+                {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={isSectionWritable(activeSection)} t={t} lang={lang} theme={theme} />}
+                {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={isSectionWritable(activeSection)} t={t} lang={lang} theme={theme} />}
+                {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={handleUpdateMetadataSuccess} isEditor={isSectionWritable(activeSection)} t={t} lang={lang} theme={theme} />}
 
                 {selectedExcel && (
                     <ExcelModal
@@ -615,7 +628,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         apiURL={API_PROXY_URL}
                         onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
 
-                        isEditor={user?.security_level === 'Editor'}
+                        isEditor={isSectionWritable(activeSection)}
                         t={t}
                         lang={lang}
                         theme={theme}
@@ -629,7 +642,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         apiURL={API_PROXY_URL}
                         onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
 
-                        isEditor={user?.security_level === 'Editor'}
+                        isEditor={isSectionWritable(activeSection)}
                         t={t}
                         lang={lang}
                         theme={theme}
@@ -643,14 +656,14 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         apiURL={API_PROXY_URL}
                         onUpdateAbstractSuccess={handleUpdateMetadataSuccess}
 
-                        isEditor={user?.security_level === 'Editor'}
+                        isEditor={isSectionWritable(activeSection)}
                         t={t}
                         lang={lang}
                         theme={theme}
                     />
                 )}
 
-                {isUploadModalOpen && user?.security_level === 'Editor' && (
+                {isUploadModalOpen && isSectionWritable(activeSection) && (
                     <UploadModal
                         onClose={() => setIsUploadModalOpen(false)}
                         apiURL={API_PROXY_URL}
@@ -660,7 +673,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     />
                 )}
 
-                {isFolderUploadModalOpen && user?.security_level === 'Editor' && (
+                {isFolderUploadModalOpen && isSectionWritable('folders') && (
                     <FolderUploadModal
                         onClose={() => setIsFolderUploadModalOpen(false)}
                         apiURL={API_PROXY_URL}

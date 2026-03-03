@@ -159,7 +159,7 @@
   "ChangeEmail": "Change Email",
   "VerifiedAccessFor": "Verified Access for",
   "AccessLoggedAt": "Access logged at",
-  "Download": "Download",
+  "download": "Download",
   "DownloadFunctionality": "Download functionality to be connected to media stream",
   "FailedRequestOtp": "Failed to request OTP",
   "FailedVerifyOtp": "Failed to verify OTP",

@@ -260,6 +260,12 @@ export default function SharedDocumentPage() {
   const [isLoadingPpt, setIsLoadingPpt] = useState(false);
   const [pptParseError, setPptParseError] = useState<string | null>(null);
 
+  // Context Menu State (for right-click download in folder view)
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; item: FolderItem | null }>({
+    visible: false, x: 0, y: 0, item: null
+  });
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
   // Toggle Language Helper
   const toggleLanguage = () => {
     setLang(prev => {
@@ -808,6 +814,44 @@ export default function SharedDocumentPage() {
     };
   }, [fileUrl, pptThumbnailUrl]);
 
+  // Close context menu on outside click
+  React.useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(prev => ({ ...prev, visible: false }));
+      }
+    };
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClick);
+    }
+    return () => document.removeEventListener('click', handleClick);
+  }, [contextMenu.visible]);
+
+  // Right-click handler for folder items
+  const handleItemRightClick = (e: React.MouseEvent, item: FolderItem) => {
+    e.preventDefault();
+    if (item.type === 'folder') return; // Only show for files
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      item
+    });
+  };
+
+  // Handle context menu download action
+  const handleContextMenuDownload = () => {
+    if (!contextMenu.item || !viewerEmail) return;
+    const item = contextMenu.item;
+    setContextMenu(prev => ({ ...prev, visible: false }));
+    downloadItem({
+      token,
+      viewerEmail,
+      itemId: item.id,
+      itemName: item.name
+    });
+  };
+
   // Render file icon based on media type
   const renderFileIcon = (item: FolderItem) => {
     const mediaType = resolveMediaType(item);
@@ -1030,7 +1074,7 @@ export default function SharedDocumentPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
               )}
-              {isDownloading ? (t('downloading') || 'Downloading...') : (t('Download'))}
+              {isDownloading ? (t('downloading') || 'Downloading...') : (t('download'))}
             </button>
           </div>
 
@@ -1179,6 +1223,7 @@ export default function SharedDocumentPage() {
                       openFileFromFolder(item);
                     }
                   }}
+                  onContextMenu={(e) => handleItemRightClick(e, item)}
                   className="group flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-gray-700 dark:hover:border-gray-600"
                 >
                   <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200">
@@ -1202,6 +1247,28 @@ export default function SharedDocumentPage() {
             <span>{t('VerifiedAccessFor')} <strong>{email}</strong></span>
           </div>
         </div>
+
+        {/* Right-click Context Menu */}
+        {contextMenu.visible && contextMenu.item && (
+          <div
+            ref={contextMenuRef}
+            className="fixed z-50 bg-white dark:bg-[#333] border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl w-48 py-1"
+            style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          >
+            <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider truncate">
+              {contextMenu.item.name}
+            </div>
+            <button
+              onClick={handleContextMenuDownload}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {t('download') || 'Download'}
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -1314,7 +1381,7 @@ export default function SharedDocumentPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                   )}
-                  {isDownloading ? (t('downloading') || 'Downloading...') : (t('Download'))}
+                  {isDownloading ? (t('downloading') || 'Downloading...') : (t('download'))}
                 </button>
               </div>
 

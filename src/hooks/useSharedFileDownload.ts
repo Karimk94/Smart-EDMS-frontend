@@ -124,9 +124,8 @@ export function useSharedFileRestore() {
 
 // Hook for downloading folder items
 export function useSharedFolderItemDownload() {
-    const downloadMutation = useMutation<Blob, Error, { token: string; viewerEmail: string; itemId: string; itemName: string }>({
-        mutationFn: async ({ token, viewerEmail, itemId }) => {
-            // Fix: Use query param for doc_id instead of path param
+    const downloadMutation = useMutation<{ blob: Blob; filename: string }, Error, { token: string; viewerEmail: string; itemId: string; itemName: string }>({
+        mutationFn: async ({ token, viewerEmail, itemId, itemName }) => {
             const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&doc_id=${itemId}`;
             const downloadResponse = await fetch(downloadUrl);
 
@@ -134,14 +133,25 @@ export function useSharedFolderItemDownload() {
                 throw new Error('Download failed');
             }
 
-            return downloadResponse.blob();
+            // Extract filename from Content-Disposition header (same as useDownload)
+            const contentDisposition = downloadResponse.headers.get('Content-Disposition');
+            let filename = itemName;
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            const blob = await downloadResponse.blob();
+            return { blob, filename };
         },
-        onSuccess: (blob, variables) => {
+        onSuccess: ({ blob, filename }) => {
             // Trigger browser download
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', variables.itemName);
+            link.setAttribute('download', filename || 'download');
             document.body.appendChild(link);
             link.click();
             link.remove();

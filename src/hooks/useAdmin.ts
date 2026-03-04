@@ -199,7 +199,30 @@ export function useAdmin() {
             }
             return response.json();
         },
-        onSuccess: (_data, variables) => {
+        onMutate: async (variables) => {
+            // Cancel outgoing refetches so they don't overwrite our optimistic update
+            await queryClient.cancelQueries({ queryKey: ['tabPermissions', variables.user_id] });
+            // Snapshot current value for rollback
+            const previous = queryClient.getQueryData<TabPermission[]>(['tabPermissions', variables.user_id]);
+            // Optimistically update the cache immediately
+            queryClient.setQueryData<TabPermission[]>(['tabPermissions', variables.user_id], (old) => {
+                if (!old) return old;
+                return old.map((p) =>
+                    p.tab_key === variables.tab_key
+                        ? { ...p, can_read: variables.can_read, can_write: variables.can_write }
+                        : p
+                );
+            });
+            return { previous };
+        },
+        onError: (_err, variables, context) => {
+            // Rollback to previous state on error
+            if (context?.previous) {
+                queryClient.setQueryData(['tabPermissions', variables.user_id], context.previous);
+            }
+        },
+        onSettled: (_data, _error, variables) => {
+            // Always refetch after mutation to ensure server consistency
             queryClient.invalidateQueries({ queryKey: ['tabPermissions', variables.user_id] });
         },
     });

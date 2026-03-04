@@ -198,7 +198,7 @@ function ProfileSearchPageContent() {
     };
 
     const API_PROXY_URL = '/api';
-    const hasValidRow = searchRows.some(r => r.type !== null);
+    const hasValidRow = searchRows.some(r => r.type !== null && r.keyword.trim().length > 0);
 
     if (!isClient) {
         return <div className="min-h-screen flex flex-col h-screen ltr bg-gray-50 dark:bg-gray-900" />;

@@ -386,8 +386,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   };
 
   const refreshCurrentView = () => {
-    queryClient.invalidateQueries({ queryKey: ['folders'] });
-    // Also invalidate 'documents' if needed, since folders affect documents view potentially
+    // Force refetch from server, bypassing stale time cache
+    queryClient.refetchQueries({ queryKey: ['folders', currentFolderId, debouncedSearchTerm] });
     queryClient.invalidateQueries({ queryKey: ['documents'] });
   };
 

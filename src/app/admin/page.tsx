@@ -750,7 +750,7 @@ export default function AdminPage() {
                                                                     user_id: editTarget.people_system_id,
                                                                     tab_key: key,
                                                                     can_read: !canRead,
-                                                                    can_write: !canRead ? false : canWrite,
+                                                                    can_write: canRead ? false : canWrite,
                                                                 })}
                                                                 disabled={isUpsertingTabPermission}
                                                                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${canRead ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'

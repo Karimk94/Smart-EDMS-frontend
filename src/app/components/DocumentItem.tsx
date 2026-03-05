@@ -118,6 +118,30 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
         return '/file-zip.svg';
       case 'text':
         return '/file-document.svg';
+      case 'audio':
+        return '/file-audio.svg';
+      case 'cad':
+        return '/file-cad.svg';
+      case 'code':
+        return '/file-code.svg';
+      case 'email':
+        return '/file-email.svg';
+      case 'font':
+        return '/file-font.svg';
+      case 'database':
+        return '/file-database.svg';
+      case 'vector':
+        return '/file-vector.svg';
+      case 'archive':
+        return '/file-archive.svg';
+      case 'executable':
+        return '/file-executable.svg';
+      case 'disc':
+        return '/file-disc.svg';
+      case 'visio':
+        return '/file-visio.svg';
+      case 'onenote':
+        return '/file-onenote.svg';
       default:
         return null;
     }

@@ -157,7 +157,20 @@ const resolveMediaType = (item: FolderItem): string => {
   if (['doc', 'docx'].includes(ext)) return 'word';
   if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) return 'excel';
   if (['ppt', 'pptx', 'pps', 'ppsx', 'odp'].includes(ext)) return 'powerpoint';
-  if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext)) return 'text';
+  if (['txt', 'csv', 'log', 'md'].includes(ext)) return 'text';
+  if (['zip'].includes(ext)) return 'zip';
+  if (['rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) return 'archive';
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext)) return 'audio';
+  if (['dwg', 'dxf', 'step', 'stp', 'iges', 'igs', 'stl', 'obj', '3ds', 'fbx'].includes(ext)) return 'cad';
+  if (['py', 'js', 'ts', 'tsx', 'jsx', 'html', 'css', 'java', 'cpp', 'c', 'cs', 'go', 'rb', 'php', 'swift', 'rs', 'r', 'sql', 'json', 'xml', 'yml', 'yaml', 'ini', 'conf'].includes(ext)) return 'code';
+  if (['eml', 'msg', 'mbox'].includes(ext)) return 'email';
+  if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(ext)) return 'font';
+  if (['db', 'sqlite', 'mdb', 'accdb'].includes(ext)) return 'database';
+  if (['ai', 'eps'].includes(ext)) return 'vector';
+  if (['exe', 'msi'].includes(ext)) return 'executable';
+  if (['iso', 'img', 'dmg', 'vhd'].includes(ext)) return 'disc';
+  if (['vsd', 'vsdx'].includes(ext)) return 'visio';
+  if (['one', 'onetoc2'].includes(ext)) return 'onenote';
 
   // Fallback to media_type if extension unknown
   return item.media_type || 'file';
@@ -860,23 +873,34 @@ export default function SharedDocumentPage() {
       return <img src="/folder-icon.svg" alt="Folder" className="w-12 h-12" />;
     }
 
-    switch (mediaType) {
-      case 'image':
-        return <img src="/file-image.svg" alt="Image" className="w-12 h-12" />;
-      case 'video':
-        return <img src="/file-video.svg" alt="Video" className="w-12 h-12" />;
-      case 'pdf':
-        return <img src="/file-pdf.svg" alt="PDF" className="w-12 h-12" />;
-      case 'excel':
-        return <img src="/file-excel.svg" alt="Excel" className="w-12 h-12" />;
-      case 'powerpoint':
-        return <img src="/file-powerpoint.svg" alt="PowerPoint" className="w-12 h-12" />;
-      case 'word':
-        return <img src="/file-word.svg" alt="Word" className="w-12 h-12" />;
-      case 'text':
-      default:
-        return <img src="/file-document.svg" alt="File" className="w-12 h-12" />;
+    const iconMap: Record<string, { src: string; alt: string }> = {
+      'image': { src: '/file-image.svg', alt: 'Image' },
+      'video': { src: '/file-video.svg', alt: 'Video' },
+      'pdf': { src: '/file-pdf.svg', alt: 'PDF' },
+      'excel': { src: '/file-excel.svg', alt: 'Excel' },
+      'powerpoint': { src: '/file-powerpoint.svg', alt: 'PowerPoint' },
+      'word': { src: '/file-word.svg', alt: 'Word' },
+      'zip': { src: '/file-zip.svg', alt: 'Zip' },
+      'audio': { src: '/file-audio.svg', alt: 'Audio' },
+      'cad': { src: '/file-cad.svg', alt: 'CAD' },
+      'code': { src: '/file-code.svg', alt: 'Code' },
+      'email': { src: '/file-email.svg', alt: 'Email' },
+      'font': { src: '/file-font.svg', alt: 'Font' },
+      'database': { src: '/file-database.svg', alt: 'Database' },
+      'vector': { src: '/file-vector.svg', alt: 'Vector' },
+      'archive': { src: '/file-archive.svg', alt: 'Archive' },
+      'executable': { src: '/file-executable.svg', alt: 'Executable' },
+      'disc': { src: '/file-disc.svg', alt: 'Disc Image' },
+      'visio': { src: '/file-visio.svg', alt: 'Visio' },
+      'onenote': { src: '/file-onenote.svg', alt: 'OneNote' },
+      'text': { src: '/file-document.svg', alt: 'File' },
+    };
+
+    const mapped = iconMap[mediaType];
+    if (mapped) {
+      return <img src={mapped.src} alt={mapped.alt} className="w-12 h-12" />;
     }
+    return <img src="/file-document.svg" alt="File" className="w-12 h-12" />;
   };
 
   // Render Excel Content

@@ -214,8 +214,22 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
 
   const getFileIcon = () => {
     const ext = doc.docname.split('.').pop()?.toLowerCase();
-    if (['xls', 'xlsx', 'csv'].includes(ext || '')) return '/file-document.svg';
-    if (['ppt', 'pptx'].includes(ext || '')) return '/file-document.svg';
+    if (['xls', 'xlsx', 'csv', 'xlsm', 'ods'].includes(ext || '')) return '/file-excel.svg';
+    if (['ppt', 'pptx', 'pps', 'ppsx', 'odp'].includes(ext || '')) return '/file-powerpoint.svg';
+    if (['doc', 'docx'].includes(ext || '')) return '/file-word.svg';
+    if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext || '')) return '/file-audio.svg';
+    if (['dwg', 'dxf', 'step', 'stp', 'iges', 'igs', 'stl', 'obj', '3ds', 'fbx'].includes(ext || '')) return '/file-cad.svg';
+    if (['py', 'js', 'ts', 'tsx', 'jsx', 'html', 'css', 'java', 'cpp', 'c', 'cs', 'go', 'rb', 'php', 'swift', 'rs', 'r', 'sql', 'json', 'xml', 'yml', 'yaml', 'ini', 'conf'].includes(ext || '')) return '/file-code.svg';
+    if (['eml', 'msg', 'mbox'].includes(ext || '')) return '/file-email.svg';
+    if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(ext || '')) return '/file-font.svg';
+    if (['db', 'sqlite', 'mdb', 'accdb'].includes(ext || '')) return '/file-database.svg';
+    if (['ai', 'eps'].includes(ext || '')) return '/file-vector.svg';
+    if (['rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext || '')) return '/file-archive.svg';
+    if (['exe', 'msi', 'bat', 'sh', 'cmd', 'ps1'].includes(ext || '')) return '/file-executable.svg';
+    if (['iso', 'img', 'dmg', 'vhd'].includes(ext || '')) return '/file-disc.svg';
+    if (['vsd', 'vsdx'].includes(ext || '')) return '/file-visio.svg';
+    if (['one', 'onetoc2'].includes(ext || '')) return '/file-onenote.svg';
+    if (['zip'].includes(ext || '')) return '/file-zip.svg';
     return '/file.svg';
   };
 

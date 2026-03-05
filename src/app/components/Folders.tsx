@@ -238,51 +238,39 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
       else { iconSrc = '/file-document.svg'; altText = 'Files'; }
     } else {
-      if (type === 'image') {
-        iconSrc = '/file-image.svg';
-        altText = 'Image';
-        invertClass = "";
-      }
-      else if (type === 'video') {
-        iconSrc = '/file-video.svg';
-        altText = 'Video';
-        invertClass = "";
-      }
-      else if (type === 'excel') {
-        iconSrc = '/file-excel.svg';
-        altText = 'Excel';
-        invertClass = "";
-      }
-      else if (type === 'pdf') {
-        iconSrc = '/file-pdf.svg';
-        altText = 'PDF';
-        invertClass = "";
-      }
-      else if (type === 'powerpoint') {
-        iconSrc = '/file-powerpoint.svg';
-        altText = 'PowerPoint';
-        invertClass = "";
-      }
-      else if (type === 'word') {
-        iconSrc = '/file-word.svg';
-        altText = 'Word';
-        invertClass = "";
-      }
-      else if (type === 'zip') {
-        iconSrc = '/file-zip.svg';
-        altText = 'Zip';
-        invertClass = "";
-      }
-      else if (type === 'text' || type === 'file') {
-        iconSrc = '/file-document.svg';
-        altText = 'File';
-        invertClass = "";
-      }
-      else {
+      const iconMap: Record<string, { src: string; alt: string }> = {
+        'image': { src: '/file-image.svg', alt: 'Image' },
+        'video': { src: '/file-video.svg', alt: 'Video' },
+        'excel': { src: '/file-excel.svg', alt: 'Excel' },
+        'pdf': { src: '/file-pdf.svg', alt: 'PDF' },
+        'powerpoint': { src: '/file-powerpoint.svg', alt: 'PowerPoint' },
+        'word': { src: '/file-word.svg', alt: 'Word' },
+        'zip': { src: '/file-zip.svg', alt: 'Zip' },
+        'audio': { src: '/file-audio.svg', alt: 'Audio' },
+        'cad': { src: '/file-cad.svg', alt: 'CAD' },
+        'code': { src: '/file-code.svg', alt: 'Code' },
+        'email': { src: '/file-email.svg', alt: 'Email' },
+        'font': { src: '/file-font.svg', alt: 'Font' },
+        'database': { src: '/file-database.svg', alt: 'Database' },
+        'vector': { src: '/file-vector.svg', alt: 'Vector' },
+        'archive': { src: '/file-archive.svg', alt: 'Archive' },
+        'executable': { src: '/file-executable.svg', alt: 'Executable' },
+        'disc': { src: '/file-disc.svg', alt: 'Disc Image' },
+        'visio': { src: '/file-visio.svg', alt: 'Visio' },
+        'onenote': { src: '/file-onenote.svg', alt: 'OneNote' },
+        'text': { src: '/file-document.svg', alt: 'File' },
+        'file': { src: '/file-document.svg', alt: 'File' },
+      };
+
+      const mapped = iconMap[type];
+      if (mapped) {
+        iconSrc = mapped.src;
+        altText = mapped.alt;
+      } else {
         iconSrc = '/folder-icon.svg';
         altText = 'Folder';
-        invertClass = "";
       }
+      invertClass = "";
     }
 
     return <img src={iconSrc} alt={altText} className={`${className} ${invertClass}`} />;
@@ -301,10 +289,23 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '')) return 'video';
     if (['pdf'].includes(ext || '')) return 'pdf';
     if (['doc', 'docx'].includes(ext || '')) return 'word';
-    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) return 'zip';
-    if (['txt', 'csv', 'json', 'xml', 'log', 'md'].includes(ext || '')) return 'text';
+    if (['zip'].includes(ext || '')) return 'zip';
+    if (['rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext || '')) return 'archive';
+    if (['txt', 'csv', 'log', 'md'].includes(ext || '')) return 'text';
     if (['xls', 'xlsx', 'ods', 'xlsm'].includes(ext || '')) return 'excel';
     if (['ppt', 'pptx', 'odp', 'pps', 'ppsx'].includes(ext || '')) return 'powerpoint';
+    if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext || '')) return 'audio';
+    if (['dwg', 'dxf', 'step', 'stp', 'iges', 'igs', 'stl', 'obj', '3ds', 'fbx'].includes(ext || '')) return 'cad';
+    if (['py', 'js', 'ts', 'tsx', 'jsx', 'html', 'css', 'java', 'cpp', 'c', 'cs', 'go', 'rb', 'php', 'swift', 'rs', 'r', 'sql', 'sh', 'bat', 'ps1', 'cmd'].includes(ext || '')) return 'code';
+    if (['eml', 'msg', 'mbox'].includes(ext || '')) return 'email';
+    if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(ext || '')) return 'font';
+    if (['db', 'sqlite', 'mdb', 'accdb'].includes(ext || '')) return 'database';
+    if (['ai', 'eps'].includes(ext || '')) return 'vector';
+    if (['exe', 'msi'].includes(ext || '')) return 'executable';
+    if (['iso', 'img', 'dmg', 'vhd'].includes(ext || '')) return 'disc';
+    if (['vsd', 'vsdx'].includes(ext || '')) return 'visio';
+    if (['one', 'onetoc2'].includes(ext || '')) return 'onenote';
+    if (['json', 'xml', 'yml', 'yaml', 'ini', 'conf'].includes(ext || '')) return 'code';
     return 'file';
   };
 
@@ -566,13 +567,27 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const getFileColorClass = (item: FolderItem) => {
     const type = getMediaType(item);
-    if (type === 'image') return 'text-blue-500 dark:text-blue-400';
-    if (type === 'video') return 'text-red-500 dark:text-red-400';
-    if (type === 'excel') return 'text-green-500 dark:text-green-400';
-    if (type === 'powerpoint') return 'text-orange-500 dark:text-orange-400';
-    if (type === 'word') return 'text-blue-700 dark:text-blue-500'; // Darker blue for Word
-    if (type === 'zip') return 'text-purple-500 dark:text-purple-400';
-    return 'text-yellow-500 dark:text-yellow-400';
+    const colorMap: Record<string, string> = {
+      'image': 'text-blue-500 dark:text-blue-400',
+      'video': 'text-red-500 dark:text-red-400',
+      'excel': 'text-green-500 dark:text-green-400',
+      'powerpoint': 'text-orange-500 dark:text-orange-400',
+      'word': 'text-blue-700 dark:text-blue-500',
+      'zip': 'text-purple-500 dark:text-purple-400',
+      'audio': 'text-teal-500 dark:text-teal-400',
+      'cad': 'text-blue-800 dark:text-blue-500',
+      'code': 'text-cyan-600 dark:text-cyan-400',
+      'email': 'text-slate-500 dark:text-slate-400',
+      'font': 'text-gray-600 dark:text-gray-400',
+      'database': 'text-indigo-500 dark:text-indigo-400',
+      'vector': 'text-pink-600 dark:text-pink-400',
+      'archive': 'text-amber-700 dark:text-amber-500',
+      'executable': 'text-slate-600 dark:text-slate-400',
+      'disc': 'text-gray-500 dark:text-gray-400',
+      'visio': 'text-blue-600 dark:text-blue-400',
+      'onenote': 'text-purple-700 dark:text-purple-400',
+    };
+    return colorMap[type] || 'text-yellow-500 dark:text-yellow-400';
   };
 
   const isInsideStandardFolder = ['images', 'videos', 'files'].includes(currentFolderId || '');

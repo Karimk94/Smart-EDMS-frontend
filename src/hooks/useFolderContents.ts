@@ -6,7 +6,7 @@ export interface FolderItem {
     name: string;
     type: 'folder' | 'item' | 'file';
     node_type?: string;
-    media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder' | 'excel' | 'powerpoint' | 'word';
+    media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder' | 'excel' | 'powerpoint' | 'word' | 'zip' | 'audio' | 'cad' | 'code' | 'email' | 'font' | 'database' | 'vector' | 'archive' | 'executable' | 'disc' | 'visio' | 'onenote';
     is_standard?: boolean;
     count?: number;
     thumbnail_url?: string;

@@ -122,6 +122,7 @@
   "warning": "Warning",
   "FailLoadingFolders": "Failed to load folder contents",
   "AddedToFavorites": "Added to favorites",
+  "RemovedFromFavorites": "Removed from favorites",
   "ThumbnailCacheCleared": "Thumbnail cache cleared successfully",
   "FailedToClearCache": "Failed to clear cache",
   "FailedToUpdateFavoriteStatus": "Failed to update favorite status",

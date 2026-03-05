@@ -33,7 +33,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
       if (newFavoriteStatus) {
         showToast(t('AddedToFavorites'), 'success');
       } else {
-        showToast('Removed from favorites', 'info');
+        showToast(t('RemovedFromFavorites'), 'info');
       }
     } catch (error) {
       setIsFavorite(!newFavoriteStatus); // Revert on error

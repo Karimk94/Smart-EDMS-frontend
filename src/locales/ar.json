@@ -122,6 +122,7 @@
   "warning": "تحذير",
   "FailLoadingFolders": "فشل تحميل محتويات المجلد",
   "AddedToFavorites": "تمت الإضافة إلى المفضلة",
+  "RemovedFromFavorites": "تمت الإزالة من المفضلة",
   "ThumbnailCacheCleared": "تم مسح ذاكرة التخزين المؤقت للصور المصغرة بنجاح",
   "FailedToClearCache": "فشل في مسح ذاكرة التخزين المؤقت",
   "FailedToUpdateFavoriteStatus": "فشل في تحديث حالة المفضلة",

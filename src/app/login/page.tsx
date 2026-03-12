@@ -37,10 +37,20 @@ function LoginContent() {
   const { showToast } = useToast();
   const { login, isLoggingIn, isAuthenticated, isLoadingUser, user } = useAuth();
 
+  // Safe redirect: only allow relative paths starting with /
+  const getSafeRedirect = (url: string | null): string => {
+    if (!url) return '/dashboard';
+    // Block absolute URLs, protocol-relative URLs, and data URIs
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url) || url.startsWith('//')) return '/dashboard';
+    // Must start with /
+    if (!url.startsWith('/')) return '/dashboard';
+    return url;
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoadingUser) {
-      const redirectPath = searchParams.get('redirect') || '/dashboard';
+      const redirectPath = getSafeRedirect(searchParams.get('redirect'));
       // If we have user preferences, apply them before redirecting
       // This is crucial because the layout/context might be using these values
       if (user) {
@@ -67,7 +77,7 @@ function LoginContent() {
       }
 
       // Redirect handled by useEffect or onSuccess of mutation, but let's ensure it here too or just wait for effect
-      const redirectPath = searchParams.get('redirect') || '/dashboard';
+      const redirectPath = getSafeRedirect(searchParams.get('redirect'));
       router.push(redirectPath);
     } catch (err: any) {
       console.error('Login exception:', err);

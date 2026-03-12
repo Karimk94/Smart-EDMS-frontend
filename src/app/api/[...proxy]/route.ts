@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
-const FACE_RECOG_URL = process.env.NEXT_PUBLIC_FACE_RECOG_URL;
+const FACE_RECOG_URL = process.env.FACE_RECOG_URL;
 
 async function proxyHandler(req: NextRequest): Promise<NextResponse> {
   const path = req.nextUrl.pathname.replace('/api', '');

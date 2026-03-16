@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAnalysis } from '../../hooks/useAnalysis';
 import { useToast } from '../context/ToastContext';
 import { PersonSelector } from './PersonSelector';
+import Image from 'next/image';
 
 import { AnalysisViewProps } from '../../interfaces/PropsInterfaces';
 
@@ -100,7 +101,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
 
   return (
     <div className="space-y-6 p-4 overflow-y-auto h-full relative">
-      <img src={`data:image/jpeg;base64,${result.processed_image}`} alt="Processed" className="rounded-lg mx-auto max-w-full" />
+      <div className="relative w-full flex justify-center">
+        <Image 
+          src={`data:image/jpeg;base64,${result.processed_image}`} 
+          alt="Processed" 
+          width={800} 
+          height={600} 
+          className="rounded-lg max-w-full h-auto" 
+        />
+      </div>
 
       <div className="space-y-4">
         <h3 className={`font-bold text-lg ${headerColor}`}>Detected Faces</h3>
@@ -110,9 +119,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
               <div className="grid grid-cols-[auto,1fr,auto] gap-4 items-center">
                 <div className="flex items-center gap-2">
                   {face.thumbnail_b64 && (
-                    <img
+                    <Image
                       src={`data:image/jpeg;base64,${face.thumbnail_b64}`}
                       alt={`Face #${face.index}`}
+                      width={64}
+                      height={64}
                       className="w-16 h-16 rounded-md object-cover"
                     />
                   )}

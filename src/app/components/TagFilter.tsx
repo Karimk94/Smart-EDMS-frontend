@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 import { TagFilterProps } from '../../interfaces/PropsInterfaces';
+import Image from 'next/image';
 
 import { useTags } from '../../hooks/useTags';
 
@@ -78,7 +79,7 @@ export const TagFilter: React.FC<TagFilterProps> = ({ apiURL, selectedTags, setS
         onClick={() => isOpen ? setIsOpen(false) : handleOpen()}
         className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-white text-sm font-medium rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition shadow-sm"
       >
-        <img src="/tag.svg" alt="Tags" className="h-5 w-5 invert dark:invert-0" />
+        <Image src="/tag.svg" alt="Tags" width={20} height={20} className="invert dark:invert-0" />
         {t('tags')}
         {selectedTags.length > 0 && (
           <span className="ml-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">

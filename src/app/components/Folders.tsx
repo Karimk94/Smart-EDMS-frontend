@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { CreateFolderModal } from './CreateFolderModal';
 import SecurityModal from './SecurityModal';
 import ShareModal from './ShareModal';
+import Image from 'next/image';
 
 
 interface FoldersProps {
@@ -215,7 +216,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const renderIcon = (item: FolderItem, isStandard = false) => {
     let iconSrc = '/folder-icon.svg';
     let altText = 'Folder';
-    let className = "h-14 w-14";
+    let size = 56; // Maps to h-14 w-14
     let invertClass = "";
 
     let type: string = 'folder';
@@ -231,7 +232,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
 
     if (isStandard) {
-      className = "h-6 w-6";
+      size = 24; // Maps to h-6 w-6
       invertClass = "";
 
       if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
@@ -273,7 +274,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       invertClass = "";
     }
 
-    return <img src={iconSrc} alt={altText} className={`${className} ${invertClass}`} />;
+    return <Image src={iconSrc} alt={altText} width={size} height={size} className={invertClass} />;
   };
 
   const getMediaType = (item: FolderItem) => {
@@ -812,7 +813,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                   onClick={() => handleContextMenuAction('download')}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
                 >
-                  <img src="/download.svg" className="w-4 h-4 dark:invert" alt="" />
+                  <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
                   {t('download') || 'Download'}
                 </button>
               )}

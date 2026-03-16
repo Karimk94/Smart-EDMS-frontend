@@ -8,6 +8,7 @@ import { useDownload } from '../../hooks/useDownload';
 import { useDocumentContent } from '../../hooks/useDocumentContent';
 import { CollapsibleSection } from './CollapsibleSection';
 import JSZip from 'jszip';
+import Image from 'next/image';
 
 import { PowerPointModalProps, SlideData } from '../../interfaces/PropsInterfaces';
 
@@ -298,7 +299,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
+                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
 
@@ -335,7 +336,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
                 <div className="bg-orange-50 dark:bg-orange-900/10 p-4 border-b border-orange-100 dark:border-orange-900/30 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-white dark:bg-[#252525] rounded-lg shadow-sm">
-                      <img src="/file-document.svg" className="w-6 h-6" style={{ filter: 'invert(52%) sepia(87%) saturate(2336%) hue-rotate(349deg) brightness(98%) contrast(96%)' }} alt="" />
+                      <Image src="/file-document.svg" width={24} height={24} style={{ filter: 'invert(52%) sepia(87%) saturate(2336%) hue-rotate(349deg) brightness(98%) contrast(96%)' }} alt="" />
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-800 dark:text-gray-200">Presentation Content</h3>
@@ -343,8 +344,8 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
                     </div>
                   </div>
                   {thumbnailUrl && (
-                    <div className="h-16 w-24 bg-gray-200 rounded overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
-                      <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <div className="h-16 w-24 relative bg-gray-200 rounded overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
+                      <Image src={thumbnailUrl} alt="Thumbnail" fill className="object-cover" unoptimized={true} />
                     </div>
                   )}
                 </div>

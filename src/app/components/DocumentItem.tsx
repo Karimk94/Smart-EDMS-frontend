@@ -3,6 +3,7 @@ import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useTags } from '../../hooks/useTags';
 import { useToast } from '../context/ToastContext';
 import { DocumentItemProps } from '../../interfaces/PropsInterfaces';
+import Image from 'next/image';
 
 export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, lang, t }) => {
   const [isPopupVisible, setIsPopupVisible] = useState(false);
@@ -165,32 +166,37 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
       )}
       <div className="relative aspect-w-16 aspect-h-9 mb-2">
         {thumbnailUrl && !imageError ? (
-          <img
+          <Image
             src={thumbnailUrl}
             alt="Thumbnail"
-            className="w-full h-full object-cover rounded-lg bg-gray-200 dark:bg-gray-800 transition"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover rounded-lg bg-gray-200 dark:bg-gray-800 transition"
             onError={() => setImageError(true)}
             draggable={false}
+            unoptimized={true}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <img
+            <Image
               src={typeIcon || '/file.svg'}
               alt="File Type"
-              className="w-16 h-16 opacity-40 dark:opacity-60"
+              width={64}
+              height={64}
+              className="opacity-40 dark:opacity-60"
             />
           </div>
         )}
 
         {doc.media_type === 'video' && !imageError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-40 transition rounded-lg">
-            <img src="/play-icon.svg" alt="Play Video" className="w-12 h-12 opacity-80 group-hover:opacity-100 transition-transform group-hover:scale-110" />
+            <Image src="/play-icon.svg" alt="Play Video" width={48} height={48} className="opacity-80 group-hover:opacity-100 transition-transform group-hover:scale-110" />
           </div>
         )}
 
         {typeIcon && !imageError && (
           <div className="pointer-events-none z-10">
-            <img src={typeIcon} alt={`${doc.media_type} Icon`} className="absolute bottom-2 right-2 w-8 h-8 drop-shadow-md" />
+            <Image src={typeIcon} alt={`${doc.media_type} Icon`} width={32} height={32} className="absolute bottom-2 right-2 drop-shadow-md" />
           </div>
         )}
 

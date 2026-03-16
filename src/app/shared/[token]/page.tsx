@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import { BreadcrumbItem, FolderItem, ShareInfo, SlideData, StoredSession } from '../../../interfaces';
 import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
+import Image from 'next/image';
 
 registerLocale('en-GB', enGB);
 
@@ -870,7 +871,7 @@ export default function SharedDocumentPage() {
     const mediaType = resolveMediaType(item);
 
     if (item.type === 'folder') {
-      return <img src="/folder-icon.svg" alt="Folder" className="w-12 h-12" />;
+      return <Image src="/folder-icon.svg" alt="Folder" width={48} height={48} className="" />;
     }
 
     const iconMap: Record<string, { src: string; alt: string }> = {
@@ -898,9 +899,9 @@ export default function SharedDocumentPage() {
 
     const mapped = iconMap[mediaType];
     if (mapped) {
-      return <img src={mapped.src} alt={mapped.alt} className="w-12 h-12" />;
+      return <Image src={mapped.src} alt={mapped.alt} width={48} height={48} className="" />;
     }
-    return <img src="/file-document.svg" alt="File" className="w-12 h-12" />;
+    return <Image src="/file-document.svg" alt="File" width={48} height={48} className="" />;
   };
 
   // Render Excel Content
@@ -990,8 +991,8 @@ export default function SharedDocumentPage() {
             </div>
           </div>
           {pptThumbnailUrl && (
-            <div className="h-16 w-24 bg-gray-200 rounded overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
-              <img src={pptThumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+            <div className="relative h-16 w-24 bg-gray-200 rounded overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
+              <Image src={pptThumbnailUrl} alt="Thumbnail" fill className="object-cover" unoptimized={true} />
             </div>
           )}
         </div>
@@ -1106,10 +1107,13 @@ export default function SharedDocumentPage() {
           <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
             <div className="w-full max-h-[600px] overflow-auto mb-6">
               {isImage(fileType) && (
-                <img
+                <Image
                   src={fileUrl}
                   alt={fileName}
-                  className="max-w-full max-h-[500px] mx-auto rounded shadow-lg object-contain"
+                  width={1200}
+                  height={800}
+                  className="max-w-full max-h-[500px] w-auto h-auto mx-auto rounded shadow-lg object-contain"
+                  unoptimized={true}
                 />
               )}
 
@@ -1329,9 +1333,9 @@ export default function SharedDocumentPage() {
             title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
           >
             {theme === 'light' ? (
-              <img src="/moon.svg" alt="Dark Mode" className="w-5 h-5" />
+              <Image src="/moon.svg" alt="Dark Mode" width={20} height={20} className="" />
             ) : (
-              <img src="/sun.svg" alt="Light Mode" className="w-5 h-5 invert" />
+              <Image src="/sun.svg" alt="Light Mode" width={20} height={20} className="invert" />
             )}
           </button>
         </div>
@@ -1371,9 +1375,9 @@ export default function SharedDocumentPage() {
           title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
         >
           {theme === 'light' ? (
-            <img src="/moon.svg" alt="Dark Mode" className="w-5 h-5" />
+            <Image src="/moon.svg" alt="Dark Mode" width={20} height={20} className="" />
           ) : (
-            <img src="/sun.svg" alt="Light Mode" className="w-5 h-5 invert" />
+            <Image src="/sun.svg" alt="Light Mode" width={20} height={20} className="invert" />
           )}
         </button>
       </div>
@@ -1421,10 +1425,13 @@ export default function SharedDocumentPage() {
 
                   {/* Image Preview */}
                   {fileUrl && isImage(fileType) && (
-                    <img
+                    <Image
                       src={fileUrl}
                       alt={fileName}
-                      className="max-w-full max-h-[500px] mx-auto rounded shadow-lg object-contain"
+                      width={1200}
+                      height={800}
+                      className="max-w-full max-h-[500px] w-auto h-auto mx-auto rounded shadow-lg object-contain"
+                      unoptimized={true}
                     />
                   )}
 
@@ -1509,9 +1516,11 @@ export default function SharedDocumentPage() {
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
 
             <div className="flex justify-center mb-6">
-              <img
+              <Image
                 src="/icon.ico"
                 alt="Logo"
+                width={80}
+                height={80}
                 className="h-20 w-auto object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';

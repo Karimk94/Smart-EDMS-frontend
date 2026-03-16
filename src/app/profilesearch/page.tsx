@@ -25,6 +25,7 @@ import { TxtModal } from '../components/TxtModal';
 import { ExcelModal } from '../components/ExcelModal';
 import { PowerPointModal } from '../components/PowerPointModal';
 import { WordModal } from '../components/WordModal';
+import Image from 'next/image';
 
 registerLocale('en-GB', enGB);
 
@@ -455,7 +456,7 @@ function ProfileSearchPageContent() {
                                 </p>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                                    <img src="/search-icon.svg" className="w-16 h-16 mb-4 opacity-50 dark:invert" alt="" />
+                                    <Image src="/search-icon.svg" width={64} height={64} className="mb-4 opacity-50 dark:invert" alt="" />
                                     <p>{t('startSearchPrompt') || 'Select a scope and type to begin searching.'}</p>
                                 </div>
                             )}

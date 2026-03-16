@@ -8,6 +8,7 @@ import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDocumentContent } from '../../hooks/useDocumentContent';
 import { useDownload } from '../../hooks/useDownload';
 import { TagEditor } from './TagEditor';
+import Image from 'next/image';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -243,7 +244,7 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
+                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
 

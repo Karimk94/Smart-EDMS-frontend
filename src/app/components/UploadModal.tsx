@@ -61,6 +61,7 @@ const removeExtension = (filename: string) => {
 import { UploadModalProps } from '../../interfaces/PropsInterfaces';
 
 import { useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
 
 export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme, t }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);
@@ -282,9 +283,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
           <div
             onDrop={onDrop}
             onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
             className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-red-500 bg-[#222]' : 'border-gray-600'}`}>
-            <img src="/upload.svg" alt="Upload Icon" className="h-10 w-10 text-gray-400 mb-2" />
+            <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2" />
             <p className="mt-2 text-lg text-gray-300">Drag & Drop files here</p>
             <p className="text-sm text-gray-500">or</p>
             <label htmlFor="file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-600 transition">

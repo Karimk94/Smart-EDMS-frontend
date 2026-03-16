@@ -97,7 +97,7 @@ export function PortalLanding() {
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                                <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                                     <Image
                                         src="/icon.ico"
                                         alt="EDMS Logo"
@@ -108,7 +108,7 @@ export function PortalLanding() {
                                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
                                         {t('edmsPortal')}
                                     </h1>
-                                </a>
+                                </Link>
                             </div>
 
                             <div className="flex items-center gap-2">

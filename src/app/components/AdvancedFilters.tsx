@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import { GroupBase, OptionsOrGroups } from 'react-select';
 import { AsyncPaginate } from 'react-select-async-paginate';
+import Image from 'next/image';
 import { fetchPersons } from '../../hooks/usePersons';
 import { PersonOption } from '../../models/PersonOption';
 
@@ -206,7 +207,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     }`}
                   title={t('images')}
                 >
-                  <img src="/file-image.svg" alt={t('images')} className={`w-5 h-5 `} />
+                  <Image src="/file-image.svg" alt={t('images')} width={20} height={20} className={`w-5 h-5 `} />
                 </button>
                 <button
                   onClick={() => setMediaType(mediaType === 'video' ? null : 'video')}
@@ -216,7 +217,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     }`}
                   title={t('videos')}
                 >
-                  <img src="/file-video.svg" alt={t('videos')} className={`w-5 h-5`} />
+                  <Image src="/file-video.svg" alt={t('videos')} width={20} height={20} className={`w-5 h-5`} />
                 </button>
                 <button
                   onClick={() => setMediaType(mediaType === 'pdf' ? null : 'pdf')}
@@ -226,7 +227,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     }`}
                   title={t("files")}
                 >
-                  <img src="/file-document.svg" alt={t("files")} className={`w-5 h-5`} />
+                  <Image src="/file-document.svg" alt={t("files")} width={20} height={20} className={`w-5 h-5`} />
                 </button>
               </div>
             </div>

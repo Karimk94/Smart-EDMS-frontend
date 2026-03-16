@@ -3,6 +3,7 @@
 import React from 'react';
 
 import { SidebarProps } from '../../interfaces/PropsInterfaces';
+import Image from 'next/image';
 
 const NavLink: React.FC<{
   icon: string;
@@ -24,10 +25,12 @@ const NavLink: React.FC<{
         } ${isSidebarOpen ? 'gap-4' : ''
         }`}
     >
-      <img
+      <Image
         src={icon}
         alt=""
-        className={`w-6 h-6 flex-shrink-0 dark:brightness-0 dark:invert ${isActive ? 'opacity-100' : 'opacity-70'
+        width={24}
+        height={24}
+        className={`flex-shrink-0 dark:brightness-0 dark:invert ${isActive ? 'opacity-100' : 'opacity-70'
           }`}
       />
       {isSidebarOpen && <span className="truncate">{label}</span>}

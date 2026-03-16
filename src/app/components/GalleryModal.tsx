@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import { GalleryModalProps } from '../../interfaces/PropsInterfaces';
+import Image from 'next/image';
 
 export const GalleryModal: React.FC<GalleryModalProps> = ({ title, images, startIndex, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
@@ -23,7 +24,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ title, images, start
       }
 
       uniqueIndexesToPreload.forEach(index => {
-        const img = new Image();
+        const img = new window.Image();
         img.src = images[index as number];
       });
     }
@@ -57,12 +58,14 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ title, images, start
               <div className="w-full h-full skeleton-loader rounded-lg"></div>
             </div>
           )}
-          <img
+          <Image
             src={images[currentIndex]}
             alt={`${title} gallery image ${currentIndex + 1}`}
-            className={`max-h-full max-w-full object-contain transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
+            fill
+            className={`object-contain transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
             onLoad={() => setIsImageLoading(false)}
             onError={() => setIsImageLoading(false)}
+            unoptimized={true}
           />
           {/* Navigation Arrows */}
           <div className="absolute top-1/2 left-5 transform -translate-y-1/2 text-white text-3xl cursor-pointer bg-black/30 rounded-full p-2 hover:bg-black/50" onClick={goToPrevious}>&#10094;</div>
@@ -73,12 +76,15 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ title, images, start
         <div className="p-2 bg-gray-100 border-t border-gray-200 flex-shrink-0">
           <div className="flex justify-center space-x-2 overflow-x-auto pb-2">
             {images.map((src, index) => (
-              <img
+              <Image
                 key={index}
                 src={src}
                 alt={`Thumbnail ${index + 1}`}
-                className={`h-20 w-20 object-cover rounded-md cursor-pointer flex-shrink-0 ${index === currentIndex ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:ring-2 hover:ring-gray-400'}`}
+                width={80}
+                height={80}
+                className={`object-cover rounded-md cursor-pointer flex-shrink-0 ${index === currentIndex ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:ring-2 hover:ring-gray-400'}`}
                 onClick={() => setCurrentIndex(index)}
+                unoptimized={true}
               />
             ))}
           </div>

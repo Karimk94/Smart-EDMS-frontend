@@ -6,6 +6,7 @@ import { HeaderProps } from '../../interfaces/PropsInterfaces';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
+import Image from 'next/image';
 
 export const Header: React.FC<HeaderProps> = ({
   onSearch,
@@ -86,9 +87,9 @@ export const Header: React.FC<HeaderProps> = ({
             aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
           >
             {theme === 'light' ? (
-              <img src="/moon.svg" alt="Dark Mode" className="w-5 h-5" />
+              <Image src="/moon.svg" alt="Dark Mode" width={20} height={20} />
             ) : (
-              <img src="/sun.svg" alt="Light Mode" className="w-5 h-5 invert" />
+              <Image src="/sun.svg" alt="Light Mode" width={20} height={20} className="invert" />
             )}
           </button>
         </div>
@@ -141,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => logout()}
             className="px-4 py-2 bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-white text-sm font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-700 transition flex items-center gap-2"
           >
-            <img src="/logout.svg" alt="Logout" className="h-5 w-5 dark:brightness-0 dark:invert" />
+            <Image src="/logout.svg" alt="Logout" width={20} height={20} className="dark:brightness-0 dark:invert" />
             <span>{t('logout')}</span>
           </button>
         </div>

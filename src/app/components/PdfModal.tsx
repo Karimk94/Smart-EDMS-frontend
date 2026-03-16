@@ -6,6 +6,7 @@ import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDownload } from '../../hooks/useDownload';
 import { PdfModalProps } from '../../interfaces/PropsInterfaces';
+import Image from 'next/image';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -207,13 +208,13 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
+                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
 
             {/* Full Screen Button */}
             <button onClick={handleFullScreen} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Full Screen">
-              <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
+              <Image src="/expand.svg" alt="Full Screen" width={24} height={24} className="dark:invert" />
             </button>
 
             {/* Details Toggle Button */}

@@ -8,6 +8,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
 import { useDownload } from '../../hooks/useDownload';
+import Image from 'next/image';
 
 
 const safeParseDate = (dateString: string): Date | null => {
@@ -248,7 +249,7 @@ export const ExcelModal: React.FC<ExcelModalProps> = ({ doc, onClose, apiURL, on
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
+                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
 

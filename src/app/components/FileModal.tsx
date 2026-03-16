@@ -8,6 +8,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
 import { Document } from '../../models/Document';
+import Image from 'next/image';
 
 
 const safeParseDate = (dateString: string): Date | null => {
@@ -259,13 +260,13 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <img src="/download.svg" alt="Download" className="w-6 h-6 dark:invert" />
+                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
 
             {isTextFile && (
               <button onClick={handleFullScreen} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Full Screen">
-                <img src="/expand.svg" alt="Full Screen" className="w-6 h-6 dark:invert" />
+                <Image src="/expand.svg" alt="Full Screen" width={24} height={24} className="dark:invert" />
               </button>
             )}
 
@@ -313,14 +314,14 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
               </div>
             ) : (
               <div className="text-center p-8">
-                <img src={getFileIcon()} alt="File" className="w-24 h-24 mb-4 mx-auto opacity-50 dark:invert" />
+                <Image src={getFileIcon()} alt="File" width={96} height={96} className="mb-4 mx-auto opacity-50 dark:invert" />
                 <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Preview not available</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">This file type cannot be previewed directly.</p>
                 <button
                   onClick={handleDownload}
                   className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center gap-2 mx-auto"
                 >
-                  <img src="/download.svg" className="w-5 h-5 brightness-0 invert" alt="" />
+                  <Image src="/download.svg" width={20} height={20} className="brightness-0 invert" alt="" />
                   Download File
                 </button>
               </div>

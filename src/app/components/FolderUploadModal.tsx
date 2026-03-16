@@ -59,6 +59,7 @@ const removeExtension = (filename: string) => {
 };
 
 import { FolderUploadModalProps } from '../../interfaces/PropsInterfaces';
+import Image from 'next/image';
 
 export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete }) => {
   const { showToast } = useToast();
@@ -281,7 +282,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-blue-500 bg-[#222]' : 'border-gray-600'}`}>
-            <img src="/upload.svg" alt="Upload Icon" className="h-10 w-10 text-gray-400 mb-2" />
+            <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2" />
             <p className="mt-2 text-lg text-gray-300">Drag & Drop files here</p>
             <p className="text-sm text-gray-500">or</p>
             <label htmlFor="folder-file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">

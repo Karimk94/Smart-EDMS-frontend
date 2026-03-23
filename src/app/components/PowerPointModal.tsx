@@ -95,6 +95,8 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
   });
 
   useEffect(() => {
+    let createdThumbnailUrl: string | null = null;
+
     // Parse PPTX
     const parsePPTX = async () => {
       if (!arrayBuffer) return;
@@ -108,6 +110,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
         if (thumbFile) {
           const thumbBlob = await thumbFile.async("blob");
           const thumbUrl = URL.createObjectURL(thumbBlob);
+          createdThumbnailUrl = thumbUrl;
           setThumbnailUrl(thumbUrl);
         }
 
@@ -170,7 +173,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
     parsePPTX();
 
     return () => {
-      if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
+      if (createdThumbnailUrl) URL.revokeObjectURL(createdThumbnailUrl);
     };
 
   }, [arrayBuffer]);

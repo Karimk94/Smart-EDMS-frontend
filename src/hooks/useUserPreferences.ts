@@ -10,6 +10,7 @@ export function useUserPreferences() {
         mutationFn: async (lang: 'en' | 'ar') => {
             const response = await fetch('/api/user/language', {
                 method: 'PUT',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -36,6 +37,7 @@ export function useUserPreferences() {
         mutationFn: async (theme: 'light' | 'dark') => {
             const response = await fetch('/api/user/theme', {
                 method: 'PUT',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
 import { UploadFileItem } from './UploadFileItem';
 import ExifReader from 'exifreader';
@@ -137,12 +137,12 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
     setFiles(prev => [...prev, ...newUploads]);
   };
 
-  const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+  const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     setIsDragOver(false);
     handleFiles(event.dataTransfer.files);
-  }, []);
+  };
 
   const onDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();

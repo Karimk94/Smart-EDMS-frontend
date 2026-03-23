@@ -74,7 +74,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
     const estimatedHeight = Math.min(filtered.length, 15) * 30 + 10;
     setSuggestionDirection(spaceBelow < estimatedHeight + 20 && inputRect.top > estimatedHeight + 20 ? 'up' : 'down');
 
-  }, [inputValue, allTags, tags, isSuggestionVisible]);
+  }, [inputValue, allTags, tags, isSuggestionVisible, suggestions.length]);
 
 
   useEffect(() => {
@@ -181,6 +181,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
               <input
                 ref={inputRef}
                 type="text"
+                role="combobox"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onFocus={() => setIsSuggestionVisible(true)}

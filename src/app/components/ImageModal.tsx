@@ -56,6 +56,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   const [error, setError] = useState<string | null>(null);
   const originalImageBlob = useRef<Blob | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const lastImageSrcRef = useRef<string | null>(null);
 
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [documentDate, setDocumentDate] = useState<Date | null>(safeParseDate(doc.date));
@@ -71,13 +72,19 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   const { download, isDownloading } = useDownload();
 
   useEffect(() => {
+    const previousImageSrc = lastImageSrcRef.current;
+    lastImageSrcRef.current = null;
+
     setView('image');
     setAnalysisResult(null);
     originalImageBlob.current = null;
-    if (imageSrc) {
-      URL.revokeObjectURL(imageSrc);
-      setImageSrc(null);
-    }
+    setImageSrc(null);
+
+    return () => {
+      if (previousImageSrc) {
+        URL.revokeObjectURL(previousImageSrc);
+      }
+    };
   }, [doc.doc_id]);
 
   const { data: imageBlob, isLoading: isFetchingImage, error: imageError } = useDocumentContent(doc.doc_id, {
@@ -93,6 +100,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
     if (imageBlob) {
       originalImageBlob.current = imageBlob as Blob;
       const newUrl = URL.createObjectURL(imageBlob as Blob);
+      lastImageSrcRef.current = newUrl;
       setImageSrc(newUrl);
       return () => {
         URL.revokeObjectURL(newUrl);

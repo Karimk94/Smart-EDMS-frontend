@@ -4,6 +4,8 @@ import React from 'react';
 
 import { SidebarProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
+import { AdminSidebarItem } from './AdminSidebarItem';
+import { EmsAdminSidebarItem } from './EmsAdminSidebarItem';
 
 const NavLink: React.FC<{
   icon: string;
@@ -96,6 +98,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         ))}
       </nav>
+
+      {/* Admin Section */}
+      <div className="border-t border-[var(--color-border-primary)] pt-2 space-y-2">
+        <AdminSidebarItem isSidebarOpen={isSidebarOpen} lang={lang} />
+        <EmsAdminSidebarItem isSidebarOpen={isSidebarOpen} lang={lang} />
+      </div>
     </aside>
   );
 };

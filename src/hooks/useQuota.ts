@@ -16,7 +16,9 @@ export function useQuota(options: UseQuotaOptions = {}) {
     return useQuery({
         queryKey: ['quota'],
         queryFn: async (): Promise<QuotaData> => {
-            const response = await fetch('/api/auth/user');
+            const response = await fetch('/api/auth/user', {
+                credentials: 'include'
+            });
             if (!response.ok) {
                 throw new Error('Failed to fetch quota');
             }

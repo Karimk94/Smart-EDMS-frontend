@@ -94,6 +94,7 @@ export function useSecurityMutation() {
 
             const response = await fetch('/api/share/generate', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
                 },

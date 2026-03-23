@@ -17,10 +17,11 @@ interface UseProcessingStatusOptions {
 export function useProcessingStatus({ user, activeSection, activeFolder, apiURL }: UseProcessingStatusOptions) {
     const queryClient = useQueryClient();
     const [processingDocs, setProcessingDocs] = useState<number[]>([]);
+    const username = user?.username;
 
     // Load from localStorage on mount
     useEffect(() => {
-        if (user) {
+        if (username) {
             const stored = localStorage.getItem('processingDocs');
             if (stored) {
                 try {
@@ -35,11 +36,11 @@ export function useProcessingStatus({ user, activeSection, activeFolder, apiURL 
                 }
             }
         }
-    }, [user?.username]);
+    }, [username]);
 
     // Polling effect
     useEffect(() => {
-        if (user) {
+        if (username) {
             if (processingDocs.length === 0) {
                 localStorage.removeItem('processingDocs');
                 return;
@@ -80,7 +81,7 @@ export function useProcessingStatus({ user, activeSection, activeFolder, apiURL 
             }, 7000);
             return () => clearInterval(interval);
         }
-    }, [processingDocs, activeSection, activeFolder, user?.username, queryClient, apiURL]);
+    }, [processingDocs, activeSection, activeFolder, username, queryClient, apiURL]);
 
     const addProcessingDocs = useCallback((docnumbers: number[]) => {
         setProcessingDocs(prev => Array.from(new Set([...prev, ...docnumbers])));

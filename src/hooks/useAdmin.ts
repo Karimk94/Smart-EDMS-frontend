@@ -62,7 +62,9 @@ export function useAdmin() {
     const useCheckAccess = () => useQuery({
         queryKey: ['adminAccess'],
         queryFn: async () => {
-            const response = await fetch("/api/admin/check-access");
+            const response = await fetch("/api/admin/check-access", {
+                credentials: 'include'
+            });
             if (response.status === 401) {
                 throw new Error("Unauthorized");
             }

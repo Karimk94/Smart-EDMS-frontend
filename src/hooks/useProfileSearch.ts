@@ -51,7 +51,9 @@ export function useProfileSearchScopes() {
     return useQuery({
         queryKey: ['profilesearch', 'scopes'],
         queryFn: async (): Promise<SearchScope[]> => {
-            const response = await fetch('/api/profilesearch/scopes');
+            const response = await fetch('/api/profilesearch/scopes', {
+                credentials: 'include'
+            });
             if (!response.ok) {
                 throw new Error('Failed to fetch search scopes');
             }
@@ -118,6 +120,7 @@ export function useProfileMultiSearch(params: MultiSearchParams & { enabled?: bo
 
             const response = await fetch('/api/profilesearch/search', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });

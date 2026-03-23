@@ -279,6 +279,7 @@ export default function SharedDocumentPage() {
     visible: false, x: 0, y: 0, item: null
   });
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const initializeAuthRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   // Toggle Language Helper
   const toggleLanguage = () => {
@@ -305,7 +306,7 @@ export default function SharedDocumentPage() {
 
 
   // Initialize Auth
-  const initializeAuth = async () => {
+  initializeAuthRef.current = async () => {
     if (!token || !shareInfo || autoOtpSentRef.current) return;
 
     // 1. Try restore session
@@ -368,7 +369,7 @@ export default function SharedDocumentPage() {
 
   useEffect(() => {
     if (shareInfo && !isLoadingShareInfo) {
-      initializeAuth();
+      initializeAuthRef.current();
     }
   }, [shareInfo, isLoadingShareInfo]);
 

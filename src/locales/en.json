@@ -161,7 +161,7 @@
   "VerifiedAccessFor": "Verified Access for",
   "AccessLoggedAt": "Access logged at",
   "download": "Download",
-  "DownloadFunctionality": "Download functionality to be connected to media stream",
+  "downloadFunctionality": "Download functionality to be connected to media stream",
   "FailedRequestOtp": "Failed to request OTP",
   "FailedVerifyOtp": "Failed to verify OTP",
   "LinkCopied": "Link copied to clipboard!",
@@ -247,7 +247,6 @@
   "searchCriteria": "Search Criteria",
   "addSearchRow": "Add Search Row",
   "removeRow": "Remove row",
-
   "emsAdmin": "EMS Admin",
   "emsAdminManagement": "EMS Admin Management",
   "emsAdminDescription": "Manage companies, departments, and sections in the EMS system",

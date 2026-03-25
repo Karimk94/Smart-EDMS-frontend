@@ -160,8 +160,8 @@
   "ChangeEmail": "تغيير البريد الإلكتروني",
   "VerifiedAccessFor": "تم التحقق من الوصول لـ",
   "AccessLoggedAt": "تم تسجيل الوصول في",
-  "Download": "تحميل",
-  "DownloadFunctionality": "سيتم ربط خاصية التحميل بتدفق الوسائط",
+  "download": "تحميل",
+  "downloadFunctionality": "سيتم ربط خاصية التحميل بتدفق الوسائط",
   "FailedRequestOtp": "فشل طلب رمز التحقق",
   "FailedVerifyOtp": "فشل التحقق من الرمز",
   "LinkCopied": "تم نسخ الرابط إلى الحافظة!",
@@ -246,7 +246,6 @@
   "searchCriteria": "معايير البحث",
   "addSearchRow": "إضافة صف بحث",
   "removeRow": "إزالة الصف",
-
   "emsAdmin": "إدارة EMS",
   "emsAdminManagement": "إدارة نظام EMS",
   "emsAdminDescription": "إدارة الشركات والإدارات والأقسام في نظام EMS",

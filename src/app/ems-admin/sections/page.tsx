@@ -14,6 +14,7 @@ interface Agency {
 }
 
 interface Department {
+    DEPTID: string;
     SYSTEM_ID: number;
     NAME: string;
     SHORT: string;
@@ -90,6 +91,9 @@ export default function EmsSectionsPage() {
                     throw new Error(errorData.error || `Failed to fetch agencies (${response.status})`);
                 }
                 const data = await response.json();
+                if (data && data.agencies && Array.isArray(data.agencies)) {
+                    return data.agencies;
+                }
                 return Array.isArray(data) ? data : [];
             } catch (error) {
                 console.error('Agencies fetch error:', error);
@@ -110,7 +114,11 @@ export default function EmsSectionsPage() {
             if (!response.ok) {
                 throw new Error('Failed to fetch departments');
             }
-            return response.json();
+            const data = await response.json();
+            if (data && data.departments && Array.isArray(data.departments)) {
+                return data.departments;
+            }
+            return Array.isArray(data) ? data : [];
         },
         enabled: !!selectedAgencyId,
     });
@@ -251,7 +259,7 @@ export default function EmsSectionsPage() {
     };
 
     const totalPages = sectionsData?.total_pages || 1;
-    const selectedDept = departments.find((d) => d.SYSTEM_ID === selectedDeptId);
+    const selectedDept = departments.find((d) => parseInt(d.DEPTID) === selectedDeptId);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-[#1f1f1f]">
@@ -333,7 +341,7 @@ export default function EmsSectionsPage() {
                             >
                                 <option value="">{t('selectADepartment')}</option>
                                 {departments.map((dept) => (
-                                    <option key={dept.SYSTEM_ID} value={dept.SYSTEM_ID}>
+                                    <option key={dept.DEPTID} value={dept.DEPTID}>
                                         {dept.NAME} ({dept.SHORT})
                                     </option>
                                 ))}

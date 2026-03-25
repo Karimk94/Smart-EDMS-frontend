@@ -80,6 +80,9 @@ export default function DepartmentsPage() {
                     throw new Error(errorData.error || `Failed to fetch agencies (${response.status})`);
                 }
                 const data = await response.json();
+                if (data && data.agencies && Array.isArray(data.agencies)) {
+                    return data.agencies;
+                }
                 return Array.isArray(data) ? data : [];
             } catch (error) {
                 console.error('Agencies fetch error:', error);

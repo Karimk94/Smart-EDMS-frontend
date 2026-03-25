@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../context/ToastContext';
 import { UploadFileItem } from './UploadFileItem';
 import ExifReader from 'exifreader';
@@ -62,6 +63,7 @@ import { FolderUploadModalProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
 
 export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete }) => {
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [files, setFiles] = useState<UploadableFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -244,6 +246,10 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
     });
 
     await Promise.all(uploadPromises);
+    // Invalidate quota and user caches so the pie chart updates immediately
+    queryClient.invalidateQueries({ queryKey: ['quota'] });
+    queryClient.invalidateQueries({ queryKey: ['user'] });
+    queryClient.invalidateQueries({ queryKey: ['folders'] });
     setIsUploading(false);
   };
 

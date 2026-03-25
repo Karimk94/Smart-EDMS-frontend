@@ -111,6 +111,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     const [uploadParentId, setUploadParentId] = useState<string | null>(null);
     const [uploadParentName, setUploadParentName] = useState<string>('');
     const [isClearCacheModalOpen, setIsClearCacheModalOpen] = useState(false);
+    const [folderRefreshTrigger, setFolderRefreshTrigger] = useState(0);
 
     const clearCacheMutation = useClearCache();
     const processDocumentsMutation = useProcessDocuments();
@@ -164,6 +165,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     const handleFolderUploadComplete = () => {
         setIsFolderUploadModalOpen(false);
+        setFolderRefreshTrigger(prev => prev + 1);
         queryClient.invalidateQueries({ queryKey: ['folders'] });
     };
 
@@ -256,6 +258,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         apiURL={API_PROXY_URL}
                         isEditor={isSectionWritable('folders')}
                         initialFolderId={initialFolderId}
+                        externalRefreshTrigger={folderRefreshTrigger}
                     />
                 </Suspense>
             );

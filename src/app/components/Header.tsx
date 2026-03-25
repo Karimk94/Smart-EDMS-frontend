@@ -6,6 +6,7 @@ import { HeaderProps } from '../../interfaces/PropsInterfaces';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
+import { useQuota } from '../../hooks/useQuota';
 import Image from 'next/image';
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,11 +23,12 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { updateLanguage, updateTheme } = useUserPreferences();
+  const { data: quotaData } = useQuota({ enabled: activeSection === 'folders' });
 
   const lang = user?.lang || 'en';
   const theme = user?.theme || 'light';
-  const quota = user?.quota;
-  const remainingQuota = user?.remaining_quota;
+  const quota = quotaData?.total ?? user?.quota;
+  const remainingQuota = quotaData?.remaining ?? user?.remaining_quota;
 
   const handleLanguageChange = async () => {
     const newLang = lang === 'en' ? 'ar' : 'en';

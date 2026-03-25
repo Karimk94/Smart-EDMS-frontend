@@ -103,6 +103,8 @@ export function useDeleteFolder() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['folders'] });
             queryClient.invalidateQueries({ queryKey: ['documents'] });
+            queryClient.invalidateQueries({ queryKey: ['quota'] });
+            queryClient.invalidateQueries({ queryKey: ['user'] });
         }
     });
 }

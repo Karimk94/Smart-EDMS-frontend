@@ -20,6 +20,7 @@ interface FoldersProps {
   apiURL: string;
   isEditor: boolean;
   initialFolderId?: string | null;
+  externalRefreshTrigger?: number;
 }
 
 interface ContextMenuState {
@@ -29,7 +30,7 @@ interface ContextMenuState {
   item: FolderItem | null;
 }
 
-export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId }) => {
+export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId, externalRefreshTrigger }) => {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
@@ -41,7 +42,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  const { data, isLoading: isFetching } = useFolderContents({
+  const { data, isLoading: isInitialLoading, isFetching } = useFolderContents({
     parentId: currentFolderId,
     searchTerm: debouncedSearchTerm,
     apiURL
@@ -49,7 +50,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const items = data?.contents || [];
   const [isOperationLoading, setIsOperationLoading] = useState(false);
-  const isLoading = isFetching || isOperationLoading;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isLoading = isInitialLoading || isOperationLoading;
+
+  // Auto-clear operation loading & refreshing when fetch settles
+  const prevIsFetchingRef = useRef(false);
+  useEffect(() => {
+    if (prevIsFetchingRef.current && !isFetching) {
+      setIsOperationLoading(false);
+      setIsRefreshing(false);
+    }
+    prevIsFetchingRef.current = isFetching;
+  }, [isFetching]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -146,6 +158,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       setCurrentFolderId(initialFolderId);
     }
   }, [initialFolderId]);
+
+  // React to external refresh trigger (e.g. upload-complete from parent)
+  const prevTriggerRef = useRef(externalRefreshTrigger);
+  useEffect(() => {
+    if (externalRefreshTrigger !== undefined && prevTriggerRef.current !== externalRefreshTrigger && prevTriggerRef.current !== undefined) {
+      setIsOperationLoading(true);
+    }
+    prevTriggerRef.current = externalRefreshTrigger;
+  }, [externalRefreshTrigger]);
 
   // Handle browser back/forward navigation
   useEffect(() => {
@@ -387,7 +408,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
   };
 
-  const refreshCurrentView = () => {
+  const refreshCurrentView = (showOverlay = false) => {
+    if (showOverlay) {
+      setIsOperationLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     // Force refetch from server, bypassing stale time cache
     queryClient.refetchQueries({ queryKey: ['folders', currentFolderId, debouncedSearchTerm] });
     queryClient.invalidateQueries({ queryKey: ['documents'] });
@@ -641,8 +667,23 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             </svg>
           </div>
 
-          <button onClick={refreshCurrentView} className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition" title={t('refresh')}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <button
+            onClick={() => refreshCurrentView()}
+            disabled={isRefreshing || isFetching}
+            className={`p-2 transition ${
+              isRefreshing || isFetching
+                ? 'text-blue-500 dark:text-blue-400 cursor-not-allowed opacity-70'
+                : 'text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400'
+            }`}
+            title={t('refresh')}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className={`h-5 w-5 ${isRefreshing || isFetching ? 'animate-spin' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
@@ -862,7 +903,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           apiURL={apiURL}
           t={t}
           initialParentId={currentFolderId || ''}
-          onFolderCreated={refreshCurrentView}
+          onFolderCreated={() => refreshCurrentView(true)}
         />
       )}
 

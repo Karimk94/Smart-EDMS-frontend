@@ -1,6 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trustee } from '../interfaces/PropsInterfaces';
+import { apiClient } from '../lib/apiClient';
 
 interface UpdateSecurityParams {
     docId: number;
@@ -29,11 +30,7 @@ export function useTrustees(docId: number) {
     return useQuery({
         queryKey: ['trustees', docId],
         queryFn: async (): Promise<Trustee[]> => {
-            const response = await fetch(`/api/document/${docId}/trustees`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch trustees');
-            }
-            return response.json();
+            return apiClient.get(`/api/document/${docId}/trustees`);
         },
         enabled: !!docId,
         initialData: [],
@@ -45,22 +42,7 @@ export function useSecurityMutation() {
 
     const updateSecurity = useMutation({
         mutationFn: async ({ docId, library, trustees, security_enabled }: UpdateSecurityParams) => {
-            const response = await fetch(`/api/document/${docId}/security`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    library,
-                    trustees,
-                    security_enabled
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update security');
-            }
-            return response.json();
+            return apiClient.post(`/api/document/${docId}/security`, { library, trustees, security_enabled });
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['trustees', variables.docId] });
@@ -92,20 +74,7 @@ export function useSecurityMutation() {
                 }
             }
 
-            const response = await fetch('/api/share/generate', {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Failed to generate link');
-            }
-            return response.json() as Promise<GenerateShareLinkResponse>;
+            return apiClient.post('/api/share/generate', payload) as Promise<GenerateShareLinkResponse>;
         }
     });
 

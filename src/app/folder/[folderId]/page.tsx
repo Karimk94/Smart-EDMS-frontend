@@ -1,14 +1,11 @@
 import { Suspense } from 'react';
 import { MainDashboard } from '../../components/MainDashboard';
+import { PageSpinner } from '../../components/Spinner';
 
 export default async function FolderPage({ params }: { params: Promise<{ folderId: string }> }) {
     const { folderId } = await params;
     return (
-        <Suspense fallback={
-            <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-[#1f1f1f]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-        }>
+        <Suspense fallback={<PageSpinner />}>
             <MainDashboard initialSection="folders" initialFolderId={folderId} />
         </Suspense>
     );

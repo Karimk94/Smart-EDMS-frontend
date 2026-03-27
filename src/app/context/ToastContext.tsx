@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { onToast } from '../../lib/toastBridge';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 type ToastVariant = 'solid' | 'subtle' | 'left-accent';
@@ -46,6 +47,11 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
     return id;
   }, []);
+
+  // Subscribe to the toast bridge (for global mutation errors from providers.tsx)
+  useEffect(() => {
+    return onToast((message, type) => showToast(message, type));
+  }, [showToast]);
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface CreateFolderParams {
     name: string;
@@ -25,18 +26,7 @@ export function useCreateFolder() {
 
     return useMutation({
         mutationFn: async ({ name, parent_id, description, apiURL = '/api' }: CreateFolderParams) => {
-            const response = await fetch(`${apiURL}/folders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, parent_id, description })
-            });
-
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || err.error || 'Failed to create folder');
-            }
-
-            return response.json();
+            return apiClient.post(`${apiURL}/folders`, { name, parent_id, description });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['folders'] });
@@ -49,18 +39,7 @@ export function useRenameFolder() {
 
     return useMutation({
         mutationFn: async ({ id, name, system_id, apiURL = '/api' }: RenameFolderParams) => {
-            const response = await fetch(`${apiURL}/folders/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, system_id })
-            });
-
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || err.error || 'Failed to rename folder');
-            }
-
-            return response.json();
+            return apiClient.put(`${apiURL}/folders/${id}`, { name, system_id });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['folders'] });
@@ -74,30 +53,8 @@ export function useDeleteFolder() {
 
     return useMutation({
         mutationFn: async ({ id, force = false, apiURL = '/api' }: DeleteFolderParams) => {
-            const response = await fetch(`${apiURL}/folders/${id}${force ? '?force=true' : ''}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                // Return error object to handle 409 specifically in component
-                try {
-                    const text = await response.text();
-                    let err;
-                    try {
-                        err = JSON.parse(text);
-                    } catch {
-                        err = { detail: text };
-                    }
-                    // Attach status to error object for component handling
-                    const errorObj: any = new Error(err.detail || err.error || response.statusText);
-                    errorObj.status = response.status;
-                    errorObj.data = err;
-                    throw errorObj;
-                } catch (e) {
-                    throw new Error('Failed to delete folder');
-                }
-            }
-
+            // ApiError already includes .status and .data for 409 handling in Folders.tsx
+            await apiClient.delete(`${apiURL}/folders/${id}${force ? '?force=true' : ''}`);
             return true;
         },
         onSuccess: () => {

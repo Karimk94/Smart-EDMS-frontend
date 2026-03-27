@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../context/ToastContext';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
 
 interface Company {
@@ -312,7 +313,7 @@ export default function CompaniesPage() {
                 {/* Results */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                     {isLoadingCompanies ? (
-                        <div className="p-6 text-center text-gray-500 dark:text-gray-400">{t('loading')}</div>
+                        <div className="p-6 text-center text-gray-500 dark:text-gray-400"><Spinner size="sm" center /></div>
                     ) : companiesData?.sections?.length === 0 ? (
                         <div className="p-6 text-center text-gray-500 dark:text-gray-400">
                             {searchQuery ? t('noCompaniesMatch') : t('enterSearchCriteria')}
@@ -354,11 +355,10 @@ export default function CompaniesPage() {
                                                 </td>
                                                 <td className="px-6 py-4 text-sm">
                                                     <span
-                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                            company.DISABLED === 'Y'
+                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${company.DISABLED === 'Y'
                                                                 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                                                 : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {company.DISABLED === 'Y' ? t('disabled') : t('active')}
                                                     </span>

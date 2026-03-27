@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface SharedFileDownloadParams {
     token: string;
@@ -38,11 +39,7 @@ export function useSharedFileDownload() {
             }
 
             // Handle regular file download
-            const downloadResponse = await fetch(downloadUrl);
-            if (!downloadResponse.ok) {
-                console.error('Download failed response:', downloadResponse.status, downloadResponse.statusText);
-                throw new Error('Download failed');
-            }
+            const downloadResponse = await apiClient.raw(downloadUrl);
 
             const blob = await downloadResponse.blob();
             const fileUrl = URL.createObjectURL(blob);
@@ -79,33 +76,29 @@ export function useSharedFileRestore() {
             const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
 
             try {
-                const initialResponse = await fetch(downloadUrl, {
+                const initialResponse = await apiClient.raw(downloadUrl, {
                     method: 'GET',
                     headers: { 'Range': 'bytes=0-0' }
                 });
+                const contentType = initialResponse.headers.get('Content-Type') || 'application/octet-stream';
 
-                if (initialResponse.ok || initialResponse.status === 206) {
-                    const contentType = initialResponse.headers.get('Content-Type') || 'application/octet-stream';
-
-                    if (contentType.startsWith('video/')) {
-                        const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
-                        return {
-                            fileUrl: streamUrl,
-                            fileName: 'video',
-                            fileType: contentType
-                        };
-                    } else {
-                        const blob = await (await fetch(downloadUrl)).blob();
-                        return {
-                            fileUrl: URL.createObjectURL(blob),
-                            fileName: 'document',
-                            fileType: contentType,
-                            blob
-                        };
-                    }
+                if (contentType.startsWith('video/')) {
+                    const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`;
+                    return {
+                        fileUrl: streamUrl,
+                        fileName: 'video',
+                        fileType: contentType
+                    };
+                } else {
+                    const fullResponse = await apiClient.raw(downloadUrl);
+                    const blob = await fullResponse.blob();
+                    return {
+                        fileUrl: URL.createObjectURL(blob),
+                        fileName: 'document',
+                        fileType: contentType,
+                        blob
+                    };
                 }
-
-                throw new Error('Failed to restore file session');
             } catch (error) {
                 console.error("Restore file session failed", error);
                 throw error;
@@ -127,11 +120,7 @@ export function useSharedFolderItemDownload() {
     const downloadMutation = useMutation<{ blob: Blob; filename: string }, Error, { token: string; viewerEmail: string; itemId: string; itemName: string }>({
         mutationFn: async ({ token, viewerEmail, itemId, itemName }) => {
             const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&doc_id=${itemId}`;
-            const downloadResponse = await fetch(downloadUrl);
-
-            if (!downloadResponse.ok) {
-                throw new Error('Download failed');
-            }
+            const downloadResponse = await apiClient.raw(downloadUrl);
 
             // Extract filename from Content-Disposition header (same as useDownload)
             const contentDisposition = downloadResponse.headers.get('Content-Disposition');

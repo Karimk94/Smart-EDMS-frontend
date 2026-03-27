@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShareInfo, StoredSession } from '../interfaces';
+import { apiClient } from '../lib/apiClient';
 
 const SESSION_KEY_PREFIX = 'share_session_';
 
@@ -67,12 +68,7 @@ export function useSharedAuth(token: string) {
     const shareInfoQuery = useQuery({
         queryKey: ['shareInfo', token],
         queryFn: async (): Promise<ShareInfo> => {
-            const response = await fetch(`/api/share/info/${token}`);
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.detail || 'This link is invalid or has expired.');
-            }
-            return response.json();
+            return apiClient.get(`/api/share/info/${token}`);
         },
         enabled: !!token,
         staleTime: 1000 * 60 * 5, // 5 minutes
@@ -82,44 +78,14 @@ export function useSharedAuth(token: string) {
     // 2. Request Access (Send OTP)
     const requestAccessMutation = useMutation({
         mutationFn: async ({ viewer_email }: RequestAccessParams) => {
-            const response = await fetch(`/api/share/request-access/${token}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ viewer_email })
-            });
-
-            if (!response.ok) {
-                const text = await response.text();
-                try {
-                    const err = JSON.parse(text);
-                    throw new Error(err.detail || err.error || 'Failed to request access');
-                } catch {
-                    throw new Error(text || 'Failed to request access');
-                }
-            }
-            return response.json();
+            return apiClient.post(`/api/share/request-access/${token}`, { viewer_email });
         }
     });
 
     // 3. Verify Access (Check OTP or Direct Access)
     const verifyAccessMutation = useMutation({
         mutationFn: async ({ viewer_email, otp, skip_otp }: VerifyAccessParams) => {
-            const response = await fetch(`/api/share/verify-access/${token}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ viewer_email, otp, skip_otp })
-            });
-
-            if (!response.ok) {
-                const text = await response.text();
-                try {
-                    const err = JSON.parse(text);
-                    throw new Error(err.detail || err.error || 'Verification failed');
-                } catch {
-                    throw new Error(text || 'Verification failed');
-                }
-            }
-            return response.json();
+            return apiClient.post(`/api/share/verify-access/${token}`, { viewer_email, otp, skip_otp });
         },
         onSuccess: (data, variables) => {
             if (data.share_type) {

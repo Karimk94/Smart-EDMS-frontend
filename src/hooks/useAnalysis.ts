@@ -1,5 +1,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface AnalyzeImageParams {
     imageFile: File;
@@ -30,45 +31,19 @@ export function useAnalysis() {
             const formData = new FormData();
             formData.append('image_file', imageFile, `${docId}.jpg`);
 
-            const response = await fetch(`/api/analyze_image`, {
-                method: 'POST',
-                body: formData,
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Analysis failed');
-            }
-            return response.json();
+            return apiClient.post('/api/analyze_image', formData);
         },
     });
 
     const addFaceMutation = useMutation({
         mutationFn: async (params: AddFaceParams) => {
-            const response = await fetch(`/api/add_face`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to add face');
-            }
-            return response.json();
+            return apiClient.post('/api/add_face', params);
         },
     });
 
     const addPersonMutation = useMutation({
         mutationFn: async (params: AddPersonParams) => {
-            const response = await fetch(`/api/add_person`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to add person');
-            }
-            return response.json();
+            return apiClient.post('/api/add_person', params);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['persons'] });
@@ -77,16 +52,7 @@ export function useAnalysis() {
 
     const updateAbstractMutation = useMutation({
         mutationFn: async (params: UpdateAbstractParams) => {
-            const response = await fetch(`/api/update_abstract`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update abstract');
-            }
-            return response.json();
+            return apiClient.post('/api/update_abstract', params);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['documents'] });

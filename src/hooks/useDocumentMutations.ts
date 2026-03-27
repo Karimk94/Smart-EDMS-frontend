@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface UpdateMetadataParams {
     doc_id: number;
@@ -16,32 +17,20 @@ export function useDocumentMutations() {
 
     const updateMetadataMutation = useMutation({
         mutationFn: async (params: UpdateMetadataParams) => {
-            const response = await fetch(`/api/update_metadata`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update metadata');
-            }
-            return response.json();
+            return apiClient.put('/api/update_metadata', params);
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['documents'] });
-            // Invalidate shared content as well if applicable, though less likely for editing metadata
         },
     });
 
     const toggleFavoriteMutation = useMutation({
         mutationFn: async ({ docId, isFavorite }: ToggleFavoriteParams) => {
-            const response = await fetch(`/api/favorites/${docId}`, {
-                method: isFavorite ? 'POST' : 'DELETE',
-            });
-            if (!response.ok) {
-                throw new Error('Failed to update favorite status');
+            if (isFavorite) {
+                return apiClient.post(`/api/favorites/${docId}`);
+            } else {
+                return apiClient.delete(`/api/favorites/${docId}`);
             }
-            return response.json();
         },
         onMutate: async ({ docId, isFavorite }) => {
             // Cancel any outgoing refetches

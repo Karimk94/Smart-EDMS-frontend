@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../context/ToastContext';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
 
 interface Agency {
@@ -285,7 +286,7 @@ export default function EmsSectionsPage() {
                 {/* Selection Section */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{t('selectDepartment')}</h2>
-                    
+
                     {agenciesError && (
                         <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400">
                             <p className="font-semibold">{t('errorLoadingAgencies')}</p>
@@ -310,7 +311,7 @@ export default function EmsSectionsPage() {
                             </p>
                         </div>
                     )}
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -472,7 +473,7 @@ export default function EmsSectionsPage() {
                 {selectedDeptId && (
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                         {isLoadingSections ? (
-                            <div className="p-6 text-center text-gray-500 dark:text-gray-400">{t('loading')}</div>
+                            <div className="p-6 text-center text-gray-500 dark:text-gray-400"><Spinner size="sm" center /></div>
                         ) : sectionsData?.sections?.length === 0 ? (
                             <div className="p-6 text-center text-gray-500 dark:text-gray-400">
                                 {searchQuery ? t('noSectionsMatch') : t('noSectionsForDept')}
@@ -514,11 +515,10 @@ export default function EmsSectionsPage() {
                                                     </td>
                                                     <td className="px-6 py-4 text-sm">
                                                         <span
-                                                            className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                                section.DISABLED === 'Y'
+                                                            className={`px-3 py-1 rounded-full text-xs font-medium ${section.DISABLED === 'Y'
                                                                     ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                                                     : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {section.DISABLED === 'Y' ? t('disabled') : t('active')}
                                                         </span>

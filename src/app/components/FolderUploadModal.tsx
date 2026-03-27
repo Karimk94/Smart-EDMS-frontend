@@ -264,7 +264,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
   const pendingFilesCount = files.filter(f => f.status === 'pending').length;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8">
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Upload to folder">
       {/* Distinct Header for Folder Upload */}
       <div className="flex-shrink-0 flex justify-between items-center mb-6 bg-blue-900/30 p-4 rounded-lg border border-blue-800">
         <div className="flex flex-col">

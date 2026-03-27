@@ -1,5 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 export interface Person {
     id: string; // or number, based on usage it seems to be string in Option but might be number from API
@@ -33,19 +34,11 @@ interface GroupsResponse {
 
 // Fetchers
 export const fetchPersons = async (page: number, search: string, lang: string): Promise<PersonsResponse> => {
-    const response = await fetch(`/api/persons?page=${page}&search=${search}&lang=${lang}`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch persons');
-    }
-    return response.json();
+    return apiClient.get(`/api/persons?page=${page}&search=${search}&lang=${lang}`);
 };
 
 export const fetchGroups = async (): Promise<Group[]> => {
-    const response = await fetch(`/api/groups`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch groups');
-    }
-    const data = await response.json();
+    const data = await apiClient.get('/api/groups');
 
     // Handle different response formats
     if (Array.isArray(data)) {
@@ -71,11 +64,7 @@ export const fetchGroups = async (): Promise<Group[]> => {
 };
 
 export const fetchGroupMembers = async (groupId: string, page: number, search: string): Promise<PersonsResponse> => {
-    const response = await fetch(`/api/groups/search_members?page=${page}&search=${encodeURIComponent(search)}&group_id=${groupId}`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch group members');
-    }
-    return response.json();
+    return apiClient.get(`/api/groups/search_members?page=${page}&search=${encodeURIComponent(search)}&group_id=${groupId}`);
 };
 
 // Hooks

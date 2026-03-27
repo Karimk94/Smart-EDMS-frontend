@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface QuotaData {
     remaining: number;
@@ -16,13 +17,7 @@ export function useQuota(options: UseQuotaOptions = {}) {
     return useQuery({
         queryKey: ['quota'],
         queryFn: async (): Promise<QuotaData> => {
-            const response = await fetch('/api/auth/user', {
-                credentials: 'include'
-            });
-            if (!response.ok) {
-                throw new Error('Failed to fetch quota');
-            }
-            const data = await response.json();
+            const data = await apiClient.get('/api/auth/user');
             return {
                 remaining: data.remaining_quota,
                 total: data.quota,
@@ -33,3 +28,4 @@ export function useQuota(options: UseQuotaOptions = {}) {
         staleTime: 30 * 1000, // Consider quota data stale after 30 seconds
     });
 }
+

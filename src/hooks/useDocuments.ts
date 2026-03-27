@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Document } from '../models/Document';
 import { PersonOption } from '../models/PersonOption';
+import { apiClient } from '../lib/apiClient';
 
 type ActiveSection = 'recent' | 'favorites' | 'folders' | 'profilesearch';
 
@@ -132,12 +133,7 @@ export function useDocuments({
 
             if (!endpoint) return { documents: [], total_pages: 1 };
 
-            const response = await fetch(`${endpoint}?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch documents. Status: ${response.status}`);
-            }
-
-            const data = await response.json();
+            const data = await apiClient.get(`${endpoint}?${params.toString()}`);
             let fetchedDocs = data[dataKey] || [];
 
             // Client-side filtering for folders (mirrors existing logic)

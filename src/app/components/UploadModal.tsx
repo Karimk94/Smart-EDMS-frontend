@@ -272,7 +272,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
   const successfulUploadsCount = files.filter(f => f.status === 'success' && f.docnumber != null).length;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8">
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Upload document">
       <div className="flex-shrink-0 flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white">Upload Documents</h2>
         <button onClick={onClose} disabled={isUploading} className="text-gray-400 hover:text-white text-3xl disabled:opacity-50">&times;</button>

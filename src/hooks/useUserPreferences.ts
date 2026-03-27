@@ -1,6 +1,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
+import { apiClient } from '../lib/apiClient';
 
 export function useUserPreferences() {
     const queryClient = useQueryClient();
@@ -8,17 +9,7 @@ export function useUserPreferences() {
 
     const updateLanguageMutation = useMutation({
         mutationFn: async (lang: 'en' | 'ar') => {
-            const response = await fetch('/api/user/language', {
-                method: 'PUT',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ lang }),
-            });
-            if (!response.ok) {
-                throw new Error('Failed to update language');
-            }
+            await apiClient.put('/api/user/language', { lang });
             return lang;
         },
         onSuccess: (newLang) => {
@@ -35,17 +26,7 @@ export function useUserPreferences() {
 
     const updateThemeMutation = useMutation({
         mutationFn: async (theme: 'light' | 'dark') => {
-            const response = await fetch('/api/user/theme', {
-                method: 'PUT',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ theme }),
-            });
-            if (!response.ok) {
-                throw new Error('Failed to update theme');
-            }
+            await apiClient.put('/api/user/theme', { theme });
             return theme;
         },
         onSuccess: (newTheme) => {

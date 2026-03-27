@@ -1,31 +1,29 @@
 "use client";
 
-import { useQueryClient } from '@tanstack/react-query';
 import { enGB } from 'date-fns/locale/en-GB';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { registerLocale } from 'react-datepicker';
-import { useProfileSearchScopes, useProfileSearchTypes, useProfileMultiSearch, SearchType, SearchCriterion } from '../../hooks/useProfileSearch';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { SearchCriterion, SearchType, useProfileMultiSearch, useProfileSearchScopes, useProfileSearchTypes } from '../../hooks/useProfileSearch';
 import { Document } from '../../models/Document';
-import { User } from '../../models/User';
+import { DocumentItemSkeleton } from '../components/DocumentItemSkeleton';
+import { DocumentList } from '../components/DocumentList';
+import { ExcelModal } from '../components/ExcelModal';
+import { FileModal } from '../components/FileModal';
+import { Header } from '../components/Header';
+import { ImageModal } from '../components/ImageModal';
+import { Pagination } from '../components/Pagination';
+import { PdfModal } from '../components/PdfModal';
+import { PowerPointModal } from '../components/PowerPointModal';
+import { Sidebar } from '../components/Sidebar';
+import { PageSpinner } from '../components/Spinner';
+import { TxtModal } from '../components/TxtModal';
+import { VideoModal } from '../components/VideoModal';
+import { WordModal } from '../components/WordModal';
 import { useUser } from '../context/UserContext';
 import { useTranslations } from '../hooks/useTranslations';
-import { Header } from '../components/Header';
-import { Sidebar } from '../components/Sidebar';
-import { DocumentList } from '../components/DocumentList';
-import { DocumentItemSkeleton } from '../components/DocumentItemSkeleton';
-import { Pagination } from '../components/Pagination';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { ImageModal } from '../components/ImageModal';
-import { VideoModal } from '../components/VideoModal';
-import { PdfModal } from '../components/PdfModal';
-import { FileModal } from '../components/FileModal';
-import { TxtModal } from '../components/TxtModal';
-import { ExcelModal } from '../components/ExcelModal';
-import { PowerPointModal } from '../components/PowerPointModal';
-import { WordModal } from '../components/WordModal';
-import Image from 'next/image';
 
 registerLocale('en-GB', enGB);
 
@@ -212,9 +210,7 @@ function ProfileSearchPageContent() {
     // Show loader while user data is loading (avoids blank screen on refresh)
     if (isLoadingUser || !user) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-300 dark:border-gray-600 border-t-red-600 dark:border-t-red-600" />
-            </div>
+            <PageSpinner />
         );
     }
 

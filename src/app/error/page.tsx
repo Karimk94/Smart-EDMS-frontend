@@ -1,7 +1,8 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { PageSpinner } from '../components/Spinner';
 import { useTranslations } from '../hooks/useTranslations';
 
 function ErrorContent() {
@@ -71,7 +72,7 @@ function ErrorContent() {
 
 export default function ErrorPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-[#121212] text-gray-500">Loading...</div>}>
+        <Suspense fallback={<PageSpinner />}>
             <ErrorContent />
         </Suspense>
     );

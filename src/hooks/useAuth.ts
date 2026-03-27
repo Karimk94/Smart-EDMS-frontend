@@ -1,6 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { apiClient } from '../lib/apiClient';
 
 interface User {
     username: string;
@@ -17,12 +18,6 @@ interface LoginCredentials {
     password: string;
 }
 
-interface AuthResponse {
-    user?: User;
-    detail?: string;
-    error?: string;
-}
-
 export function useAuth() {
     const queryClient = useQueryClient();
     const router = useRouter();
@@ -30,13 +25,7 @@ export function useAuth() {
     const userQuery = useQuery({
         queryKey: ['user'],
         queryFn: async () => {
-            const response = await fetch('/api/auth/user', {
-                credentials: 'include'
-            });
-            if (!response.ok) {
-                throw new Error('Not authenticated');
-            }
-            const data = await response.json();
+            const data = await apiClient.get('/api/auth/user');
             return data.user as User;
         },
         retry: false, // Don't retry if 401
@@ -45,20 +34,7 @@ export function useAuth() {
 
     const loginMutation = useMutation({
         mutationFn: async (credentials: LoginCredentials) => {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(credentials),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || data.error || 'Login failed');
-            }
-            return response.json();
+            return apiClient.post('/api/auth/login', credentials);
         },
         onSuccess: (data) => {
             queryClient.setQueryData(['user'], data.user); // Optimistically update user
@@ -68,14 +44,8 @@ export function useAuth() {
 
     const logoutMutation = useMutation({
         mutationFn: async () => {
-            // Assuming there is a logout endpoint, otherwise just clear client state
-            // If no endpoint, we just clear the query cache
-            // But usually cookies need to be cleared via server
             try {
-                await fetch('/api/auth/logout', { 
-                    method: 'POST',
-                    credentials: 'include'
-                });
+                await apiClient.post('/api/auth/logout');
             } catch (e) {
                 console.error("Logout failed", e);
             }
@@ -97,3 +67,4 @@ export function useAuth() {
         isLoggingOut: logoutMutation.isPending,
     };
 }
+

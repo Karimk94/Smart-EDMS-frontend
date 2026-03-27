@@ -1,4 +1,5 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 export interface FolderItem {
     id: string;
@@ -20,7 +21,7 @@ interface FoldersResponse {
 interface UseFolderContentsParams {
     parentId: string | null;
     searchTerm: string;
-    apiURL: string; // Passed from component to keep flexibility or could be hardcoded
+    apiURL: string;
     isEnabled?: boolean;
 }
 
@@ -44,19 +45,10 @@ export function useFolderContents({
 
             if (searchTerm) params.append('search', searchTerm);
 
-            const response = await fetch(`${apiURL}/folders?${params.toString()}`);
-
-            if (!response.ok) {
-                if (response.status === 404) {
-                    throw new Error('Folder not found');
-                }
-                throw new Error('Failed to fetch folder contents');
-            }
-
-            return response.json();
+            return apiClient.get(`${apiURL}/folders?${params.toString()}`);
         },
         enabled: isEnabled,
-        // placeholderData: keepPreviousData, // Removed to show loading state
         staleTime: 1000 * 60, // 1 minute
     });
 }
+

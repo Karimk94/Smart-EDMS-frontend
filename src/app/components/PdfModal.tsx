@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Document } from '../../models/Document';
-import { TagEditor } from './TagEditor';
+import Image from 'next/image';
+import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
-import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDownload } from '../../hooks/useDownload';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { PdfModalProps } from '../../interfaces/PropsInterfaces';
-import Image from 'next/image';
+import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
+import { TagEditor } from './TagEditor';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -44,6 +44,7 @@ const formatToApiDate = (date: Date | null): string | null => {
 };
 
 export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
+  const focusTrapRef = useFocusTrap(onClose);
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
   const [isEditingDate, setIsEditingDate] = useState(false);
@@ -174,8 +175,8 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" onClick={onClose}>
-      <div className="bg-white dark:bg-[#282828] text-gray-900 dark:text-gray-200 rounded-xl w-full max-w-6xl h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" role="dialog" aria-modal="true" aria-label="PDF viewer" onClick={onClose}>
+      <div ref={focusTrapRef} className="bg-white dark:bg-[#282828] text-gray-900 dark:text-gray-200 rounded-xl w-full max-w-6xl h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
 

@@ -1,3 +1,2 @@
-export const Loader = () => (
-    <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
-);
+// Re-export Spinner as Loader for backwards compatibility
+export { Spinner as Loader } from './Spinner';

@@ -1,12 +1,13 @@
 'use client';
 
-import { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
 import { useEmsAdminAuth } from '@/hooks/useEmsAdminAuth';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ReactNode } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
+import { PageSpinner } from '../components/Spinner';
 import { useTranslations } from '../hooks/useTranslations';
 
 interface EmsAdminLayoutProps {
@@ -35,9 +36,7 @@ export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-                <div className="text-gray-600 dark:text-gray-300">{t('loading')}</div>
-            </div>
+            <PageSpinner />
         );
     }
 

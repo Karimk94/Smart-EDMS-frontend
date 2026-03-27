@@ -2,6 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { ApiError } from '../lib/apiClient';
+import { emitToast } from '../lib/toastBridge';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -19,8 +22,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                     mutations: {
                         retry: 0, // Don't retry mutations by default
                         onError: (error) => {
-                            // Global error handling for mutations
-                            console.error('Mutation error:', error);
+                            // Show a toast for every failed mutation
+                            const message =
+                                error instanceof ApiError
+                                    ? error.data?.detail || error.data?.error || error.message
+                                    : error.message || 'An unexpected error occurred';
+                            emitToast(message, 'error');
                         },
                     },
                 },
@@ -28,6 +35,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+            <ErrorBoundary>
+                {children}
+            </ErrorBoundary>
+        </QueryClientProvider>
     );
 }
+

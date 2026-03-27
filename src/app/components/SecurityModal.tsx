@@ -303,6 +303,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   return (
     <div
       className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
+      role="dialog" aria-modal="true" aria-label="Security settings"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

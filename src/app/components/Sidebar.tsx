@@ -1,9 +1,8 @@
 "use client";
 
-import React from 'react';
-
-import { SidebarProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
+import React from 'react';
+import { SidebarProps } from '../../interfaces/PropsInterfaces';
 import { AdminSidebarItem } from './AdminSidebarItem';
 import { EmsAdminSidebarItem } from './EmsAdminSidebarItem';
 
@@ -22,6 +21,7 @@ const NavLink: React.FC<{
   return (
     <button
       onClick={onClick}
+      aria-label={label}
       className={`relative flex items-center w-full p-3 rounded-lg transition-colors duration-150 ease-in-out group ${isActive ? activeClass : inactiveClass
         } ${rtlClass} ${!isSidebarOpen ? 'justify-center' : ''
         } ${isSidebarOpen ? 'gap-4' : ''

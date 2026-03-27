@@ -1,5 +1,6 @@
 import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { Document } from '../models/Document';
+import { apiClient } from '../lib/apiClient';
 
 export interface SearchType {
     label: string;
@@ -51,13 +52,7 @@ export function useProfileSearchScopes() {
     return useQuery({
         queryKey: ['profilesearch', 'scopes'],
         queryFn: async (): Promise<SearchScope[]> => {
-            const response = await fetch('/api/profilesearch/scopes', {
-                credentials: 'include'
-            });
-            if (!response.ok) {
-                throw new Error('Failed to fetch search scopes');
-            }
-            const data = await response.json();
+            const data = await apiClient.get('/api/profilesearch/scopes');
             return data.scopes || [];
         },
         staleTime: 1000 * 60 * 60, // 1 hour
@@ -71,11 +66,7 @@ export function useProfileSearchTypes(scope?: string) {
             const url = scope
                 ? `/api/profilesearch/types?scope=${encodeURIComponent(scope)}`
                 : '/api/profilesearch/types';
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error('Failed to fetch search types');
-            }
-            const data = await response.json();
+            const data = await apiClient.get(url);
             return data.types || [];
         },
         staleTime: 1000 * 60 * 60,
@@ -118,16 +109,7 @@ export function useProfileMultiSearch(params: MultiSearchParams & { enabled?: bo
                 page_size: 20,
             };
 
-            const response = await fetch('/api/profilesearch/search', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            if (!response.ok) {
-                throw new Error('Search failed');
-            }
-            return await response.json();
+            return apiClient.post('/api/profilesearch/search', body);
         },
         enabled: enabled && criteria.some(c => c.type !== null),
         placeholderData: keepPreviousData,

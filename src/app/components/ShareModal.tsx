@@ -144,7 +144,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
   const iconColor = isFolder ? 'text-yellow-600 dark:text-yellow-400' : 'text-blue-600 dark:text-blue-400';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-label="Share document">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
         {/* Header with Icon */}
         <div className="flex items-center gap-3 mb-4">

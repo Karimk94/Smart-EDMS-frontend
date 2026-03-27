@@ -1,15 +1,16 @@
+import Image from 'next/image';
 import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import { useAnalysis } from '../../hooks/useAnalysis';
 import { useDocumentContent } from '../../hooks/useDocumentContent';
 import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDownload } from '../../hooks/useDownload';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { ImageModalProps } from '../../interfaces/PropsInterfaces';
 import { AnalysisView } from './AnalysisView';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
-import Image from 'next/image';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -48,6 +49,7 @@ const formatToApiDate = (date: Date | null): string | null => {
 };
 
 export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
+  const focusTrapRef = useFocusTrap(onClose);
   const [view, setView] = useState<'image' | 'analysis'>('image');
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -258,8 +260,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
 
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label="Image viewer" onClick={onClose}>
+      <div ref={focusTrapRef} className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative`} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
@@ -331,10 +333,10 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
                 }
               >
                 <div className={
-                    isFullScreen
-                      ? "relative w-full h-full"
-                      : "relative w-full min-h-[40vh] max-h-[60vh]"
-                  }>
+                  isFullScreen
+                    ? "relative w-full h-full"
+                    : "relative w-full min-h-[40vh] max-h-[60vh]"
+                }>
                   <Image src={imageSrc}
                     alt={doc.docname.replace(/\.[^/.]+$/, "")}
                     fill

@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface DownloadParams {
     docId: number | string;
@@ -9,10 +10,7 @@ interface DownloadParams {
 export function useDownload() {
     const downloadMutation = useMutation({
         mutationFn: async ({ docId, docname, apiURL }: DownloadParams) => {
-            const response = await fetch(`${apiURL}/download_watermarked/${docId}`);
-            if (!response.ok) {
-                throw new Error('Download failed');
-            }
+            const response = await apiClient.raw(`${apiURL}/download_watermarked/${docId}`);
             const contentDisposition = response.headers.get('Content-Disposition');
             let filename = docname;
             if (contentDisposition) {
@@ -45,3 +43,4 @@ export function useDownload() {
         downloadError: downloadMutation.error,
     };
 }
+

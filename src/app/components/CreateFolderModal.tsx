@@ -49,7 +49,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Create folder">
       <div className="bg-white dark:bg-[#282828] rounded-xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t('createFolder')}</h2>

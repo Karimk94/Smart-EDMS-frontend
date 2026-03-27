@@ -13,7 +13,7 @@ export function ClearCacheModal({ isOpen, onClose, onConfirm }: ClearCacheModalP
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4 animate-fade-in" role="dialog" aria-modal="true" aria-label="Clear cache confirmation">
             <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-600">
                 <div className="flex items-center gap-3 mb-4 text-amber-500">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

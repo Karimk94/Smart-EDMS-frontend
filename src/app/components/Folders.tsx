@@ -7,6 +7,7 @@ import { useDownload } from '../../hooks/useDownload';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
 import { CreateFolderModal } from './CreateFolderModal';
+import { FolderSkeleton } from './FolderSkeleton';
 import SecurityModal from './SecurityModal';
 import ShareModal from './ShareModal';
 import Image from 'next/image';
@@ -730,9 +731,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
       <div className="flex-1 overflow-y-auto p-6" onContextMenu={handleBackgroundContextMenu}>
         {isLoading ? (
-          <div className="flex justify-center items-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
+          <FolderSkeleton />
         ) : (
           <div className="flex flex-col gap-8">
 

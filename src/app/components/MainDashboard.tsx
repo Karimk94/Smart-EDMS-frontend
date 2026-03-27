@@ -5,15 +5,16 @@ import { enGB } from 'date-fns/locale/en-GB';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { registerLocale } from 'react-datepicker';
-import { useDocuments } from '../../hooks/useDocuments';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useDocumentModals } from '../../hooks/useDocumentModals';
+import { useDocuments } from '../../hooks/useDocuments';
 import { useProcessingStatus } from '../../hooks/useProcessingStatus';
+import { useClearCache, useProcessDocuments } from '../../hooks/useSystemOperations';
 import { UploadableFile } from '../../interfaces';
 import { PersonOption } from '../../models/PersonOption';
 import { useToast } from '../context/ToastContext';
 import { useUser } from '../context/UserContext';
 import { useTranslations } from '../hooks/useTranslations';
-import { useClearCache, useProcessDocuments } from '../../hooks/useSystemOperations';
 import { ClearCacheModal } from './ClearCacheModal';
 import { DocumentItemSkeleton } from './DocumentItemSkeleton';
 import { DocumentList } from './DocumentList';
@@ -24,6 +25,8 @@ import { FolderUploadModal } from './FolderUploadModal';
 import { Header } from './Header';
 import { Pagination } from './Pagination';
 import { Sidebar } from './Sidebar';
+import { SidebarSkeleton } from './SidebarSkeleton';
+import { Spinner, PageSpinner } from './Spinner';
 import { UploadModal } from './UploadModal';
 
 type ActiveSection = 'recent' | 'favorites' | 'folders' | 'profilesearch';
@@ -88,13 +91,16 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     const { processingDocs, addProcessingDocs, removeProcessingDocs, isProcessing } =
         useProcessingStatus({ user, activeSection, activeFolder, apiURL: API_PROXY_URL });
 
+    // Debounce search term to reduce API calls during typing
+    const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
+
     // --- Documents ---
     const {
         data: documentsData,
         isLoading: isDocumentsLoading,
         error: documentsError
     } = useDocuments({
-        activeSection, activeFolder, currentPage, searchTerm,
+        activeSection, activeFolder, currentPage, searchTerm: debouncedSearchTerm,
         dateFrom, dateTo, selectedPerson, personCondition,
         selectedTags, selectedYears, filterMediaType, lang,
         isEnabled: !!user
@@ -246,9 +252,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
         if (activeSection === 'folders' && !activeFolder) {
             return (
                 <Suspense fallback={
-                    <div className="flex justify-center items-center h-full">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
+                    <Spinner size="md" center />
                 }>
                     <Folders
                         onFolderClick={handleFolderClick}
@@ -305,9 +309,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     if (!user) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-300 dark:border-gray-600 border-t-red-600 dark:border-t-red-600" />
-            </div>
+            <PageSpinner />
         );
     }
 
@@ -328,15 +330,19 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                 />
 
                 <div className="flex flex-1 overflow-hidden">
-                    <Sidebar
-                        isSidebarOpen={isSidebarOpen}
-                        activeSection={activeSection}
-                        handleSectionChange={handleSectionChange}
-                        isShowingFullMemories={false}
-                        t={t}
-                        lang={lang}
-                        hiddenSections={hiddenSections}
-                    />
+                    {isLoadingUser ? (
+                        <SidebarSkeleton isSidebarOpen={isSidebarOpen} />
+                    ) : (
+                        <Sidebar
+                            isSidebarOpen={isSidebarOpen}
+                            activeSection={activeSection}
+                            handleSectionChange={handleSectionChange}
+                            isShowingFullMemories={false}
+                            t={t}
+                            lang={lang}
+                            hiddenSections={hiddenSections}
+                        />
+                    )}
 
                     <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-w-0">
                         {(activeSection !== 'folders' || activeFolder) && (

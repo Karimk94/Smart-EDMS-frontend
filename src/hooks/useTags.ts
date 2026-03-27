@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { TagObject } from '../interfaces/TagObject';
+import { apiClient } from '../lib/apiClient';
 
 interface UseTagsParams {
     lang: 'en' | 'ar';
@@ -25,11 +26,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
     const allTagsQuery = useQuery({
         queryKey: ['allTags', lang],
         queryFn: async (): Promise<string[]> => {
-            const response = await fetch(`/api/tags?lang=${lang}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch tags');
-            }
-            return response.json();
+            return apiClient.get(`/api/tags?lang=${lang}`);
         },
         staleTime: 1000 * 60 * 5, // 5 minutes
         select: selectAllTags,
@@ -40,11 +37,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
         queryKey: ['documentTags', docId, lang],
         queryFn: async (): Promise<TagsResponse> => {
             if (!docId) return { tags: [] };
-            const response = await fetch(`/api/tags/${docId}?lang=${lang}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch document tags');
-            }
-            return response.json();
+            return apiClient.get(`/api/tags/${docId}?lang=${lang}`);
         },
         enabled: !!docId,
         staleTime: 1000 * 60, // 1 minute
@@ -55,16 +48,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
     const addTagMutation = useMutation({
         mutationFn: async (tag: string) => {
             if (!docId) throw new Error('Document ID is required to add a tag');
-            const response = await fetch(`/api/tags/${docId}?lang=${lang}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tag }),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to add tag');
-            }
-            return response.json();
+            return apiClient.post(`/api/tags/${docId}?lang=${lang}`, { tag });
         },
         onMutate: async (tag: string) => {
             if (!docId) return;
@@ -102,14 +86,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
     const removeTagMutation = useMutation({
         mutationFn: async (tagToRemove: string) => {
             if (!docId) throw new Error('Document ID is required to remove a tag');
-            const response = await fetch(`/api/tags/${docId}/${encodeURIComponent(tagToRemove)}`, {
-                method: 'DELETE',
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete tag');
-            }
-            return response.json();
+            return apiClient.delete(`/api/tags/${docId}/${encodeURIComponent(tagToRemove)}`);
         },
         onMutate: async (tagToRemove: string) => {
             if (!docId) return;
@@ -144,13 +121,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
     // 5. Toggle Shortlist Mutation
     const toggleShortlistMutation = useMutation({
         mutationFn: async (tagText: string) => {
-            const response = await fetch(`/api/tags/shortlist`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tag: tagText }),
-            });
-            if (!response.ok) throw new Error('Failed to toggle shortlist');
-            return response.json();
+            return apiClient.post('/api/tags/shortlist', { tag: tagText });
         },
         onMutate: async (tagText: string) => {
             if (!docId) return;

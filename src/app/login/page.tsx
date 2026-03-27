@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from '../hooks/useTranslations';
-import { useToast } from '../context/ToastContext';
+import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { PageSpinner } from '../components/Spinner';
+import { useToast } from '../context/ToastContext';
+import { useTranslations } from '../hooks/useTranslations';
 
 function LoginContent() {
   const [username, setUsername] = useState('');
@@ -108,18 +109,14 @@ function LoginContent() {
   // If we are checking auth status, show loading
   if (isLoadingUser) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
-        <div>{t('loading')}</div>
-      </div>
+      <PageSpinner />
     );
   }
 
   // If authenticated, we are redirecting, so maybe show loading or nothing
   if (isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
-        <div>{t('loading')}...</div>
-      </div>
+      <PageSpinner />
     );
   }
 
@@ -204,11 +201,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
-    }>
+    <Suspense fallback={<PageSpinner />}>
       <LoginContent />
     </Suspense>
   );

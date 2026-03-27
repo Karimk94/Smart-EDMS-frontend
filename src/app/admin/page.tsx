@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "../context/ToastContext";
+import { useEffect, useState } from "react";
+import { EdmsUser, PersonResult, useAdmin } from "../../hooks/useAdmin";
 import QuotaPieChart from "../components/QuotaPieChart";
-import { useAdmin, EdmsUser, SecurityLevel, PersonResult, TabPermission } from "../../hooks/useAdmin";
+import { PageSpinner, Spinner } from "../components/Spinner";
+import { useToast } from "../context/ToastContext";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -224,9 +225,7 @@ export default function AdminPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-                <div className="text-gray-600 dark:text-gray-300">Loading...</div>
-            </div>
+            <PageSpinner />
         );
     }
 
@@ -384,7 +383,7 @@ export default function AdminPage() {
                             {isLoadingUsers && users.length === 0 && (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                        Loading...
+                                        <Spinner size="sm" center />
                                     </td>
                                 </tr>
                             )}

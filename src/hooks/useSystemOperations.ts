@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface ProcessingStatusParams {
     docnumbers: number[];
@@ -21,15 +22,7 @@ interface ProcessDocumentsParams {
 export function useProcessingStatus() {
     return useMutation<ProcessingStatusResponse, Error, ProcessingStatusParams>({
         mutationFn: async ({ docnumbers, apiURL }) => {
-            const response = await fetch(`${apiURL}/processing_status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ docnumbers }),
-            });
-            if (!response.ok) {
-                throw new Error('Failed to fetch processing status');
-            }
-            return response.json();
+            return apiClient.post(`${apiURL}/processing_status`, { docnumbers });
         },
     });
 }
@@ -39,12 +32,7 @@ export function useClearCache() {
 
     return useMutation<void, Error, ClearCacheParams>({
         mutationFn: async ({ apiURL }) => {
-            const response = await fetch(`${apiURL}/clear_cache`, {
-                method: 'POST',
-            });
-            if (!response.ok) {
-                throw new Error(`Cache clear failed: ${response.statusText}`);
-            }
+            await apiClient.post(`${apiURL}/clear_cache`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['documents'] });
@@ -55,14 +43,7 @@ export function useClearCache() {
 export function useProcessDocuments() {
     return useMutation<void, Error, ProcessDocumentsParams>({
         mutationFn: async ({ docnumbers, apiURL }) => {
-            const response = await fetch(`${apiURL}/process_uploaded_documents`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ docnumbers }),
-            });
-            if (!response.ok) {
-                throw new Error('Failed to process documents');
-            }
+            await apiClient.post(`${apiURL}/process_uploaded_documents`, { docnumbers });
         },
     });
 }

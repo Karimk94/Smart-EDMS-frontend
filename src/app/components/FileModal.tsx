@@ -1,14 +1,14 @@
 import { FileModalProps } from '@/interfaces/PropsInterfaces';
+import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
 import DatePicker from 'react-datepicker';
-import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDocumentContent } from '../../hooks/useDocumentContent';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDownload } from '../../hooks/useDownload';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
-import { Document } from '../../models/Document';
-import Image from 'next/image';
 
 
 const safeParseDate = (dateString: string): Date | null => {
@@ -47,6 +47,7 @@ const formatToApiDate = (date: Date | null): string | null => {
 };
 
 export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
+  const focusTrapRef = useFocusTrap(onClose);
   const { updateMetadata, toggleFavorite } = useDocumentMutations();
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
   const [textContent, setTextContent] = useState<string | null>(null);
@@ -235,8 +236,8 @@ export const FileModal: React.FC<FileModalProps> = ({ doc, onClose, apiURL, onUp
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" onClick={onClose}>
-      <div className={`${modalBg} ${textPrimary} rounded - xl w - full max - w - 6xl h - [90vh] flex flex - col`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" role="dialog" aria-modal="true" aria-label="File viewer" onClick={onClose}>
+      <div ref={focusTrapRef} className={`${modalBg} ${textPrimary} rounded - xl w - full max - w - 6xl h - [90vh] flex flex - col`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
 

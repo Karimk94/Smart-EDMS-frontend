@@ -1,5 +1,6 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { FolderItem, BreadcrumbItem } from '../interfaces';
+import { apiClient } from '../lib/apiClient';
 
 interface UseSharedContentParams {
     token: string;
@@ -37,17 +38,11 @@ export function useSharedContent({
                 params.append('parent_id', folderId);
             }
 
-            const response = await fetch(`/api/share/folder-contents/${token}?${params.toString()}`);
-
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.detail || 'Failed to load folder contents');
-            }
-
-            return response.json();
+            return apiClient.get(`/api/share/folder-contents/${token}?${params.toString()}`);
         },
         enabled: isEnabled && !!viewerEmail,
         placeholderData: keepPreviousData,
         staleTime: 1000 * 60 * 5, // 5 minutes
     });
 }
+

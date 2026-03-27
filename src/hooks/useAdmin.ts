@@ -1,5 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 export interface EdmsUser {
     username: string;
@@ -62,16 +63,7 @@ export function useAdmin() {
     const useCheckAccess = () => useQuery({
         queryKey: ['adminAccess'],
         queryFn: async () => {
-            const response = await fetch("/api/admin/check-access", {
-                credentials: 'include'
-            });
-            if (response.status === 401) {
-                throw new Error("Unauthorized");
-            }
-            if (!response.ok) {
-                throw new Error("Failed to check access");
-            }
-            return response.json();
+            return apiClient.get('/api/admin/check-access');
         },
         retry: false,
     });
@@ -84,11 +76,7 @@ export function useAdmin() {
                 page: String(page),
                 limit: '20'
             });
-            const response = await fetch(`/api/admin/users?${params}`);
-            if (!response.ok) {
-                throw new Error("Failed to load users");
-            }
-            return response.json();
+            return apiClient.get(`/api/admin/users?${params}`);
         },
         enabled,
         placeholderData: (previousData) => previousData, // Keep previous data while fetching new page
@@ -97,11 +85,7 @@ export function useAdmin() {
     const useSecurityLevels = (enabled: boolean = true) => useQuery({
         queryKey: ['securityLevels'],
         queryFn: async (): Promise<SecurityLevel[]> => {
-            const response = await fetch("/api/admin/security-levels");
-            if (!response.ok) {
-                throw new Error("Failed to load security levels");
-            }
-            return response.json();
+            return apiClient.get('/api/admin/security-levels');
         },
         enabled,
     });
@@ -110,11 +94,7 @@ export function useAdmin() {
         queryKey: ['peopleSearch', query],
         queryFn: async (): Promise<PersonResult[]> => {
             if (query.length < 2) return [];
-            const response = await fetch(`/api/admin/search-people?search=${encodeURIComponent(query)}`);
-            if (!response.ok) {
-                throw new Error("Search failed");
-            }
-            return response.json();
+            return apiClient.get(`/api/admin/search-people?search=${encodeURIComponent(query)}`);
         },
         enabled: enabled && query.length >= 2,
     });
@@ -122,16 +102,7 @@ export function useAdmin() {
     // Mutations
     const addUserMutation = useMutation({
         mutationFn: async (params: AddUserParams) => {
-            const response = await fetch("/api/admin/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(params),
-            });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || "Failed to add user");
-            }
-            return response.json();
+            return apiClient.post('/api/admin/users', params);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -141,16 +112,7 @@ export function useAdmin() {
     const updateUserMutation = useMutation({
         mutationFn: async (params: UpdateUserParams) => {
             const { edms_user_id, ...body } = params;
-            const response = await fetch(`/api/admin/users/${edms_user_id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || "Failed to update user");
-            }
-            return response.json();
+            return apiClient.put(`/api/admin/users/${edms_user_id}`, body);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -159,14 +121,7 @@ export function useAdmin() {
 
     const deleteUserMutation = useMutation({
         mutationFn: async (userId: number) => {
-            const response = await fetch(`/api/admin/users/${userId}`, {
-                method: "DELETE",
-            });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || "Failed to delete user");
-            }
-            return response.json();
+            return apiClient.delete(`/api/admin/users/${userId}`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -178,11 +133,7 @@ export function useAdmin() {
         queryKey: ['tabPermissions', userId],
         queryFn: async (): Promise<TabPermission[]> => {
             if (!userId) return [];
-            const response = await fetch(`/api/admin/tab-permissions/${userId}`);
-            if (!response.ok) {
-                throw new Error("Failed to load tab permissions");
-            }
-            const data = await response.json();
+            const data = await apiClient.get(`/api/admin/tab-permissions/${userId}`);
             return data.permissions;
         },
         enabled: enabled && !!userId,
@@ -190,16 +141,7 @@ export function useAdmin() {
 
     const upsertTabPermissionMutation = useMutation({
         mutationFn: async (params: { user_id: number; tab_key: string; can_read: boolean; can_write: boolean }) => {
-            const response = await fetch("/api/admin/tab-permissions", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(params),
-            });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || "Failed to update tab permission");
-            }
-            return response.json();
+            return apiClient.put('/api/admin/tab-permissions', params);
         },
         onMutate: async (variables) => {
             // Cancel outgoing refetches so they don't overwrite our optimistic update
@@ -231,14 +173,7 @@ export function useAdmin() {
 
     const initTabPermissionsMutation = useMutation({
         mutationFn: async (userId: number) => {
-            const response = await fetch(`/api/admin/tab-permissions/init/${userId}`, {
-                method: "POST",
-            });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || "Failed to init tab permissions");
-            }
-            return response.json();
+            return apiClient.post(`/api/admin/tab-permissions/init/${userId}`);
         },
     });
 

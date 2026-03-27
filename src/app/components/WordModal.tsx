@@ -1,14 +1,15 @@
 import { WordModalProps } from '@/interfaces/PropsInterfaces';
 import { renderAsync } from 'docx-preview';
+import Image from 'next/image';
 import React, { useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
+import { useDocumentContent } from '../../hooks/useDocumentContent';
+import { useDocumentMutations } from '../../hooks/useDocumentMutations';
+import { useDownload } from '../../hooks/useDownload';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
-import { useDocumentMutations } from '../../hooks/useDocumentMutations';
-import { useDocumentContent } from '../../hooks/useDocumentContent';
-import { useDownload } from '../../hooks/useDownload';
 import { TagEditor } from './TagEditor';
-import Image from 'next/image';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -46,6 +47,7 @@ const formatToApiDate = (date: Date | null): string | null => {
 };
 
 export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
+  const focusTrapRef = useFocusTrap(onClose);
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
   const [isEditingDate, setIsEditingDate] = useState(false);
@@ -216,8 +218,8 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
   const closeButtonColor = theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" onClick={onClose}>
-      <div className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-7xl h-[90vh] flex flex-col`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Word document viewer" onClick={onClose}>
+      <div ref={focusTrapRef} className={`${modalBg} ${textPrimary} rounded-xl w-full max-w-7xl h-[90vh] flex flex-col`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="pt-6 pr-6 pl-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start top-0 z-20 bg-inherit rounded-t-xl">
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
 
 interface UseProcessingStatusOptions {
     user: any;
@@ -48,13 +49,7 @@ export function useProcessingStatus({ user, activeSection, activeFolder, apiURL 
             localStorage.setItem('processingDocs', JSON.stringify(processingDocs));
             const interval = setInterval(async () => {
                 try {
-                    const response = await fetch(`${apiURL}/processing_status`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ docnumbers: processingDocs }),
-                    });
-                    if (!response.ok) return;
-                    const data = await response.json();
+                    const data = await apiClient.post(`${apiURL}/processing_status`, { docnumbers: processingDocs });
                     const stillProcessing = data.processing || [];
 
                     if (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEmsAdminAuth } from '@/hooks/useEmsAdminAuth';
+import { useAdmin } from '../../hooks/useAdmin';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -10,13 +10,13 @@ import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { PageSpinner } from '../components/Spinner';
 import { useTranslations } from '../hooks/useTranslations';
 
-interface EmsAdminLayoutProps {
+interface AdminLayoutProps {
     children: ReactNode;
 }
 
-export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
+export default function AdminLayout({ children }: AdminLayoutProps) {
     const router = useRouter();
-    const { useCheckAccess } = useEmsAdminAuth();
+    const { useCheckAccess } = useAdmin();
     const { data: accessData, isLoading } = useCheckAccess();
     const { user } = useAuth();
     const { updateLanguage, updateTheme } = useUserPreferences();
@@ -73,9 +73,9 @@ export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
                             </svg>
                         </Link>
-                        <Link href="/ems-admin">
+                        <Link href="/admin">
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white ml-4 cursor-pointer">
-                                EMS <span className="text-red-500">Admin</span>
+                                Smart <span className="text-green-500">Admin</span>
                             </h1>
                         </Link>
                         {/* Language Toggle — same style as dashboard */}

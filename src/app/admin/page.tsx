@@ -229,37 +229,11 @@ export default function AdminPage() {
         );
     }
 
-    if (!hasAccess) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-                <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-                    <h1 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Access Denied</h1>
-                    <p className="text-gray-600 dark:text-gray-300">You do not have permission to access this page.</p>
-                    <button
-                        onClick={() => router.push("/folders")}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        Go to Dashboard
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    if (!hasAccess) return null;
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6">
+        <div className="p-6">
             <div className="max-w-6xl mx-auto">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel - User Management</h1>
-                    <button
-                        onClick={() => router.push("/dashboard")}
-                        className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                    >
-                        ← Back to Dashboard
-                    </button>
-                </div>
-
                 {/* Users Table Card */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                     {/* Table Header with Search and Add Button */}

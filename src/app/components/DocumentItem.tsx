@@ -1,18 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useDocumentMutations } from '../../hooks/useDocumentMutations';
-import { useTags } from '../../hooks/useTags';
 import { useToast } from '../context/ToastContext';
 import { DocumentItemProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
 
-export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick, apiURL, onTagSelect, isProcessing, lang, t }) => {
+export const DocumentItem: React.FC<DocumentItemProps> = ({
+  doc,
+  onDocumentClick,
+  apiURL,
+  onTagSelect,
+  isProcessing,
+  itemTags = [],
+  isTagsLoading = false,
+  lang,
+  t
+}) => {
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [imageError, setImageError] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { documentTags: itemTags, isLoadingDocumentTags: isLoadingTags } = useTags({ lang, docId: doc.doc_id });
   const { toggleFavorite } = useDocumentMutations();
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
 
@@ -219,7 +227,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({ doc, onDocumentClick
         <h3 className="font-bold text-base text-gray-900 dark:text-white truncate group-hover:text-gray-600 dark:group-hover:text-gray-400 transition" title={cleanDocName}>{cleanDocName || "No title available."}</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400">{displayDate}</p>
         <div className="relative mt-auto pt-1 mb-1 h-5">
-          {isLoadingTags ? (
+          {isTagsLoading ? (
             <div className="flex flex-wrap gap-1">
               <div className="h-5 bg-gray-300 dark:bg-gray-700 rounded w-12"></div>
               <div className="h-5 bg-gray-300 dark:bg-gray-700 rounded w-16"></div>

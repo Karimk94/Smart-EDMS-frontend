@@ -79,6 +79,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
                 queryClient.invalidateQueries({ queryKey: ['documentTags', docId] });
             }
             queryClient.invalidateQueries({ queryKey: ['allTags'] });
+            queryClient.invalidateQueries({ queryKey: ['documentTagsBatch'] });
         },
     });
 
@@ -115,6 +116,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
             if (docId) {
                 queryClient.invalidateQueries({ queryKey: ['documentTags', docId] });
             }
+            queryClient.invalidateQueries({ queryKey: ['documentTagsBatch'] });
         },
     });
 
@@ -153,6 +155,7 @@ export function useTags({ lang, docId }: UseTagsParams) {
         onSettled: () => {
             // Invalidate all related queries to reflect the shortlist status change across the app
             queryClient.invalidateQueries({ queryKey: ['documentTags'] });
+            queryClient.invalidateQueries({ queryKey: ['documentTagsBatch'] });
         },
     });
 

@@ -1,6 +1,7 @@
 import { Document } from "../models/Document";
 import { UploadableFile } from "./UploadableFile";
 import { PersonOption } from "../models/PersonOption";
+import { TagObject } from "./TagObject";
 
 export interface UploadModalProps {
     onClose: () => void;
@@ -289,6 +290,8 @@ export interface DocumentItemProps {
     apiURL: string;
     onTagSelect: (tag: string) => void;
     isProcessing: boolean;
+    itemTags?: TagObject[];
+    isTagsLoading?: boolean;
 
     lang: 'en' | 'ar';
     t: Function;

@@ -32,6 +32,44 @@ interface UsersResponse {
     has_more: boolean;
 }
 
+interface QueueSummary {
+    queued: number;
+    in_progress: number;
+    completed: number;
+    failed: number;
+    total: number;
+}
+
+interface QueueFailure {
+    docnumber: number;
+    attempts: number;
+    error: string;
+    updated_at: string;
+    status?: 'queued' | 'in_progress' | 'completed' | 'failed';
+}
+
+interface ProcessingQueueStatusResponse {
+    summary: QueueSummary;
+    recent_failures: QueueFailure[];
+    recent_in_progress?: QueueFailure[];
+    recent_queued?: QueueFailure[];
+    oracle_queued_count?: number;
+    source_counts?: {
+        local_failed: number;
+        local_in_progress: number;
+        oracle_queued: number;
+    };
+    worker_paused?: boolean;
+    worker_mode?: 'running' | 'draining' | 'paused';
+    last_mode_change?: {
+        previous_mode?: string;
+        new_mode?: string;
+        actor?: string;
+        reason?: string;
+        changed_at?: string;
+    };
+}
+
 export interface TabPermission {
     id: number;
     tab_key: string;
@@ -97,6 +135,70 @@ export function useAdmin() {
             return apiClient.get(`/api/admin/search-people?search=${encodeURIComponent(query)}`);
         },
         enabled: enabled && query.length >= 2,
+    });
+
+    const useProcessingQueueStatus = (enabled: boolean = true) => useQuery({
+        queryKey: ['processingQueueStatus'],
+        queryFn: async (): Promise<ProcessingQueueStatusResponse> => {
+            return apiClient.get('/api/admin/processing-queue/status');
+        },
+        enabled,
+        refetchInterval: 8000,
+        staleTime: 5000,
+    });
+
+    const retryFailedQueueMutation = useMutation({
+        mutationFn: async (limit: number = 100) => {
+            return apiClient.post(`/api/admin/processing-queue/retry-failed?limit=${limit}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['processingQueueStatus'] });
+        },
+    });
+
+    const retrySelectedQueueMutation = useMutation({
+        mutationFn: async (docnumbers: number[]) => {
+            return apiClient.post('/api/admin/processing-queue/retry-selected', { docnumbers });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['processingQueueStatus'] });
+        },
+    });
+
+    const clearCompletedQueueMutation = useMutation({
+        mutationFn: async (olderThanHours: number = 24) => {
+            return apiClient.delete(`/api/admin/processing-queue/completed?older_than_hours=${olderThanHours}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['processingQueueStatus'] });
+        },
+    });
+
+    const pauseQueueWorkerMutation = useMutation({
+        mutationFn: async () => {
+            return apiClient.post('/api/admin/processing-queue/worker/pause');
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['processingQueueStatus'] });
+        },
+    });
+
+    const resumeQueueWorkerMutation = useMutation({
+        mutationFn: async () => {
+            return apiClient.post('/api/admin/processing-queue/worker/resume');
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['processingQueueStatus'] });
+        },
+    });
+
+    const drainQueueWorkerMutation = useMutation({
+        mutationFn: async () => {
+            return apiClient.post('/api/admin/processing-queue/worker/drain');
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['processingQueueStatus'] });
+        },
     });
 
     // Mutations
@@ -182,7 +284,20 @@ export function useAdmin() {
         useUsers,
         useSecurityLevels,
         useSearchPeople,
+        useProcessingQueueStatus,
         useTabPermissions,
+        retryFailedQueue: retryFailedQueueMutation.mutateAsync,
+        isRetryingFailedQueue: retryFailedQueueMutation.isPending,
+        retrySelectedQueue: retrySelectedQueueMutation.mutateAsync,
+        isRetryingSelectedQueue: retrySelectedQueueMutation.isPending,
+        clearCompletedQueue: clearCompletedQueueMutation.mutateAsync,
+        isClearingCompletedQueue: clearCompletedQueueMutation.isPending,
+        pauseQueueWorker: pauseQueueWorkerMutation.mutateAsync,
+        isPausingQueueWorker: pauseQueueWorkerMutation.isPending,
+        resumeQueueWorker: resumeQueueWorkerMutation.mutateAsync,
+        isResumingQueueWorker: resumeQueueWorkerMutation.isPending,
+        drainQueueWorker: drainQueueWorkerMutation.mutateAsync,
+        isDrainingQueueWorker: drainQueueWorkerMutation.isPending,
         addUser: addUserMutation.mutateAsync,
         isAddingUser: addUserMutation.isPending,
         updateUser: updateUserMutation.mutateAsync,

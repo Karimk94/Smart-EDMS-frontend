@@ -29,7 +29,20 @@ export default function AdminPage() {
         useUsers,
         useSecurityLevels,
         useSearchPeople,
+        useProcessingQueueStatus,
         useTabPermissions,
+        retryFailedQueue,
+        isRetryingFailedQueue,
+        retrySelectedQueue,
+        isRetryingSelectedQueue,
+        clearCompletedQueue,
+        isClearingCompletedQueue,
+        pauseQueueWorker,
+        isPausingQueueWorker,
+        resumeQueueWorker,
+        isResumingQueueWorker,
+        drainQueueWorker,
+        isDrainingQueueWorker,
         addUser,
         isAddingUser,
         updateUser,
@@ -55,6 +68,14 @@ export default function AdminPage() {
 
     // Security Levels Query
     const { data: securityLevels = [] } = useSecurityLevels(!!hasAccess);
+
+    // Queue status polling
+    const {
+        data: queueStatus,
+        isLoading: isQueueLoading,
+        isFetching: isQueueFetching,
+        refetch: refetchQueueStatus,
+    } = useProcessingQueueStatus(!!hasAccess);
 
 
     // Add user modal
@@ -92,6 +113,10 @@ export default function AdminPage() {
 
     // Delete confirmation
     const [deleteTarget, setDeleteTarget] = useState<EdmsUser | null>(null);
+    const [retryingDocnumber, setRetryingDocnumber] = useState<number | null>(null);
+    const [expandedErrorRows, setExpandedErrorRows] = useState<Record<number, boolean>>({});
+    const [queueViewFilter, setQueueViewFilter] = useState<'failed' | 'in_progress' | 'queued'>('failed');
+    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker'>('users');
 
     const router = useRouter();
     const { showToast } = useToast();
@@ -217,6 +242,91 @@ export default function AdminPage() {
         }
     };
 
+    const handleRetryFailedQueue = async () => {
+        try {
+            const result = await retryFailedQueue(100);
+            showToast(`Requeued ${result?.requeued ?? 0} failed jobs`, "success");
+            await refetchQueueStatus();
+        } catch (err: any) {
+            showToast(err.message || "Failed to retry queue jobs", "error");
+        }
+    };
+
+    const handleClearCompletedQueue = async () => {
+        try {
+            const result = await clearCompletedQueue(24);
+            showToast(`Cleared ${result?.deleted ?? 0} completed jobs`, "success");
+            await refetchQueueStatus();
+        } catch (err: any) {
+            showToast(err.message || "Failed to clear completed queue jobs", "error");
+        }
+    };
+
+    const handleRetrySingleDoc = async (docnumber: number) => {
+        setRetryingDocnumber(docnumber);
+        try {
+            const result = await retrySelectedQueue([docnumber]);
+            showToast(`Requeued ${result?.requeued ?? 0} job for doc ${docnumber}`, "success");
+            await refetchQueueStatus();
+        } catch (err: any) {
+            showToast(err.message || `Failed to retry doc ${docnumber}`, "error");
+        } finally {
+            setRetryingDocnumber(null);
+        }
+    };
+
+    const toggleErrorExpanded = (docnumber: number) => {
+        setExpandedErrorRows((prev) => ({
+            ...prev,
+            [docnumber]: !prev[docnumber],
+        }));
+    };
+
+    const handleCopyError = async (docnumber: number, errorText: string) => {
+        const text = errorText || 'Unknown error';
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast(`Error copied for doc ${docnumber}`, 'success');
+        } catch {
+            showToast('Failed to copy error text', 'error');
+        }
+    };
+
+    const handleManualQueueRefresh = async () => {
+        await refetchQueueStatus();
+    };
+
+    const handleToggleWorkerPause = async () => {
+        try {
+            if (queueStatus?.worker_paused) {
+                await resumeQueueWorker();
+                showToast('Processing worker resumed', 'success');
+            } else {
+                await pauseQueueWorker();
+                showToast('Processing worker paused', 'info');
+            }
+            await refetchQueueStatus();
+        } catch (err: any) {
+            showToast(err.message || 'Failed to toggle worker state', 'error');
+        }
+    };
+
+    const handleDrainWorker = async () => {
+        try {
+            await drainQueueWorker();
+            showToast('Processing worker is draining then will pause', 'info');
+            await refetchQueueStatus();
+        } catch (err: any) {
+            showToast(err.message || 'Failed to drain worker', 'error');
+        }
+    };
+
+    const displayedQueueRows = queueViewFilter === 'failed'
+        ? (queueStatus?.recent_failures || [])
+        : queueViewFilter === 'in_progress'
+            ? (queueStatus?.recent_in_progress || [])
+            : (queueStatus?.recent_queued || []);
+
     const goToPage = (page: number) => {
         if (page >= 1 && page <= totalPages) {
             setCurrentPage(page);
@@ -234,7 +344,220 @@ export default function AdminPage() {
     return (
         <div className="p-6">
             <div className="max-w-6xl mx-auto">
+                <div className="mb-4 flex items-center gap-2">
+                    <button
+                        onClick={() => setActiveAdminTab('users')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        Users
+                    </button>
+                    <button
+                        onClick={() => setActiveAdminTab('worker')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'worker' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        Worker
+                    </button>
+                </div>
+
+                {/* Processing Queue Status */}
+                {activeAdminTab === 'worker' && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Processing Queue</h2>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleManualQueueRefresh}
+                                disabled={isQueueFetching}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isQueueFetching ? 'Refreshing...' : 'Refresh'}
+                            </button>
+                            <button
+                                onClick={handleToggleWorkerPause}
+                                disabled={isPausingQueueWorker || isResumingQueueWorker}
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed ${queueStatus?.worker_paused ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                            >
+                                {isPausingQueueWorker || isResumingQueueWorker
+                                    ? 'Updating...'
+                                    : (queueStatus?.worker_paused ? 'Resume Worker' : 'Pause Worker')}
+                            </button>
+                            <button
+                                onClick={handleDrainWorker}
+                                disabled={isDrainingQueueWorker || queueStatus?.worker_mode === 'paused' || queueStatus?.worker_mode === 'draining'}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isDrainingQueueWorker ? 'Draining...' : 'Drain & Pause'}
+                            </button>
+                            <button
+                                onClick={handleRetryFailedQueue}
+                                disabled={isRetryingFailedQueue || (queueStatus?.summary?.failed ?? 0) === 0}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isRetryingFailedQueue ? 'Retrying...' : 'Retry Failed'}
+                            </button>
+                            <button
+                                onClick={handleClearCompletedQueue}
+                                disabled={isClearingCompletedQueue || (queueStatus?.summary?.completed ?? 0) === 0}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isClearingCompletedQueue ? 'Clearing...' : 'Clear Completed (>24h)'}
+                            </button>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {isQueueLoading ? 'Loading...' : 'Auto-refresh every 8s'}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded ${queueStatus?.worker_mode === 'paused' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' : queueStatus?.worker_mode === 'draining' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                                Worker: {queueStatus?.worker_mode === 'draining' ? 'Draining' : (queueStatus?.worker_paused ? 'Paused' : 'Running')}
+                            </span>
+                        </div>
+                    </div>
+
+                    {queueStatus?.last_mode_change?.changed_at && (
+                        <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                            Last mode change: {queueStatus.last_mode_change.previous_mode || 'unknown'}{' -> '}{queueStatus.last_mode_change.new_mode || 'unknown'}
+                            {' '}by <span className="font-medium">{queueStatus.last_mode_change.actor || 'system'}</span>
+                            {' '}at {queueStatus.last_mode_change.changed_at}
+                            {queueStatus.last_mode_change.reason ? ` (${queueStatus.last_mode_change.reason})` : ''}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Queued</div>
+                            <div className="text-xl font-bold text-amber-600 dark:text-amber-400">{queueStatus?.summary?.queued ?? 0}</div>
+                        </div>
+                        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">In Progress</div>
+                            <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{queueStatus?.summary?.in_progress ?? 0}</div>
+                        </div>
+                        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Completed</div>
+                            <div className="text-xl font-bold text-green-600 dark:text-green-400">{queueStatus?.summary?.completed ?? 0}</div>
+                        </div>
+                        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Failed</div>
+                            <div className="text-xl font-bold text-red-600 dark:text-red-400">{queueStatus?.summary?.failed ?? 0}</div>
+                        </div>
+                        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Total</div>
+                            <div className="text-xl font-bold text-gray-800 dark:text-gray-100">{queueStatus?.summary?.total ?? 0}</div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Oracle TAGGING_QUEUE Candidates</div>
+                            <div className="text-xl font-bold text-amber-700 dark:text-amber-300">{queueStatus?.oracle_queued_count ?? queueStatus?.source_counts?.oracle_queued ?? 0}</div>
+                        </div>
+                        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3 text-xs text-gray-600 dark:text-gray-300">
+                            <div className="font-medium mb-1">Row Source</div>
+                            <div>Failed / In Progress lists are from local worker queue (SQLite).</div>
+                            <div>TAGGING_QUEUE list is from Oracle pending candidates.</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {queueViewFilter === 'failed'
+                                    ? 'Recent Failures (Local Queue)'
+                                    : queueViewFilter === 'in_progress'
+                                        ? 'Recent In Progress (Local Queue)'
+                                        : 'Queued in TAGGING_QUEUE'}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setQueueViewFilter('failed')}
+                                    className={`px-2 py-1 rounded text-xs font-medium ${queueViewFilter === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}
+                                >
+                                    Show Failed ({queueStatus?.source_counts?.local_failed ?? queueStatus?.summary?.failed ?? 0})
+                                </button>
+                                <button
+                                    onClick={() => setQueueViewFilter('in_progress')}
+                                    className={`px-2 py-1 rounded text-xs font-medium ${queueViewFilter === 'in_progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}
+                                >
+                                    Show In Progress ({queueStatus?.source_counts?.local_in_progress ?? queueStatus?.summary?.in_progress ?? 0})
+                                </button>
+                                <button
+                                    onClick={() => setQueueViewFilter('queued')}
+                                    className={`px-2 py-1 rounded text-xs font-medium ${queueViewFilter === 'queued' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}
+                                >
+                                    Show TAGGING_QUEUE ({queueStatus?.oracle_queued_count ?? queueStatus?.source_counts?.oracle_queued ?? 0})
+                                </button>
+                            </div>
+                        </div>
+                        {displayedQueueRows.length === 0 ? (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {queueViewFilter === 'failed'
+                                    ? 'No recent failures.'
+                                    : queueViewFilter === 'in_progress'
+                                        ? 'No in-progress jobs.'
+                                        : 'No queued TAGGING_QUEUE candidates returned.'}
+                            </p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-gray-500 dark:text-gray-400">
+                                            <th className="py-2 pr-4">Doc</th>
+                                            <th className="py-2 pr-4">Attempts</th>
+                                            <th className="py-2 pr-4">Updated</th>
+                                            <th className="py-2">Error</th>
+                                            <th className="py-2 pl-4">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {displayedQueueRows.map((f) => (
+                                            <tr key={`${f.docnumber}-${f.updated_at}`} className="border-t border-gray-100 dark:border-gray-700">
+                                                <td className="py-2 pr-4 font-mono">{f.docnumber}</td>
+                                                <td className="py-2 pr-4">{f.attempts}</td>
+                                                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">{f.updated_at}</td>
+                                                <td className="py-2 max-w-[420px]">
+                                                    <div className="flex flex-col gap-1">
+                                                        <div
+                                                            className={`text-red-600 dark:text-red-400 ${expandedErrorRows[f.docnumber] ? 'whitespace-pre-wrap break-words' : 'truncate'}`}
+                                                            title={f.error}
+                                                        >
+                                                            {f.error || (queueViewFilter === 'in_progress' ? 'Processing...' : queueViewFilter === 'queued' ? 'Pending in TAGGING_QUEUE' : 'Unknown error')}
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <button
+                                                                onClick={() => toggleErrorExpanded(f.docnumber)}
+                                                                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                                            >
+                                                                {expandedErrorRows[f.docnumber] ? 'Collapse' : 'Expand'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCopyError(f.docnumber, f.error || '')}
+                                                                className="text-xs text-gray-600 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
+                                                            >
+                                                                Copy Error
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 pl-4">
+                                                    <button
+                                                        onClick={() => handleRetrySingleDoc(f.docnumber)}
+                                                        disabled={queueViewFilter !== 'failed' || (isRetryingSelectedQueue && retryingDocnumber === f.docnumber)}
+                                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        {queueViewFilter !== 'failed'
+                                                            ? 'N/A'
+                                                            : (isRetryingSelectedQueue && retryingDocnumber === f.docnumber ? 'Retrying...' : 'Retry')}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                )}
+
                 {/* Users Table Card */}
+                {activeAdminTab === 'users' && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                     {/* Table Header with Search and Add Button */}
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -406,6 +729,7 @@ export default function AdminPage() {
                         </div>
                     )}
                 </div>
+                )}
             </div>
 
             {/* Add User Modal */}

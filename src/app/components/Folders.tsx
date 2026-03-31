@@ -69,6 +69,35 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null });
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
+  const estimateContextMenuHeight = (item: FolderItem | null) => {
+    const header = 40;
+    const row = 36;
+
+    if (!item) {
+      return header + row * 2 + 8;
+    }
+
+    let actions = 4; // share, rename, permissions, delete
+    if (item.type === 'folder') actions += 1; // create subfolder
+    if (item.type !== 'folder') actions += 1; // download
+
+    return header + actions * row + 8;
+  };
+
+  const getSafeContextMenuPosition = (rawX: number, rawY: number, item: FolderItem | null) => {
+    const viewportPadding = 8;
+    const menuWidth = 192; // matches w-48
+    const menuHeight = estimateContextMenuHeight(item);
+
+    const maxX = window.innerWidth - menuWidth - viewportPadding;
+    const maxY = window.innerHeight - menuHeight - viewportPadding;
+
+    return {
+      x: Math.max(viewportPadding, Math.min(rawX, maxX)),
+      y: Math.max(viewportPadding, Math.min(rawY, maxY)),
+    };
+  };
+
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [selectedSecurityItem, setSelectedSecurityItem] = useState<FolderItem | null>(null);
 
@@ -432,10 +461,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (!isEditor) return;
     if (item.is_standard) return;
 
+    const position = getSafeContextMenuPosition(e.clientX, e.clientY, item);
+
     setContextMenu({
       visible: true,
-      x: e.pageX,
-      y: e.pageY,
+      x: position.x,
+      y: position.y,
       item: item
     });
   };
@@ -445,13 +476,35 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (!isEditor) return;
     if (e.target !== e.currentTarget) return;
 
+    const position = getSafeContextMenuPosition(e.clientX, e.clientY, null);
+
     setContextMenu({
       visible: true,
-      x: e.pageX,
-      y: e.pageY,
+      x: position.x,
+      y: position.y,
       item: null
     });
   };
+
+  useEffect(() => {
+    if (!contextMenu.visible || !contextMenuRef.current) return;
+
+    const rect = contextMenuRef.current.getBoundingClientRect();
+    const viewportPadding = 8;
+
+    const adjustedX = Math.max(
+      viewportPadding,
+      Math.min(contextMenu.x, window.innerWidth - rect.width - viewportPadding)
+    );
+    const adjustedY = Math.max(
+      viewportPadding,
+      Math.min(contextMenu.y, window.innerHeight - rect.height - viewportPadding)
+    );
+
+    if (adjustedX !== contextMenu.x || adjustedY !== contextMenu.y) {
+      setContextMenu(prev => ({ ...prev, x: adjustedX, y: adjustedY }));
+    }
+  }, [contextMenu.visible, contextMenu.x, contextMenu.y]);
 
   const getCurrentFolderName = () => {
     if (breadcrumbs.length > 0) {
@@ -822,7 +875,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       {contextMenu.visible && (
         <div
           ref={contextMenuRef}
-          className="absolute z-50 bg-white dark:bg-[#333] border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl w-48 py-1"
+          className="absolute z-[220] bg-white dark:bg-[#333] border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl w-48 py-1"
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px`, position: 'fixed' }}
         >
           {contextMenu.item ? (

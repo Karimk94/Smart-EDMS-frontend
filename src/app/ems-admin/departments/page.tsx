@@ -52,6 +52,7 @@ export default function DepartmentsPage() {
 
     // State for search
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedAgencyFilter, setSelectedAgencyFilter] = useState<number | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [perPage] = useState(10);
 
@@ -95,13 +96,16 @@ export default function DepartmentsPage() {
 
     // Fetch departments
     const { data: departmentsData, isLoading: isLoadingDepartments } = useQuery({
-        queryKey: ['departments', currentPage, searchQuery],
+        queryKey: ['departments', currentPage, searchQuery, selectedAgencyFilter],
         queryFn: async (): Promise<DepartmentsResponse> => {
             const params = new URLSearchParams();
             if (searchQuery) {
                 if (searchQuery.length >= 3) {
                     params.append('name', searchQuery);
                 }
+            }
+            if (selectedAgencyFilter !== null) {
+                params.append('agency_id', String(selectedAgencyFilter));
             }
             params.append('page', String(currentPage));
             params.append('per_page', String(perPage));
@@ -313,7 +317,7 @@ export default function DepartmentsPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        {t('emsDepartmentId')} *
+                                        {t('emsDepartmentId')} * <span className="text-xs text-gray-500 dark:text-gray-400">({addShort.length}/5)</span>
                                     </label>
                                     <input
                                         type="text"
@@ -322,7 +326,7 @@ export default function DepartmentsPage() {
                                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         required
                                         minLength={2}
-                                        maxLength={10}
+                                        maxLength={5}
                                         placeholder="e.g., EMS01"
                                     />
                                 </div>
@@ -357,6 +361,26 @@ export default function DepartmentsPage() {
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{t('searchDepartments')}</h2>
                     <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                {t('agency')}
+                            </label>
+                            <select
+                                value={selectedAgencyFilter || ''}
+                                onChange={(e) => {
+                                    setSelectedAgencyFilter(e.target.value ? parseInt(e.target.value) : null);
+                                    setCurrentPage(1);
+                                }}
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            >
+                                <option value="">{t('allAgencies')}</option>
+                                {agencies.map((agency) => (
+                                    <option key={agency.SYSTEM_ID} value={agency.SYSTEM_ID}>
+                                        {agency.NAME}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 {t('searchByNameCodeTranslation')}

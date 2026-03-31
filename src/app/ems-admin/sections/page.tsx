@@ -376,7 +376,7 @@ export default function EmsSectionsPage() {
                             <form onSubmit={handleAddSubmit} className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        {t('emsCode')} *
+                                        {t('emsCode')} * <span className="text-xs text-gray-500 dark:text-gray-400">({addCode.length}/5)</span>
                                     </label>
                                     <input
                                         type="text"
@@ -385,7 +385,7 @@ export default function EmsSectionsPage() {
                                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         required
                                         minLength={2}
-                                        maxLength={10}
+                                        maxLength={5}
                                         placeholder="e.g., SEC01"
                                     />
                                 </div>

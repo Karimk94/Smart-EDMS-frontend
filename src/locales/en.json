@@ -298,6 +298,7 @@
   "agency": "Agency",
   "department": "Department",
   "selectAnAgency": "-- Select an Agency --",
+  "allAgencies": "All Agencies",
   "selectADepartment": "-- Select a Department --",
   "selectDepartment": "Select Department",
   "showDisabledOnly": "Show disabled companies only",

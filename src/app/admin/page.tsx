@@ -19,6 +19,25 @@ const THEMES = [
     { code: 'dark', name: 'Dark' }
 ];
 
+type AdminTabKey = 'recent' | 'folders' | 'profilesearch' | 'ems_admin';
+
+const TAB_PERMISSION_ITEMS: { key: AdminTabKey; label: string }[] = [
+    { key: 'recent', label: 'Smart EDMS & Favorites' },
+    { key: 'folders', label: 'Folders' },
+    { key: 'profilesearch', label: 'Profile Search' },
+    { key: 'ems_admin', label: 'EMS Admin (Enterprise Management System)' },
+];
+
+type TabToggleState = { can_read: boolean; can_write: boolean };
+type AddTabPermissionsState = Record<AdminTabKey, TabToggleState>;
+
+const createDefaultAddTabPermissions = (): AddTabPermissionsState => ({
+    recent: { can_read: true, can_write: false },
+    folders: { can_read: true, can_write: false },
+    profilesearch: { can_read: true, can_write: false },
+    ems_admin: { can_read: false, can_write: false },
+});
+
 export default function AdminPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasAccess, setHasAccess] = useState(false);
@@ -85,6 +104,7 @@ export default function AdminPage() {
     const [selectedSecurityLevel, setSelectedSecurityLevel] = useState<number | null>(null);
     const [selectedLang, setSelectedLang] = useState("en");
     const [selectedTheme, setSelectedTheme] = useState("light");
+    const [addTabPermissions, setAddTabPermissions] = useState<AddTabPermissionsState>(createDefaultAddTabPermissions);
 
     // People Search Query
     const { data: searchResults = [], isLoading: isSearching } = useSearchPeople(searchQuery, showAddModal);
@@ -165,6 +185,16 @@ export default function AdminPage() {
             // Create default tab permissions for the new user
             try {
                 await initTabPermissions(selectedPerson.system_id);
+
+                for (const { key } of TAB_PERMISSION_ITEMS) {
+                    const permission = addTabPermissions[key];
+                    await upsertTabPermission({
+                        user_id: selectedPerson.system_id,
+                        tab_key: key,
+                        can_read: permission.can_read,
+                        can_write: permission.can_read ? permission.can_write : false,
+                    });
+                }
             } catch (permErr) {
                 // Non-critical: user was added, permissions can be set later
                 console.warn('Failed to init tab permissions:', permErr);
@@ -183,6 +213,7 @@ export default function AdminPage() {
         setSelectedSecurityLevel(null);
         setSelectedLang("en");
         setSelectedTheme("light");
+        setAddTabPermissions(createDefaultAddTabPermissions());
         setSearchQuery("");
         // searchResults is derived from query, so clearing query clears results
     };
@@ -875,6 +906,59 @@ export default function AdminPage() {
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Tab Permissions Toggles */}
+                            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Tab Permissions</h4>
+                                <div className="space-y-3">
+                                    {TAB_PERMISSION_ITEMS.map(({ key, label }) => {
+                                        const canRead = addTabPermissions[key].can_read;
+                                        const canWrite = addTabPermissions[key].can_write;
+
+                                        return (
+                                            <div key={key} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 rounded-lg px-4 py-3">
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[11px] text-gray-400 dark:text-gray-500 uppercase">Visible</span>
+                                                        <button
+                                                            onClick={() => setAddTabPermissions((prev) => ({
+                                                                ...prev,
+                                                                [key]: {
+                                                                    can_read: !canRead,
+                                                                    can_write: canRead ? false : canWrite,
+                                                                }
+                                                            }))}
+                                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${canRead ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'} cursor-pointer hover:opacity-80`}
+                                                        >
+                                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${canRead ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[11px] text-gray-400 dark:text-gray-500 uppercase">Editor</span>
+                                                        <button
+                                                            onClick={() => setAddTabPermissions((prev) => ({
+                                                                ...prev,
+                                                                [key]: {
+                                                                    can_read: canRead,
+                                                                    can_write: !canWrite,
+                                                                }
+                                                            }))}
+                                                            disabled={!canRead}
+                                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${canWrite ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'} ${!canRead ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}`}
+                                                        >
+                                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${canWrite ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    Users in group EMS_ADMIN are automatically granted EMS Admin tab access.
+                                </p>
+                            </div>
                         </div>
 
                         {/* Modal Footer */}
@@ -1026,13 +1110,9 @@ export default function AdminPage() {
                                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                                     <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Tab Permissions</h4>
                                     <div className="space-y-3">
-                                        {[
-                                            { key: 'recent', label: 'Smart EDMS & Favorites' },
-                                            { key: 'folders', label: 'Folders' },
-                                            { key: 'profilesearch', label: 'Profile Search' },
-                                        ].map(({ key, label }) => {
+                                        {TAB_PERMISSION_ITEMS.map(({ key, label }) => {
                                             const perm = editUserTabPerms.find(p => p.tab_key === key);
-                                            const canRead = perm?.can_read ?? true;
+                                            const canRead = perm?.can_read ?? (key === 'ems_admin' ? false : true);
                                             const canWrite = perm?.can_write ?? false;
 
                                             return (
@@ -1080,6 +1160,9 @@ export default function AdminPage() {
                                             );
                                         })}
                                     </div>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Users in group EMS_ADMIN are always enabled for EMS Admin visibility.
+                                    </p>
                                 </div>
                             )}
                             {editTarget.security_level === 'Admin' && (

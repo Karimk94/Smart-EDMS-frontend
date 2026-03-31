@@ -297,6 +297,7 @@
   "agency": "الجهة",
   "department": "الإدارة",
   "selectAnAgency": "-- اختر جهة --",
+  "allAgencies": "جميع الجهات",
   "selectADepartment": "-- اختر إدارة --",
   "selectDepartment": "اختر الإدارة",
   "showDisabledOnly": "عرض الشركات المعطّلة فقط",

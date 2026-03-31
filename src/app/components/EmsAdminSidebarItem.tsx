@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
+import React from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../../hooks/useAuth';
+
 
 interface EmsAdminSidebarItemProps {
   isSidebarOpen: boolean;
@@ -11,30 +12,16 @@ interface EmsAdminSidebarItemProps {
 
 export const EmsAdminSidebarItem: React.FC<EmsAdminSidebarItemProps> = ({ isSidebarOpen, lang }) => {
   const router = useRouter();
-  const [hasAdminAccess, setHasAdminAccess] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
+  const { user, isLoadingUser } = useAuth();
 
-  useEffect(() => {
-    const checkAdminAccess = async () => {
-      try {
-        const response = await fetch('/api/admin/check-access', {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setHasAdminAccess(data.has_access === true);
-        }
-      } catch (error) {
-        console.error('Error checking admin access:', error);
-      } finally {
-        setIsChecking(false);
-      }
-    };
+  const hasEmsTabAccess = (user?.tab_permissions || []).some(
+    (perm) => perm.tab_key === 'ems_admin' && perm.can_read
+  );
+  const hasEmsGroupAccess = user?.is_ems_admin_group_member === true;
+  const hasAdminLevelAccess = user?.security_level === 'Admin' || user?.security_level === 'Editor';
+  const hasEmsAdminAccess = hasEmsTabAccess || hasEmsGroupAccess || hasAdminLevelAccess;
 
-    checkAdminAccess();
-  }, []);
-
-  if (isChecking || !hasAdminAccess) {
+  if (isLoadingUser || !hasEmsAdminAccess) {
     return null;
   }
 
@@ -45,13 +32,23 @@ export const EmsAdminSidebarItem: React.FC<EmsAdminSidebarItemProps> = ({ isSide
       onClick={() => router.push('/ems-admin')}
       className={`relative flex items-center w-full p-3 rounded-lg transition-colors duration-150 ease-in-out group ${inactiveClass} ${!isSidebarOpen ? 'justify-center' : ''} ${isSidebarOpen ? 'gap-4' : ''}`}
     >
-      <Image
-        src="/ems-admin-icon.svg"
-        alt=""
-        width={24}
-        height={24}
-        className="flex-shrink-0 dark:brightness-0 dark:invert opacity-70"
-      />
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        className="h-6 w-6 flex-shrink-0 opacity-80"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        aria-hidden="true"
+      >
+        <path d="M3 21h18" />
+        <path d="M5 21V8l7-4 7 4v13" />
+        <path d="M9 11h2v2H9z" />
+        <path d="M13 11h2v2h-2z" />
+        <path d="M9 15h2v2H9z" />
+        <path d="M13 15h2v2h-2z" />
+        <path d="M11 21v-3h2v3" />
+      </svg>
       {isSidebarOpen && <span className="truncate">EMS Admin</span>}
 
       {!isSidebarOpen && (

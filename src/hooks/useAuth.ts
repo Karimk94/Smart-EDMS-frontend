@@ -10,6 +10,7 @@ interface User {
     theme: 'light' | 'dark';
     quota: number;
     remaining_quota: number;
+    is_ems_admin_group_member?: boolean;
     tab_permissions?: { tab_key: string; can_read: boolean; can_write: boolean }[];
 }
 

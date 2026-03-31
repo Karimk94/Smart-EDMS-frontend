@@ -12,7 +12,7 @@ export function useEmsAdminAuth() {
     const useCheckAccess = () => useQuery({
         queryKey: ['emsAdminAccess'],
         queryFn: async () => {
-            return apiClient.get('/api/admin/check-access') as Promise<EmsAdminAccessResponse>;
+            return apiClient.get('/api/ems-admin/check-access') as Promise<EmsAdminAccessResponse>;
         },
         retry: false,
     });

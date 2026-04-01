@@ -27,13 +27,17 @@ const QuotaPieChart: React.FC<QuotaPieChartProps> = ({ remaining, total, compact
     const strokeWidth = compact ? 4 : 6;
 
     // Color determination (Usage Based)
-    let strokeColor = "text-green-500 dark:text-green-400"; // Low usage (< 50%)
+    let strokeColor = "text-green-700 dark:text-green-500"; // Low usage (< 50%)
+    let arcColor = "#15803d";
     if (percentage > 90) {
-        strokeColor = "text-red-500 dark:text-red-400"; // Critical usage (> 90%)
+        strokeColor = "text-red-700 dark:text-red-500"; // Critical usage (> 90%)
+        arcColor = "#b91c1c";
     } else if (percentage > 75) {
-        strokeColor = "text-orange-500 dark:text-orange-400"; // High usage (75-90%)
+        strokeColor = "text-orange-700 dark:text-orange-500"; // High usage (75-90%)
+        arcColor = "#c2410c";
     } else if (percentage > 50) {
-        strokeColor = "text-yellow-500 dark:text-yellow-400"; // Medium usage (50-75%)
+        strokeColor = "text-yellow-700 dark:text-yellow-500"; // Medium usage (50-75%)
+        arcColor = "#a16207";
     }
 
     // Format helper within component
@@ -48,19 +52,15 @@ const QuotaPieChart: React.FC<QuotaPieChartProps> = ({ remaining, total, compact
     const chart = (
         <div className="relative" title={compact ? `${formatSize(used)} used of ${formatSize(safeTotal)}` : undefined}>
             <div
-                className="relative rounded-full transition-all duration-500"
+                className="relative rounded-full bg-gray-200 dark:bg-gray-700 transition-all duration-500"
                 style={{
                     width: size,
                     height: size,
-                    background: `conic-gradient(currentColor ${percentage}%, transparent ${percentage}% 100%)`,
+                    backgroundImage: `conic-gradient(from -90deg, ${arcColor} ${percentage}%, transparent ${percentage}% 100%)`,
                 }}
             >
                 <div
-                    className={`absolute inset-0 rounded-full ${strokeColor}`}
-                    style={{ transform: 'rotate(-90deg)' }}
-                />
-                <div
-                    className="absolute rounded-full bg-white dark:bg-[#1f2937]"
+                    className="absolute rounded-full bg-gray-50 dark:bg-gray-900"
                     style={{
                         top: strokeWidth,
                         left: strokeWidth,

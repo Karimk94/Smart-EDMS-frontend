@@ -238,6 +238,24 @@ export default function AdminPage() {
         setEditTotalQuota(null);
     };
 
+    useEffect(() => {
+        if (!editTarget) return;
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setEditTarget(null);
+                setEditSecurityLevel(null);
+                setEditLang("en");
+                setEditTheme("light");
+                setEditQuota(null);
+                setEditTotalQuota(null);
+            }
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [editTarget]);
+
     const handleEditUser = async () => {
         if (!editTarget || !editSecurityLevel) {
             showToast("Please select a security level", "error");
@@ -653,7 +671,12 @@ export default function AdminPage() {
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             {users.map((user) => (
-                                <tr key={user.edms_user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <tr
+                                    key={user.edms_user_id}
+                                    onDoubleClick={() => openEditModal(user)}
+                                    title="Double-click to edit"
+                                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                                         {user.username}
                                     </td>

@@ -22,12 +22,9 @@ const QuotaPieChart: React.FC<QuotaPieChartProps> = ({ remaining, total, compact
     // Calculate percentage used
     const percentage = Math.min(100, (used / safeTotal) * 100);
 
-    // SVG parameters
+    // Chart parameters
     const size = compact ? 32 : 50;
     const strokeWidth = compact ? 4 : 6;
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
     // Color determination (Usage Based)
     let strokeColor = "text-green-500 dark:text-green-400"; // Low usage (< 50%)
@@ -50,30 +47,28 @@ const QuotaPieChart: React.FC<QuotaPieChartProps> = ({ remaining, total, compact
 
     const chart = (
         <div className="relative" title={compact ? `${formatSize(used)} used of ${formatSize(safeTotal)}` : undefined}>
-            {/* Background Circle */}
-            <svg width={size} height={size} className="transform -rotate-90">
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    stroke="currentColor"
-                    strokeWidth={strokeWidth}
-                    fill="transparent"
-                    className="text-gray-200 dark:text-gray-700"
+            <div
+                className="relative rounded-full transition-all duration-500"
+                style={{
+                    width: size,
+                    height: size,
+                    background: `conic-gradient(currentColor ${percentage}%, transparent ${percentage}% 100%)`,
+                }}
+            >
+                <div
+                    className={`absolute inset-0 rounded-full ${strokeColor}`}
+                    style={{ transform: 'rotate(-90deg)' }}
                 />
-                {/* Progress Circle */}
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    stroke="currentColor"
-                    strokeWidth={strokeWidth}
-                    fill="transparent"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    className={`transition-all duration-500 ${strokeColor}`}
+                <div
+                    className="absolute rounded-full bg-white dark:bg-[#1f2937]"
+                    style={{
+                        top: strokeWidth,
+                        left: strokeWidth,
+                        right: strokeWidth,
+                        bottom: strokeWidth,
+                    }}
                 />
-            </svg>
+            </div>
             {/* Text in center */}
             <div className="absolute inset-0 flex items-center justify-center">
                 <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-bold ${strokeColor}`}>

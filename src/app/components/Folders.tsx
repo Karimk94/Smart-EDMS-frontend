@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FolderItem, useFolderContents } from '../../hooks/useFolderContents';
 import { useDeleteFolder, useRenameFolder } from '../../hooks/useFolderMutations';
 import { useDownload } from '../../hooks/useDownload';
+import { apiClient } from '../../lib/apiClient';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
 import { CreateFolderModal } from './CreateFolderModal';
@@ -119,7 +120,34 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [renameValue, setRenameValue] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
 
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [marqueeSelection, setMarqueeSelection] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    additive: boolean;
+    baseSelection: Set<string>;
+  } | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const gridAreaRef = useRef<HTMLDivElement>(null);
+  const fileTileRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const suppressItemClickRef = useRef(false);
+
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [moveCurrentFolderId, setMoveCurrentFolderId] = useState<string | null>(null);
+  const [moveBreadcrumbs, setMoveBreadcrumbs] = useState<{ id: string | null; name: string }[]>([{ id: null, name: t('home') || 'Home' }]);
+  const [moveFolderItems, setMoveFolderItems] = useState<FolderItem[]>([]);
+  const [isMoveFoldersLoading, setIsMoveFoldersLoading] = useState(false);
+  const [isBatchMoving, setIsBatchMoving] = useState(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [targetMoveFolderId, setTargetMoveFolderId] = useState<string | null>(null);
+
   const { showToast, removeToast } = useToast();
+
+  const selectedFiles = items.filter((item) => selectedFileIds.has(item.id) && item.type === 'file');
+  const selectedFileCount = selectedFiles.length;
 
   // Debounce search term
   useEffect(() => {
@@ -188,6 +216,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       setCurrentFolderId(initialFolderId);
     }
   }, [initialFolderId]);
+
+  useEffect(() => {
+    setSelectedFileIds(new Set());
+    setIsSelectionMode(false);
+  }, [currentFolderId, debouncedSearchTerm]);
 
   // React to external refresh trigger (e.g. upload-complete from parent)
   const prevTriggerRef = useRef(externalRefreshTrigger);
@@ -456,6 +489,278 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     queryClient.invalidateQueries({ queryKey: ['documents'] });
   };
 
+  const clearSelection = () => {
+    setSelectedFileIds(new Set());
+  };
+
+  useEffect(() => {
+    const handleEscapeClearSelection = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (selectedFileIds.size === 0) return;
+      clearSelection();
+    };
+
+    document.addEventListener('keydown', handleEscapeClearSelection);
+    return () => document.removeEventListener('keydown', handleEscapeClearSelection);
+  }, [selectedFileIds]);
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode((prev) => {
+      if (prev) {
+        setSelectedFileIds(new Set());
+      }
+      return !prev;
+    });
+  };
+
+  const toggleFileSelection = (fileId: string, checked?: boolean) => {
+    setSelectedFileIds(prev => {
+      const next = new Set(prev);
+      const isChecked = checked !== undefined ? checked : !next.has(fileId);
+
+      if (isChecked) next.add(fileId);
+      else next.delete(fileId);
+
+      return next;
+    });
+  };
+
+  const selectOnlyFile = (fileId: string) => {
+    setSelectedFileIds(new Set([fileId]));
+  };
+
+  const isRectIntersecting = (a: DOMRect, b: { left: number; right: number; top: number; bottom: number }) => {
+    return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+  };
+
+  const startMarqueeSelection = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isEditor || e.button !== 0) return;
+
+    const ctrlHeld = e.ctrlKey || e.metaKey;
+    if (!isSelectionMode && !ctrlHeld) return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('button,input,textarea,label,a,[data-no-marquee="true"]')) return;
+
+    const additive = ctrlHeld;
+    if (!isSelectionMode && ctrlHeld) {
+      setIsSelectionMode(true);
+    }
+    setMarqueeSelection({
+      startX: e.clientX,
+      startY: e.clientY,
+      currentX: e.clientX,
+      currentY: e.clientY,
+      additive,
+      baseSelection: new Set(selectedFileIds),
+    });
+    suppressItemClickRef.current = false;
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    if (!marqueeSelection) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setMarqueeSelection(prev => {
+        if (!prev) return prev;
+
+        const next = {
+          ...prev,
+          currentX: e.clientX,
+          currentY: e.clientY,
+        };
+
+        const left = Math.min(next.startX, next.currentX);
+        const right = Math.max(next.startX, next.currentX);
+        const top = Math.min(next.startY, next.currentY);
+        const bottom = Math.max(next.startY, next.currentY);
+
+        if (Math.abs(next.currentX - next.startX) > 3 || Math.abs(next.currentY - next.startY) > 3) {
+          suppressItemClickRef.current = true;
+        }
+
+        const intersected = new Set<string>();
+        items.forEach((item) => {
+          if (item.type !== 'file') return;
+          const node = fileTileRefs.current[item.id];
+          if (!node) return;
+          const rect = node.getBoundingClientRect();
+          if (isRectIntersecting(rect, { left, right, top, bottom })) {
+            intersected.add(item.id);
+          }
+        });
+
+        setSelectedFileIds(() => {
+          if (next.additive) {
+            const merged = new Set(next.baseSelection);
+            intersected.forEach((id) => merged.add(id));
+            return merged;
+          }
+          return intersected;
+        });
+
+        return next;
+      });
+    };
+
+    const handleMouseUp = () => {
+      setMarqueeSelection(prev => {
+        if (!prev) return null;
+
+        const wasClick = Math.abs(prev.currentX - prev.startX) <= 3 && Math.abs(prev.currentY - prev.startY) <= 3;
+        if (wasClick && !prev.additive) {
+          clearSelection();
+        }
+
+        return null;
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [marqueeSelection, items]);
+
+  const moveFilesToFolder = async (fileIds: string[], destinationFolderId: string | null) => {
+    if (fileIds.length === 0) return;
+
+    if (destinationFolderId === currentFolderId) {
+      showToast(t('alreadyInThisFolder') || 'Selected files are already in this folder.', 'info');
+      return;
+    }
+
+    setIsOperationLoading(true);
+    setIsBatchMoving(true);
+
+    let moved = 0;
+    let failed = 0;
+
+    try {
+      const itemNames = Object.fromEntries(
+        fileIds
+          .map((id) => {
+            const matched = items.find((item) => item.id === id);
+            return matched ? [id, matched.name] : null;
+          })
+          .filter((entry): entry is [string, string] => Array.isArray(entry))
+      );
+
+      const result = await apiClient.post(`${apiURL}/folders/move-items`, {
+        item_ids: fileIds,
+        destination_parent_id: destinationFolderId,
+        item_names: itemNames,
+      });
+
+      moved = Number(result?.moved_count || 0);
+      failed = Number(result?.failed_count || 0);
+
+      if (moved > 0) {
+        showToast(t('successMoving') || `Moved ${moved} file(s) successfully.`, 'success');
+      }
+      if (failed > 0) {
+        showToast(t('errorMoving') || `${failed} file(s) could not be moved.`, 'error');
+      }
+
+      clearSelection();
+      if (moved > 0 && failed === 0) {
+        setIsSelectionMode(false);
+      }
+      refreshCurrentView(true);
+    } finally {
+      setIsBatchMoving(false);
+      setIsOperationLoading(false);
+    }
+  };
+
+  const fetchMoveFolderItems = async (parentId: string | null) => {
+    setIsMoveFoldersLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (parentId) params.append('parent_id', parentId);
+      params.append('scope', 'folders');
+
+      const response = await apiClient.get(`${apiURL}/folders?${params.toString()}`);
+      const allItems: FolderItem[] = response?.contents || [];
+      const onlyFolders = allItems.filter((item) => item.type === 'folder' && !item.is_standard);
+      setMoveFolderItems(onlyFolders);
+    } catch (e: any) {
+      showToast(t('errorLoadingFolders') || `Failed to load folders: ${e.message || 'Unknown error'}`, 'error');
+      setMoveFolderItems([]);
+    } finally {
+      setIsMoveFoldersLoading(false);
+    }
+  };
+
+  const openMoveModal = async () => {
+    setIsMoveModalOpen(true);
+    setMoveCurrentFolderId(null);
+    setMoveBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
+    setTargetMoveFolderId(currentFolderId);
+    await fetchMoveFolderItems(null);
+  };
+
+  const handleMoveModalNavigate = async (folder: FolderItem) => {
+    const nextBreadcrumbs = [...moveBreadcrumbs, { id: folder.id, name: folder.name }];
+    setMoveCurrentFolderId(folder.id);
+    setMoveBreadcrumbs(nextBreadcrumbs);
+    setTargetMoveFolderId(folder.id);
+    await fetchMoveFolderItems(folder.id);
+  };
+
+  const handleMoveBreadcrumbClick = async (index: number) => {
+    const target = moveBreadcrumbs[index];
+    const nextBreadcrumbs = moveBreadcrumbs.slice(0, index + 1);
+    setMoveBreadcrumbs(nextBreadcrumbs);
+    setMoveCurrentFolderId(target.id);
+    setTargetMoveFolderId(target.id);
+    await fetchMoveFolderItems(target.id);
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedFileCount === 0) return;
+
+    const confirmed = window.confirm(
+      t('confirmDeleteMultiple') || `Are you sure you want to delete ${selectedFileCount} selected file(s)?`
+    );
+
+    if (!confirmed) return;
+
+    setIsOperationLoading(true);
+    setIsBatchDeleting(true);
+
+    let deleted = 0;
+    let failed = 0;
+
+    try {
+      await Promise.all(Array.from(selectedFileIds).map(async (id) => {
+        try {
+          await deleteFolderMutation.mutateAsync({ id, force: false, apiURL });
+          deleted += 1;
+        } catch {
+          failed += 1;
+        }
+      }));
+
+      if (deleted > 0) {
+        showToast(t('successDeleting') || `Deleted ${deleted} file(s) successfully.`, 'success');
+      }
+      if (failed > 0) {
+        showToast(t('errorDeleting') || `${failed} file(s) could not be deleted.`, 'error');
+      }
+
+      clearSelection();
+      refreshCurrentView(true);
+    } finally {
+      setIsBatchDeleting(false);
+      setIsOperationLoading(false);
+    }
+  };
+
   const handleRightClick = (e: React.MouseEvent, item: FolderItem) => {
     e.preventDefault();
     if (!isEditor) return;
@@ -531,6 +836,25 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     setContextMenu({ ...contextMenu, visible: false });
 
+    if (action === 'select' && targetItem.type === 'file') {
+      setIsSelectionMode(true);
+      setSelectedFileIds((prev) => {
+        const next = new Set(prev);
+        next.add(targetItem.id);
+        return next;
+      });
+      return;
+    }
+
+    if (action === 'deselect' && targetItem.type === 'file') {
+      setSelectedFileIds((prev) => {
+        const next = new Set(prev);
+        next.delete(targetItem.id);
+        return next;
+      });
+      return;
+    }
+
     if (action === 'createChild' && targetItem.type === 'folder') {
       handleNavigate(targetItem);
       setShowCreateModal(true);
@@ -556,6 +880,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
     else if (action === 'download') {
       handleDownload(targetItem);
+    }
+    else if (action === 'moveSelected') {
+      openMoveModal();
+    }
+    else if (action === 'deleteSelected') {
+      handleBatchDelete();
     }
   };
 
@@ -697,6 +1027,44 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
 
+      {isSelectionMode && isEditor && (
+        <div className="mx-6 mt-4 mb-0 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 flex items-center justify-between gap-3">
+          <div className="text-sm font-medium text-blue-900 dark:text-blue-200">
+            {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openMoveModal}
+              disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
+              className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {isBatchMoving ? (t('moving') || 'Moving...') : (t('move') || 'Move')}
+            </button>
+            <button
+              onClick={handleBatchDelete}
+              disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
+              className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {isBatchDeleting ? (t('deleting') || 'Deleting...') : (t('delete') || 'Delete')}
+            </button>
+            <button
+              onClick={clearSelection}
+              disabled={isBatchMoving || isBatchDeleting}
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+            >
+              {t('clear') || 'Clear'}
+            </button>
+            <button
+              onClick={toggleSelectionMode}
+              disabled={isBatchMoving || isBatchDeleting}
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+            >
+              {t('doneSelecting') || 'Done'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
         <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
           {breadcrumbs.map((crumb, index) => (
@@ -723,18 +1091,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-48 transition-all focus:w-64"
             />
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-60 dark:invert" />
             {searchTerm && (
               <button
                 onClick={() => { setSearchTerm(''); setDebouncedSearchTerm(''); }}
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 aria-label="Clear search"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
               </button>
             )}
           </div>
@@ -749,40 +1113,43 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             }`}
             title={t('refresh')}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className={`h-5 w-5 ${isRefreshing || isFetching ? 'animate-spin' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <Image src="/icons/refresh.svg" alt="" width={20} height={20} className={`${isRefreshing || isFetching ? 'animate-spin' : ''} dark:invert`} />
           </button>
+
+          {isEditor && (
+            <button
+              onClick={toggleSelectionMode}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm text-sm font-medium ${isSelectionMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+            >
+              <Image src="/icons/select.svg" alt="" width={20} height={20} className="dark:invert" />
+              {isSelectionMode ? (t('doneSelecting') || 'Done') : (t('select') || 'Select')}
+            </button>
+          )}
 
           {isEditor && (<button
             onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())}
             className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
+            <Image src="/upload.svg" alt="" width={20} height={20} className="dark:invert" />
             {t('upload')}
           </button>
           )}
 
           {isEditor && (
             <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <Image src="/icons/plus.svg" alt="" width={20} height={20} className="dark:invert" />
               {t('createFolder')}
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6" onContextMenu={handleBackgroundContextMenu}>
+      <div
+        ref={gridAreaRef}
+        className="flex-1 overflow-y-auto p-6"
+        onContextMenu={handleBackgroundContextMenu}
+        onMouseDown={startMarqueeSelection}
+      >
         {isLoading ? (
           <FolderSkeleton />
         ) : (
@@ -808,7 +1175,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} ${t('items')}` : ''}</p>
                       </div>
                       <div className="text-gray-300 dark:text-gray-600">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        <Image src="/icons/chevron-right.svg" alt="" width={20} height={20} className="dark:invert" />
                       </div>
                     </div>
                   ))}
@@ -824,6 +1191,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {userItems.map((item) => {
                   const isFile = item.type === 'file';
+                  const isSelected = selectedFileIds.has(item.id);
+                  const isDragOverTarget = dragOverFolderId === item.id;
 
                   if (!isFile && item.type === 'folder') {
                     return (
@@ -831,7 +1200,38 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                         key={item.id}
                         onClick={() => handleNavigate(item)}
                         onContextMenu={(e) => handleRightClick(e, item)}
-                        className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700`}
+                        onDragOver={(e) => {
+                          if (!isEditor) return;
+                          e.preventDefault();
+                          setDragOverFolderId(item.id);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverFolderId === item.id) {
+                            setDragOverFolderId(null);
+                          }
+                        }}
+                        onDrop={async (e) => {
+                          if (!isEditor) return;
+                          e.preventDefault();
+                          setDragOverFolderId(null);
+
+                          let draggedIds: string[] = [];
+                          try {
+                            const raw = e.dataTransfer.getData('application/json');
+                            if (raw) {
+                              const parsed = JSON.parse(raw);
+                              if (Array.isArray(parsed?.fileIds)) {
+                                draggedIds = parsed.fileIds;
+                              }
+                            }
+                          } catch {
+                            draggedIds = [];
+                          }
+
+                          const idsToMove = draggedIds.length > 0 ? draggedIds : Array.from(selectedFileIds);
+                          await moveFilesToFolder(idsToMove, item.id);
+                        }}
+                        className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:shadow-sm dark:hover:bg-[#2c2c2c] ${isDragOverTarget ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-500' : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'}`}
                       >
                         <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200 text-gray-400 group-hover:text-blue-500">
                           {renderIcon(item, false)}
@@ -845,11 +1245,51 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
                   return (
                     <div
+                      ref={(el) => {
+                        fileTileRefs.current[item.id] = el;
+                      }}
+                      data-select-item="true"
                       key={item.id}
-                      onClick={() => handleNavigate(item)}
+                      onClick={(e) => {
+                        if (suppressItemClickRef.current) {
+                          suppressItemClickRef.current = false;
+                          return;
+                        }
+
+                        if ((e.ctrlKey || e.metaKey) && isEditor) {
+                          e.preventDefault();
+                          if (!isSelectionMode) setIsSelectionMode(true);
+                          toggleFileSelection(item.id);
+                          return;
+                        }
+                        handleNavigate(item);
+                      }}
                       onContextMenu={(e) => handleRightClick(e, item)}
-                      className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700`}
+                      draggable={isEditor}
+                      onDragStart={(e) => {
+                        const payloadIds = isSelectionMode && isSelected && selectedFileCount > 1
+                          ? selectedFiles.map((file) => file.id)
+                          : [item.id];
+                        e.dataTransfer.setData('application/json', JSON.stringify({ fileIds: payloadIds }));
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragEnd={() => setDragOverFolderId(null)}
+                      className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700 ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent'}`}
                     >
+                      {isEditor && isSelectionMode && (
+                        <label className="absolute top-2 left-2 z-10 flex items-center justify-center w-5 h-5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f1f1f] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleFileSelection(item.id, e.target.checked);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-3.5 w-3.5"
+                          />
+                        </label>
+                      )}
                       <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
                         {renderIcon(item, false)}
                       </div>
@@ -871,6 +1311,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           </div>
         )}
       </div>
+
+      {marqueeSelection && (
+        <div
+          className="fixed z-[250] border border-blue-500 bg-blue-400/15 pointer-events-none"
+          style={{
+            left: Math.min(marqueeSelection.startX, marqueeSelection.currentX),
+            top: Math.min(marqueeSelection.startY, marqueeSelection.currentY),
+            width: Math.abs(marqueeSelection.currentX - marqueeSelection.startX),
+            height: Math.abs(marqueeSelection.currentY - marqueeSelection.startY),
+          }}
+        />
+      )}
 
       {contextMenu.visible && (
         <div
@@ -897,14 +1349,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 onClick={() => handleContextMenuAction('upload')}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                <Image src="/upload.svg" width={16} height={16} className="dark:invert" alt="" />
                 {t('upload')}
               </button>
               <button
                 onClick={() => handleContextMenuAction('createFolder')}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                <Image src="/icons/plus.svg" width={16} height={16} className="dark:invert" alt="" />
                 {t('createFolder')}
               </button>
             </>
@@ -915,13 +1367,45 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               onClick={() => handleContextMenuAction('createChild')}
               className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              <Image src="/icons/plus.svg" width={16} height={16} className="dark:invert" alt="" />
               {t('createSubfolder') || 'Create Subfolder'}
             </button>
           )}
 
           {contextMenu.item && (
             <>
+              {contextMenu.item.type === 'file' && (
+                <button
+                  onClick={() => handleContextMenuAction(selectedFileIds.has(contextMenu.item!.id) ? 'deselect' : 'select')}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                >
+                  <Image src="/icons/select.svg" width={16} height={16} className="dark:invert" alt="" />
+                  {selectedFileIds.has(contextMenu.item.id)
+                    ? (t('deselect') || 'Deselect')
+                    : (t('select') || 'Select')}
+                </button>
+              )}
+
+              {isSelectionMode && contextMenu.item.type === 'file' && selectedFileCount > 0 && selectedFileIds.has(contextMenu.item.id) && (
+                <>
+                  <button
+                    onClick={() => handleContextMenuAction('moveSelected')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                  >
+                    <Image src="/icons/move-selected.svg" width={16} height={16} className="dark:invert" alt="" />
+                    {t('moveSelected') || 'Move selected'}
+                  </button>
+                  <button
+                    onClick={() => handleContextMenuAction('deleteSelected')}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
+                  >
+                    <Image src="/icons/trash.svg" width={16} height={16} className="dark:invert" alt="" />
+                    {t('deleteSelected') || 'Delete selected'}
+                  </button>
+                  <div className="mx-2 my-1 border-t border-gray-100 dark:border-gray-700" />
+                </>
+              )}
+
               {contextMenu.item.type !== 'folder' && (
                 <button
                   onClick={() => handleContextMenuAction('download')}
@@ -936,9 +1420,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 onClick={() => handleContextMenuAction('share')}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
+                <Image src="/icons/share.svg" width={16} height={16} className="dark:invert" alt="" />
                 {t('share') || 'Share'}
               </button>
 
@@ -946,7 +1428,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 onClick={() => handleContextMenuAction('rename')}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                <Image src="/icons/rename.svg" width={16} height={16} className="dark:invert" alt="" />
                 {t('rename') || 'Rename'}
               </button>
 
@@ -954,7 +1436,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 onClick={() => handleContextMenuAction('security')}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                <Image src="/icons/lock.svg" width={16} height={16} className="dark:invert" alt="" />
                 {t('permissions') || 'Permissions'}
               </button>
 
@@ -962,7 +1444,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 onClick={() => handleContextMenuAction('delete')}
                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                <Image src="/icons/trash.svg" width={16} height={16} className="dark:invert" alt="" />
                 {t('delete') || 'Delete'}
               </button>
             </>
@@ -1018,13 +1500,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         >
           <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-600">
             <div className={`flex items-center gap-3 mb-4 ${deleteMode === 'force' ? 'text-amber-500' : 'text-red-500'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {deleteMode === 'force' ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                )}
-              </svg>
+              <Image src={deleteMode === 'force' ? '/icons/warning.svg' : '/icons/trash.svg'} alt="" width={32} height={32} className="dark:invert" />
               <h3 className="text-lg font-bold dark:text-white">
                 {deleteMode === 'force' ? (t('warning') || 'Warning') : (t('delete') || 'Delete Item')}
               </h3>
@@ -1055,8 +1531,93 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 className={`px-4 py-2 text-sm text-white rounded transition-colors shadow-sm flex items-center gap-2 ${deleteMode === 'force' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
                 disabled={isLoading}
               >
-                {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>}
+                {isLoading && <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin" />}
                 {deleteMode === 'force' ? (t('yesDelete') || 'Yes, Delete') : (t('delete') || 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMoveModalOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4 animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsMoveModalOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-[#333] rounded-lg p-5 max-w-xl w-full shadow-xl border border-gray-200 dark:border-gray-600 max-h-[80vh] flex flex-col">
+            <h3 className="text-lg font-bold mb-3 dark:text-white">{t('moveToFolder') || 'Move to folder'}</h3>
+
+            <div className="flex items-center flex-wrap gap-2 text-sm mb-3">
+              {moveBreadcrumbs.map((crumb, index) => (
+                <React.Fragment key={`${crumb.id || 'root'}-${index}`}>
+                  {index > 0 && <span className="text-gray-400">/</span>}
+                  <button
+                    onClick={() => handleMoveBreadcrumbClick(index)}
+                    className={`hover:underline ${index === moveBreadcrumbs.length - 1 ? 'font-semibold text-gray-900 dark:text-white' : 'text-blue-600 dark:text-blue-400'}`}
+                  >
+                    {crumb.name}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
+
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex-1 overflow-y-auto min-h-[220px]">
+              <button
+                onClick={() => setTargetMoveFolderId(moveCurrentFolderId)}
+                className={`w-full text-left px-3 py-2 rounded-md mb-2 border ${targetMoveFolderId === moveCurrentFolderId ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              >
+                <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                  {t('selectCurrentFolder') || 'Select this folder'}
+                </div>
+              </button>
+
+              {isMoveFoldersLoading ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">{t('loading') || 'Loading...'}</div>
+              ) : moveFolderItems.length === 0 ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">{t('noSubfolders') || 'No subfolders here'}</div>
+              ) : (
+                <div className="space-y-1">
+                  {moveFolderItems.map((folder) => (
+                    <div key={folder.id} className="flex items-center gap-2">
+                      <button
+                        onClick={() => setTargetMoveFolderId(folder.id)}
+                        className={`flex-1 text-left px-3 py-2 rounded-md border ${targetMoveFolderId === folder.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                      >
+                        <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{folder.name}</div>
+                      </button>
+                      <button
+                        onClick={() => handleMoveModalNavigate(folder)}
+                        className="px-2 py-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        title={t('openFolder') || 'Open folder'}
+                      >
+                        <Image src="/icons/chevron-right.svg" width={16} height={16} className="dark:invert" alt="" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                onClick={() => setIsMoveModalOpen(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                {t('cancel') || 'Cancel'}
+              </button>
+              <button
+                onClick={async () => {
+                  await moveFilesToFolder(Array.from(selectedFileIds), targetMoveFolderId);
+                  setIsMoveModalOpen(false);
+                }}
+                disabled={isBatchMoving || selectedFileCount === 0}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
+              >
+                {isBatchMoving ? (t('moving') || 'Moving...') : (t('moveHere') || 'Move here')}
               </button>
             </div>
           </div>

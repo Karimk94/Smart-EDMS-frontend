@@ -269,16 +269,14 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
       <div className="flex-shrink-0 flex justify-between items-center mb-6 bg-blue-900/30 p-4 rounded-lg border border-blue-800">
         <div className="flex flex-col">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
+            <Image src="/folder.svg" alt="" width={24} height={24} className="brightness-0 invert" />
             Upload to Folder
           </h2>
           <p className="text-sm text-gray-300 mt-1">
             Target Directory: <span className="text-blue-300 font-bold underline">{parentName || 'Home'}</span>
           </p>
         </div>
-        <button onClick={handleClose} disabled={isUploading} className="text-gray-400 hover:text-white text-3xl disabled:opacity-50">&times;</button>
+        <button onClick={handleClose} disabled={isUploading} className="text-gray-400 hover:text-white disabled:opacity-50 p-1"><Image src="/icons/close.svg" alt="" width={24} height={24} className="invert" /></button>
       </div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 overflow-hidden">
@@ -288,7 +286,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-blue-500 bg-[#222]' : 'border-gray-600'}`}>
-            <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2" />
+            <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2 invert" />
             <p className="mt-2 text-lg text-gray-300">Drag & Drop files here</p>
             <p className="text-sm text-gray-500">or</p>
             <label htmlFor="folder-file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
@@ -329,10 +327,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             >
               {isUploading ? (
                 <>
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin" />
                   Uploading...
                 </>
               ) : (

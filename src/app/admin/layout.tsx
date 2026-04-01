@@ -70,9 +70,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                             className="p-2 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
                             aria-label={t('backToDashboard')}
                         >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
-                            </svg>
+                            <Image src="/icons/chevron-left.svg" alt="" width={24} height={24} className="w-6 h-6 dark:invert" />
                         </Link>
                         <Link href="/admin">
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white ml-4 cursor-pointer">

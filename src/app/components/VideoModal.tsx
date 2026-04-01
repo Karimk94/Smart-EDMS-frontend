@@ -214,14 +214,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
               className={`p-2 rounded-full transition-colors ${isFavorite ? 'bg-black bg-opacity-10' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} flex-shrink-0 mt-0.5`}
               title={isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
-              <svg className={`w-6 h-6 ${isFavorite ? 'text-yellow-400' : 'text-gray-300'} `} fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={isFavorite ? 1 : 2}
-                  d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01 .321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z"
-                />
-              </svg>
+              <Image src={isFavorite ? "/icons/star-filled.svg" : "/icons/star-outline.svg"} alt="" width={24} height={24} />
             </button>
             <h2 className={`text-xl font-bold ${textHeader} break-words pt-1 mt-0.5`}>
               {doc.docname.replace(/\.[^/.]+$/, "")}
@@ -247,7 +240,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
 
             {/* Close Button */}
             <button onClick={onClose} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-2`}>
-              <span className={`text-3xl leading-none ${closeButtonColor} `}>&times;</span>
+              <Image src="/icons/close.svg" alt="" width={24} height={24} className={`${closeButtonColor.includes('hover:text-white') ? 'invert' : 'dark:invert'}`} />
             </button>
           </div>
         </div>
@@ -263,9 +256,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
                 onClick={handleFullScreen}
                 className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors z-[70]"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <Image src="/icons/close.svg" alt="" width={32} height={32} className="invert" />
               </button>
             )}
           </div>

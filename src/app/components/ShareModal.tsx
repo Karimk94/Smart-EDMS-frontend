@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useToast } from '../context/ToastContext';
 import { useSecurityMutation } from '../../hooks/useSecurity';
 
@@ -150,13 +151,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
         <div className="flex items-center gap-3 mb-4">
           <div className={`p-2 rounded-lg ${iconBgColor}`}>
             {isFolder ? (
-              <svg className={`w-6 h-6 ${iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
+              <Image src="/icons/folder-outline.svg" alt="" width={24} height={24} className={iconColor.includes('yellow') ? '' : 'dark:invert'} />
             ) : (
-              <svg className={`w-6 h-6 ${iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <Image src="/icons/file-outline.svg" alt="" width={24} height={24} className="dark:invert" />
             )}
           </div>
           <div>
@@ -225,9 +222,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                           onClick={() => handleRemoveEmail(email)}
                           className="hover:text-red-500 focus:outline-none"
                         >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          <Image src="/icons/close.svg" alt="" width={12} height={12} className="dark:invert" />
                         </button>
                       </div>
                     ))}
@@ -253,9 +248,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                     disabled={!targetEmail || !validateEmail(targetEmail)}
                     className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
+                    <Image src="/icons/plus.svg" alt="" width={20} height={20} className="dark:invert" />
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -281,9 +274,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
             {isFolder && (
               <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <Image src="/icons/info.svg" alt="" width={20} height={20} className="flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-yellow-700 dark:text-yellow-300">
                     {t('folderShareNotice')}
                   </p>
@@ -357,16 +348,12 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   }`}>
                   {isFolder ? (
                     <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                      </svg>
+                      <Image src="/icons/folder-outline.svg" alt="" width={16} height={16} />
                       {t('folderShareCreated')}
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                      <Image src="/icons/file-outline.svg" alt="" width={16} height={16} className="dark:invert" />
                       {t('fileShareCreated')}
                     </>
                   )}

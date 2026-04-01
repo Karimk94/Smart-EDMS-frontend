@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from 'next/image';
 import { useEffect, useState } from "react";
 import { EdmsUser, PersonResult, useAdmin } from "../../hooks/useAdmin";
 import QuotaPieChart from "../components/QuotaPieChart";
@@ -608,20 +609,10 @@ export default function AdminPage() {
                                     placeholder="Search users..."
                                     className="w-full sm:w-64 px-3 py-2 pl-9 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                                 />
-                                <svg
-                                    className="absolute left-3 top-2.5 h-4 w-4 text-gray-400"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
+                                <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:invert" />
                                 {isLoadingUsers && (
                                     <div className="absolute right-3 top-2.5">
-                                        <svg className="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                        </svg>
+                                        <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin h-4 w-4" />
                                     </div>
                                 )}
                             </div>
@@ -630,9 +621,7 @@ export default function AdminPage() {
                                 onClick={() => setShowAddModal(true)}
                                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 text-sm font-medium"
                             >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
+                                <Image src="/icons/plus.svg" alt="" width={16} height={16} className="h-4 w-4 invert" />
                                 Add User
                             </button>
                         </div>
@@ -776,9 +765,7 @@ export default function AdminPage() {
                                 onClick={closeAddModal}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                             >
-                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <Image src="/icons/close.svg" alt="" width={24} height={24} className="h-6 w-6 dark:invert" />
                             </button>
                         </div>
 
@@ -801,10 +788,7 @@ export default function AdminPage() {
                                 />
                                 {isSearching && (
                                     <div className="absolute right-4 top-11 text-gray-400">
-                                        <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                        </svg>
+                                        <Image src="/icons/spinner.svg" alt="" width={20} height={20} className="animate-spin h-5 w-5" />
                                     </div>
                                 )}
                                 {searchResults.length > 0 && !selectedPerson && (
@@ -845,9 +829,7 @@ export default function AdminPage() {
                                         }}
                                         className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200"
                                     >
-                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
+                                        <Image src="/icons/close.svg" alt="" width={20} height={20} className="h-5 w-5 dark:invert" />
                                     </button>
                                 </div>
                             )}
@@ -977,10 +959,7 @@ export default function AdminPage() {
                             >
                                 {isAddingUser ? (
                                     <>
-                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                        </svg>
+                                        <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin h-4 w-4 invert" />
                                         Adding...
                                     </>
                                 ) : (
@@ -1005,9 +984,7 @@ export default function AdminPage() {
                                 onClick={closeEditModal}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                             >
-                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <Image src="/icons/close.svg" alt="" width={24} height={24} className="h-6 w-6 dark:invert" />
                             </button>
                         </div>
 
@@ -1168,9 +1145,7 @@ export default function AdminPage() {
                             {editTarget.security_level === 'Admin' && (
                                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                        <Image src="/icons/info.svg" alt="" width={16} height={16} className="h-4 w-4 dark:invert" />
                                         Admin users have full access to all tabs.
                                     </div>
                                 </div>
@@ -1193,10 +1168,7 @@ export default function AdminPage() {
                             >
                                 {isUpdatingUser ? (
                                     <>
-                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                        </svg>
+                                        <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin h-4 w-4 invert" />
                                         Saving...
                                     </>
                                 ) : (

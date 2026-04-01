@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useToast } from '../context/ToastContext';
 import { useTags } from '../../hooks/useTags';
 
@@ -155,13 +156,9 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
                     title={tag.shortlisted ? "Remove from shortlist" : "Add to shortlist"}
                   >
                     {tag.shortlisted === 1 ? (
-                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.196-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
+                      <Image src="/icons/star-filled.svg" alt="" width={14} height={14} />
                     ) : (
-                      <svg className="w-3.5 h-3.5 stroke-current fill-none" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.539 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588 1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                      </svg>
+                      <Image src="/icons/star-outline.svg" alt="" width={14} height={14} />
                     )}
                   </button>
                 )}
@@ -169,7 +166,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
                 <span>{tag.text}</span>
 
                 <button onClick={() => handleRemoveTagClick(tag.text)} className="ml-2 -mr-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white focus:outline-none" aria-label={`Remove ${tag.text}`} >
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"> <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /> </svg>
+                  <Image src="/icons/close.svg" alt="" width={12} height={12} className="dark:invert" />
                 </button>
               </div>
             )) : <span className="text-sm text-gray-500 italic px-1">{t('noTagsAssigned')}.</span>}
@@ -192,7 +189,7 @@ export const TagEditor: React.FC<TagEditorProps> = ({ docId, apiURL, lang, theme
                 aria-autocomplete="list" aria-controls="tag-suggestions" aria-expanded={isSuggestionVisible}
               />
               <button onClick={handleToggleSuggestions} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md hover:bg-gray-200 dark:hover:bg-gray-600 transition" aria-label="Browse tags" >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"> <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /> </svg>
+                <Image src="/icons/more-vertical.svg" alt="" width={20} height={20} className="dark:invert" />
               </button>
             </div>
 

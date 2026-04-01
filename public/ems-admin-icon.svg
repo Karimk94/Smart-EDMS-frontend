@@ -1,10 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Gear/Cog for settings/admin -->
-  <circle cx="12" cy="12" r="3"></circle>
-  <path d="M12 1v6m0 6v6"></path>
-  <path d="M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24"></path>
-  <path d="M1 12h6m6 0h6"></path>
-  <path d="M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
-  <!-- Shield background for security -->
-  <path d="M12 17a5 5 0 0 0 5 -5V7H7v5a5 5 0 0 0 5 5z" opacity="0.3"></path>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="5" width="8" height="6" rx="1.2"/>
+  <rect x="13" y="3" width="8" height="8" rx="1.2"/>
+  <rect x="7" y="13" width="10" height="8" rx="1.2"/>
+  <path d="M11 8h2"/>
+  <path d="M9 11v2"/>
+  <path d="M17 11v2"/>
+  <path d="M12 13v-2"/>
+  <circle cx="12" cy="17" r="2"/>
+  <path d="M12 15v-1"/>
 </svg>

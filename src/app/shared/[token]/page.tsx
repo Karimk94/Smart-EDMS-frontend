@@ -982,9 +982,7 @@ export default function SharedDocumentPage() {
         <div className="bg-orange-50 dark:bg-orange-900/10 p-4 border-b border-orange-100 dark:border-orange-900/30 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
-              <svg className="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z" />
-              </svg>
+              <Image src="/file-powerpoint.svg" alt="" width={24} height={24} className="w-6 h-6" />
             </div>
             <div>
               <h3 className="font-bold text-gray-800 dark:text-gray-200">Presentation Content</h3>
@@ -1079,9 +1077,7 @@ export default function SharedDocumentPage() {
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title={t('back') || 'Back'}
             >
-              <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <Image src="/icons/chevron-left.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">
@@ -1096,9 +1092,7 @@ export default function SharedDocumentPage() {
               {isDownloading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
+                <Image src="/download.svg" alt="" width={16} height={16} className="w-4 h-4 invert" />
               )}
               {isDownloading ? (t('downloading') || 'Downloading...') : (t('download'))}
             </button>
@@ -1184,9 +1178,7 @@ export default function SharedDocumentPage() {
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
           {/* Breadcrumbs */}
           <div className="flex items-center gap-2 mb-2 overflow-x-auto">
-            <svg className="w-5 h-5 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
-            </svg>
+            <Image src="/folder.svg" alt="" width={20} height={20} className="w-5 h-5 flex-shrink-0" />
             {breadcrumbs.map((crumb: BreadcrumbItem, index: number) => (
               <React.Fragment key={crumb.id}>
                 {index > 0 && <span className="text-gray-400">/</span>}
@@ -1212,9 +1204,7 @@ export default function SharedDocumentPage() {
                   className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
                   title={t('back') || 'Back'}
                 >
-                  <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  <Image src="/icons/chevron-left.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
                 </button>
               )}
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -1235,9 +1225,7 @@ export default function SharedDocumentPage() {
             </div>
           ) : folderContents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-              <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
+              <Image src="/folder.svg" alt="" width={64} height={64} className="w-16 h-16 mb-4 opacity-60" />
               <p>{t('emptyFolder') || 'This folder is empty'}</p>
             </div>
           ) : (
@@ -1270,9 +1258,7 @@ export default function SharedDocumentPage() {
         {/* Footer with access info */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
           <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Image src="/icons/check.svg" alt="" width={20} height={20} className="w-5 h-5" />
             <span>{t('VerifiedAccessFor')} <strong>{email}</strong></span>
           </div>
         </div>
@@ -1291,9 +1277,7 @@ export default function SharedDocumentPage() {
               onClick={handleContextMenuDownload}
               className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
+              <Image src="/download.svg" alt="" width={16} height={16} className="w-4 h-4 dark:invert" />
               {t('download') || 'Download'}
             </button>
           </div>
@@ -1343,9 +1327,7 @@ export default function SharedDocumentPage() {
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 text-center">
             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+              <Image src="/icons/warning.svg" alt="" width={32} height={32} className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
               {t('linkInvalid') || 'Link Invalid'}
@@ -1406,9 +1388,7 @@ export default function SharedDocumentPage() {
                   {isDownloading ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
+                    <Image src="/download.svg" alt="" width={16} height={16} className="w-4 h-4 invert" />
                   )}
                   {isDownloading ? (t('downloading') || 'Downloading...') : (t('download'))}
                 </button>
@@ -1500,9 +1480,7 @@ export default function SharedDocumentPage() {
 
                 {/* Access Confirmation */}
                 <div className="border border-green-300 dark:border-green-600 rounded-lg p-4 bg-green-50 dark:bg-green-900/20 inline-block text-green-800 dark:text-green-200 text-center">
-                  <svg className="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <Image src="/icons/check.svg" alt="" width={24} height={24} className="w-6 h-6 mx-auto mb-2" />
                   {t('VerifiedAccessFor')} <strong>{email}</strong>
                   <br />
                   <span className="text-xs opacity-75">{t('AccessLoggedAt')} {new Date().toLocaleTimeString()}</span>
@@ -1540,9 +1518,7 @@ export default function SharedDocumentPage() {
             {shareInfo?.share_type === 'folder' && (
               <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
                 <div className="flex items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
-                  </svg>
+                  <Image src="/folder.svg" alt="" width={20} height={20} className="w-5 h-5" />
                   <span className="font-medium text-sm">{t('sharedFolder') || 'Shared Folder'}</span>
                 </div>
               </div>
@@ -1552,9 +1528,7 @@ export default function SharedDocumentPage() {
             {shareInfo?.is_restricted && (
               <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
+                  <Image src="/icons/lock.svg" alt="" width={20} height={20} className="w-5 h-5" />
                   <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
                     {t('restrictedLink') || 'Restricted Access'}
                   </span>

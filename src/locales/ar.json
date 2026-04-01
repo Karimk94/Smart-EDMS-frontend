@@ -113,6 +113,8 @@
   "readWrite": "قراءة/كتابة",
   "readOnly": "قراءة فقط",
   "savePermissions": "حفظ الصلاحيات",
+  "addAllMembers": "إضافة جميع أعضاء المجموعة",
+  "authorCannotBeRemoved": "المؤلف – لا يمكن حذفه",
   "add": "إضافة",
   "user": "المستخدم",
   "remove": "إزالة",

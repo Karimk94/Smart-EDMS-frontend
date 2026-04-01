@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '../context/ToastContext';
 
 import { SecurityModalProps, Trustee } from '../../interfaces/PropsInterfaces';
 import { useGroups, fetchGroupMembers } from '../../hooks/usePersons';
 import { useTrustees, useSecurityMutation } from '../../hooks/useSecurity';
+import { useAuth } from '../../hooks/useAuth';
 
 const InfiniteSelect = ({
   options,
@@ -48,7 +49,7 @@ const InfiniteSelect = ({
     }
   };
 
-  const updateDropdownPosition = () => {
+  const updateDropdownPosition = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -83,7 +84,7 @@ const InfiniteSelect = ({
       width,
       maxHeight: Math.min(listMaxHeight, Math.max(120, maxAvailableHeight - headerHeight)),
     });
-  };
+  }, [onSearch]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -121,7 +122,7 @@ const InfiniteSelect = ({
       window.removeEventListener('resize', updateDropdownPosition);
       window.removeEventListener('scroll', updateDropdownPosition, true);
     };
-  }, [isOpen, options.length, isLoading, onSearch]);
+  }, [isOpen, options.length, isLoading, updateDropdownPosition]);
 
   const selectedOption = options.find(o => o.value === value);
 
@@ -225,10 +226,18 @@ const InfiniteSelect = ({
 };
 
 export default function SecurityModal({ isOpen, onClose, docId, library, itemName, t }: SecurityModalProps) {
+  const { user } = useAuth();
+  const currentUsername = user?.username;
+
   const { data: trusteesData, isLoading: isLoadingTrustees } = useTrustees(parseInt(docId));
   const [trustees, setTrustees] = useState<Trustee[]>([]);
   const [saving, setSaving] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const hasLoadedInitialTrustees = useRef(false);
+  const trusteesDataRef = useRef(trusteesData);
+  trusteesDataRef.current = trusteesData;
+  const currentUsernameRef = useRef(currentUsername);
+  currentUsernameRef.current = currentUsername;
 
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [groupSearch, setGroupSearch] = useState('');
@@ -242,6 +251,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   const [memberSearch, setMemberSearch] = useState('');
   const [memberPage, setMemberPage] = useState(1);
   const [hasMoreMembers, setHasMoreMembers] = useState(true);
+  const [isAddingAllMembers, setIsAddingAllMembers] = useState(false);
 
   const { showToast } = useToast();
   const { updateSecurity, isUpdatingSecurity } = useSecurityMutation();
@@ -263,10 +273,20 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (trusteesData) {
-      setTrustees(trusteesData);
+    // Run once when the real fetch completes (isLoadingTrustees flips to false)
+    if (!isLoadingTrustees && !hasLoadedInitialTrustees.current) {
+      const initial = [...(trusteesDataRef.current || [])];
+      const username = currentUsernameRef.current;
+      // Always ensure the current user (author) is visible immediately
+      if (username && !initial.find(t => t.username === username)) {
+        initial.unshift({ username, rights: 255, flag: 2 });
+      }
+      setTrustees(initial);
+      hasLoadedInitialTrustees.current = true;
     }
-  }, [trusteesData]);
+  // Only react to the loading flag — trusteesData/currentUsername are read via refs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingTrustees]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -278,6 +298,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       setHasMoreMembers(true);
       setGroupSearch('');
       setIsExpanded(false);
+      hasLoadedInitialTrustees.current = false;
     }
   }, [isOpen]);
 
@@ -361,6 +382,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
   };
 
   const handleRemoveTrustee = (username: string) => {
+    if (username === currentUsername) return;
     setTrustees(trustees.filter(t => t.username !== username));
   };
 
@@ -370,13 +392,68 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
     ));
   };
 
+  const handleAddAllGroupMembers = async () => {
+    if (!selectedGroupId || isAddingAllMembers) return;
+    setIsAddingAllMembers(true);
+    try {
+      const allMembers: any[] = [];
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const data = await fetchGroupMembers(selectedGroupId, page, '');
+        const members = Array.isArray(data?.options) ? data.options : [];
+        allMembers.push(...members);
+        hasMore = data?.hasMore ?? false;
+        page++;
+        if (members.length === 0) break;
+      }
+      setTrustees(prev => {
+        const existing = new Set(prev.map(t => t.username));
+        const newEntries = allMembers
+          .filter(m => {
+            const uid = m.user_id || m.USER_ID || m.id;
+            return uid && !existing.has(uid);
+          })
+          .map(m => ({
+            username: m.user_id || m.USER_ID || m.id as string,
+            rights: 63,
+            flag: 2
+          }));
+        return [...prev, ...newEntries];
+      });
+    } catch (err) {
+      console.error('Failed to fetch all group members', err);
+      showToast(t('failedToUpdatePermissions'), 'error');
+    } finally {
+      setIsAddingAllMembers(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
+      let updatedTrustees = [...trustees];
+
+      // Auto-add member that was selected but not yet clicked Add
+      if (selectedMemberId) {
+        const person = groupMembers.find(m => (m.user_id || m.USER_ID || m.id) === selectedMemberId);
+        if (person) {
+          const userId = person.user_id || person.USER_ID || person.id;
+          if (userId && !updatedTrustees.find(t => t.username === userId)) {
+            updatedTrustees = [...updatedTrustees, { username: userId, rights: 63, flag: 2 }];
+          }
+        }
+      }
+
+      // Ensure the current user (author) is always present with full control
+      if (currentUsername && !updatedTrustees.find(t => t.username === currentUsername)) {
+        updatedTrustees = [{ username: currentUsername, rights: 255, flag: 2 }, ...updatedTrustees];
+      }
+
       await updateSecurity({
         docId: parseInt(docId),
         library: library || 'RTA_MAIN',
-        trustees: trustees,
+        trustees: updatedTrustees,
         security_enabled: '1'
       });
 
@@ -503,6 +580,34 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                 {t('add') || "Add"}
               </button>
             </div>
+
+            {/* Add All Group Members */}
+            {selectedGroupId && (
+              <div className="flex justify-end mt-2">
+                <button
+                  onClick={handleAddAllGroupMembers}
+                  disabled={isAddingAllMembers}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-blue-600 dark:text-blue-300 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
+                >
+                  {isAddingAllMembers ? (
+                    <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                      <line x1="19" y1="8" x2="23" y2="8"></line>
+                      <line x1="21" y1="6" x2="21" y2="10"></line>
+                    </svg>
+                  )}
+                  {t('addAllMembers') || 'Add All Members from Group'}
+                </button>
+              </div>
+            )}
             </div>
 
             {/* Trustees List */}
@@ -556,17 +661,29 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                         </select>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleRemoveTrustee(trustee.username)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                          </svg>
-                        </button>
+                        {trustee.username === currentUsername ? (
+                          <span
+                            title={t('authorCannotBeRemoved') || 'Author – cannot be removed'}
+                            className="inline-flex items-center justify-center p-1 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRemoveTrustee(trustee.username)}
+                            className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"></polyline>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              <line x1="10" y1="11" x2="10" y2="17"></line>
+                              <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))

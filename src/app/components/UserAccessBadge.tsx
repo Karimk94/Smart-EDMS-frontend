@@ -1,0 +1,125 @@
+import React, { useEffect, useRef, useState } from 'react';
+
+type UserPermission = {
+  tab_key: string;
+  can_read: boolean;
+  can_write: boolean;
+};
+
+type HeaderUser = {
+  username?: string;
+  security_level?: string;
+  tab_permissions?: UserPermission[];
+};
+
+interface UserAccessBadgeProps {
+  user?: HeaderUser;
+  lang?: 'en' | 'ar';
+}
+
+const TAB_LABELS: Record<string, string> = {
+  recent: 'Recent',
+  favorites: 'Favorites',
+  folders: 'Folders',
+  profilesearch: 'Profile Search',
+  ems_admin: 'EMS Admin',
+};
+
+const formatTabLabel = (tabKey: string): string => {
+  if (TAB_LABELS[tabKey]) return TAB_LABELS[tabKey];
+  return tabKey
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
+
+const formatAccess = (permission: UserPermission): string => {
+  if (permission.can_write) return 'Read/Write';
+  if (permission.can_read) return 'Read Only';
+  return 'No Access';
+};
+
+export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({ user, lang = 'en' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  if (!user?.username) {
+    return null;
+  }
+
+  const tabPermissions = user.tab_permissions ?? [];
+  const noPermissionsText = lang === 'ar' ? 'لا توجد صلاحيات تبويب محددة' : 'No explicit tab permissions';
+  const securityLabel = lang === 'ar' ? 'مستوى الأمان' : 'Security Level';
+  const tabAccessLabel = lang === 'ar' ? 'صلاحيات التبويبات' : 'Tab Access';
+
+  return (
+    <div ref={wrapperRef} className="relative group">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+      >
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-semibold">
+          {user.username.charAt(0).toUpperCase()}
+        </span>
+        <span className="max-w-[120px] truncate font-medium">{user.username}</span>
+      </button>
+
+      <div
+        className={`absolute right-0 mt-2 w-72 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg translate-y-1 transition-all duration-150 z-50 ${isOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none'} group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0`}
+      >
+        <div className="p-3 text-sm">
+          <p className="text-gray-500 dark:text-gray-400">{securityLabel}</p>
+          <p className="font-semibold text-gray-900 dark:text-gray-100">
+            {user.security_level || 'N/A'}
+          </p>
+
+          <div className="mt-3">
+            <p className="text-gray-500 dark:text-gray-400 mb-1">{tabAccessLabel}</p>
+            {tabPermissions.length === 0 ? (
+              <p className="text-gray-700 dark:text-gray-300">{noPermissionsText}</p>
+            ) : (
+              <ul className="space-y-1 max-h-48 overflow-auto pr-1">
+                {tabPermissions.map((permission) => (
+                  <li
+                    key={permission.tab_key}
+                    className="flex items-center justify-between text-gray-800 dark:text-gray-200"
+                  >
+                    <span>{formatTabLabel(permission.tab_key)}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                      {formatAccess(permission)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

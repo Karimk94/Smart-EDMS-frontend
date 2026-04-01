@@ -8,6 +8,7 @@ import { ReactNode } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { PageSpinner } from '../components/Spinner';
+import { UserAccessBadge } from '../components/UserAccessBadge';
 import { useTranslations } from '../hooks/useTranslations';
 
 interface EmsAdminLayoutProps {
@@ -101,6 +102,7 @@ export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
 
                     {/* Right: Empty */}
                     <div className="flex items-center gap-4 ml-auto">
+                        <UserAccessBadge user={user} lang={lang} />
                     </div>
                 </div>
             </header>

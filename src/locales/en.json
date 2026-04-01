@@ -113,6 +113,8 @@
   "readWrite": "Read/Write",
   "readOnly": "Read Only",
   "savePermissions": "Save Permissions",
+  "addAllMembers": "Add All Members from Group",
+  "authorCannotBeRemoved": "Author \u2013 cannot be removed",
   "add": "Add",
   "user": "User",
   "remove": "Remove",

@@ -50,7 +50,7 @@ const QuotaPieChart: React.FC<QuotaPieChartProps> = ({ remaining, total, compact
     };
 
     const chart = (
-        <div className="relative" title={compact ? `${formatSize(used)} used of ${formatSize(safeTotal)}` : undefined}>
+        <div className="relative">
             <div
                 className="relative rounded-full bg-gray-200 dark:bg-gray-700 transition-all duration-500"
                 style={{

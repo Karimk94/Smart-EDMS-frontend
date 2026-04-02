@@ -1,6 +1,5 @@
 import React from 'react';
 import { SearchBar } from './SearchBar';
-import QuotaPieChart from './QuotaPieChart';
 
 import { HeaderProps } from '../../interfaces/PropsInterfaces';
 
@@ -9,6 +8,7 @@ import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useQuota } from '../../hooks/useQuota';
 import Image from 'next/image';
 import { UserAccessBadge } from './UserAccessBadge';
+import { QuotaAccessBadge } from './QuotaAccessBadge';
 
 export const Header: React.FC<HeaderProps> = ({
   onSearch,
@@ -98,9 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
           className={`flex items-center gap-4 ${searchBarMargin} ${rtlClass}`}
         >
           {activeSection === 'folders' && quota !== undefined && remainingQuota !== undefined && (
-            <div className="bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm flex items-center gap-2 border border-gray-100 dark:border-gray-700 mx-2 cursor-pointer">
-              <QuotaPieChart remaining={remainingQuota} total={quota} compact={true} />
-            </div>
+            <QuotaAccessBadge total={quota} remaining={remainingQuota} t={t} />
           )}
           {isProcessing && (
             <div className="flex items-center gap-2 text-gray-900 dark:text-white text-sm">

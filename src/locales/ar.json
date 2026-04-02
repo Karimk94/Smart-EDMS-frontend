@@ -62,6 +62,7 @@
   "login": "تسجيل الدخول",
   "loggingIn": "جاري تسجيل الدخول...",
   "loading": "جاري التحميل...",
+  "loadingFolders": "جاري تحميل المجلدات الفرعية...",
   "matchCondition": "شرط المطابقة",
   "filterByTags": "تصفية حسب الوسوم",
   "clearAllTags": "مسح كل الوسوم",

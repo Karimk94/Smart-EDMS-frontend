@@ -2,13 +2,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import { FolderItem, useFolderContents } from '../../hooks/useFolderContents';
-import { useDeleteFolder, useRenameFolder } from '../../hooks/useFolderMutations';
+import { useMoveModalFolders } from '../../hooks/useMoveModalFolders';
+import { useDeleteFolder, useRenameFolder, useMoveItemsMutation } from '../../hooks/useFolderMutations';
 import { useDownload } from '../../hooks/useDownload';
 import { apiClient } from '../../lib/apiClient';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
+import { Spinner } from './Spinner';
 import { CreateFolderModal } from './CreateFolderModal';
-import { FolderSkeleton } from './FolderSkeleton';
 import SecurityModal from './SecurityModal';
 import ShareModal from './ShareModal';
 import Image from 'next/image';
@@ -50,7 +51,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     apiURL
   });
 
-  const items = data?.contents || [];
+  const [hiddenItemIds, setHiddenItemIds] = useState<Set<string>>(new Set());
+  const items = (data?.contents || []).filter((item) => !hiddenItemIds.has(item.id));
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isLoading = isInitialLoading || isOperationLoading;
@@ -108,6 +110,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const deleteFolderMutation = useDeleteFolder();
   const renameFolderMutation = useRenameFolder();
+  const moveItemsMutation = useMoveItemsMutation();
   const { download } = useDownload();
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -138,11 +141,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [moveCurrentFolderId, setMoveCurrentFolderId] = useState<string | null>(null);
   const [moveBreadcrumbs, setMoveBreadcrumbs] = useState<{ id: string | null; name: string }[]>([{ id: null, name: t('home') || 'Home' }]);
-  const [moveFolderItems, setMoveFolderItems] = useState<FolderItem[]>([]);
-  const [isMoveFoldersLoading, setIsMoveFoldersLoading] = useState(false);
+  const [targetMoveFolderId, setTargetMoveFolderId] = useState<string | null>(null);
   const [isBatchMoving, setIsBatchMoving] = useState(false);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
-  const [targetMoveFolderId, setTargetMoveFolderId] = useState<string | null>(null);
+  
+  // Use react-query hook for move modal folders with caching
+  const { data: moveFolderItems = [], isLoading: isMoveFoldersLoading, isFetching: isMoveFoldersFetching } = useMoveModalFolders({
+    parentId: moveCurrentFolderId,
+    apiURL,
+    isEnabled: isMoveModalOpen
+  });
+  const isMoveFoldersInitialLoading = isMoveFoldersLoading && moveFolderItems.length === 0;
+  const isMoveFoldersRefreshing = isMoveFoldersFetching && moveFolderItems.length > 0;
 
   const { showToast, removeToast } = useToast();
 
@@ -220,6 +230,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   useEffect(() => {
     setSelectedFileIds(new Set());
     setIsSelectionMode(false);
+  }, [currentFolderId, debouncedSearchTerm]);
+
+  useEffect(() => {
+    setHiddenItemIds(new Set());
   }, [currentFolderId, debouncedSearchTerm]);
 
   // React to external refresh trigger (e.g. upload-complete from parent)
@@ -489,6 +503,37 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     queryClient.invalidateQueries({ queryKey: ['documents'] });
   };
 
+  const updateItemsInCurrentView = (updater: (item: FolderItem) => FolderItem) => {
+    queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
+      if (!previous?.contents) return previous;
+
+      return {
+        ...previous,
+        contents: previous.contents.map((item: FolderItem) => updater(item)),
+      };
+    });
+  };
+
+  const hideItemsFromCurrentView = (itemIds: string[]) => {
+    if (itemIds.length === 0) return;
+
+    const idsToHide = new Set(itemIds);
+    setHiddenItemIds((prev) => {
+      const next = new Set(prev);
+      itemIds.forEach((id) => next.add(id));
+      return next;
+    });
+
+    queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
+      if (!previous?.contents) return previous;
+
+      return {
+        ...previous,
+        contents: previous.contents.filter((item: FolderItem) => !idsToHide.has(item.id)),
+      };
+    });
+  };
+
   const clearSelection = () => {
     setSelectedFileIds(new Set());
   };
@@ -636,9 +681,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     setIsOperationLoading(true);
     setIsBatchMoving(true);
-
-    let moved = 0;
-    let failed = 0;
+    let didTriggerRefresh = false;
 
     try {
       const itemNames = Object.fromEntries(
@@ -650,14 +693,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           .filter((entry): entry is [string, string] => Array.isArray(entry))
       );
 
-      const result = await apiClient.post(`${apiURL}/folders/move-items`, {
+      const result = await moveItemsMutation.mutateAsync({
         item_ids: fileIds,
         destination_parent_id: destinationFolderId,
         item_names: itemNames,
+        apiURL
       });
 
-      moved = Number(result?.moved_count || 0);
-      failed = Number(result?.failed_count || 0);
+      const moved = Number(result?.moved_count || 0);
+      const failed = Number(result?.failed_count || 0);
 
       if (moved > 0) {
         showToast(t('successMoving') || `Moved ${moved} file(s) successfully.`, 'success');
@@ -666,34 +710,30 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         showToast(t('errorMoving') || `${failed} file(s) could not be moved.`, 'error');
       }
 
+      if (moved > 0 && failed === 0) {
+        hideItemsFromCurrentView(fileIds);
+      }
+
       clearSelection();
       if (moved > 0 && failed === 0) {
         setIsSelectionMode(false);
       }
+      didTriggerRefresh = true;
       refreshCurrentView(true);
+    } catch (error: any) {
+      setIsOperationLoading(false);
+      showToast(t('errorMoving') || `Error moving files: ${error.message || 'Unknown error'}`, 'error');
     } finally {
       setIsBatchMoving(false);
-      setIsOperationLoading(false);
+      if (!didTriggerRefresh) {
+        setIsOperationLoading(false);
+      }
     }
   };
 
   const fetchMoveFolderItems = async (parentId: string | null) => {
-    setIsMoveFoldersLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (parentId) params.append('parent_id', parentId);
-      params.append('scope', 'folders');
-
-      const response = await apiClient.get(`${apiURL}/folders?${params.toString()}`);
-      const allItems: FolderItem[] = response?.contents || [];
-      const onlyFolders = allItems.filter((item) => item.type === 'folder' && !item.is_standard);
-      setMoveFolderItems(onlyFolders);
-    } catch (e: any) {
-      showToast(t('errorLoadingFolders') || `Failed to load folders: ${e.message || 'Unknown error'}`, 'error');
-      setMoveFolderItems([]);
-    } finally {
-      setIsMoveFoldersLoading(false);
-    }
+    // No longer needed - useMoveModalFolders hook handles fetching with caching
+    // This function is kept as a no-op for backward compatibility
   };
 
   const openMoveModal = async () => {
@@ -701,7 +741,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     setMoveCurrentFolderId(null);
     setMoveBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
     setTargetMoveFolderId(currentFolderId);
-    await fetchMoveFolderItems(null);
+    // No need to manually fetch - hook will load data automatically
   };
 
   const handleMoveModalNavigate = async (folder: FolderItem) => {
@@ -709,7 +749,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     setMoveCurrentFolderId(folder.id);
     setMoveBreadcrumbs(nextBreadcrumbs);
     setTargetMoveFolderId(folder.id);
-    await fetchMoveFolderItems(folder.id);
+    // Hook automatically fetches data based on moveCurrentFolderId change
   };
 
   const handleMoveBreadcrumbClick = async (index: number) => {
@@ -718,7 +758,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     setMoveBreadcrumbs(nextBreadcrumbs);
     setMoveCurrentFolderId(target.id);
     setTargetMoveFolderId(target.id);
-    await fetchMoveFolderItems(target.id);
+    // Hook automatically fetches data based on moveCurrentFolderId change
   };
 
   const handleBatchDelete = async () => {
@@ -735,12 +775,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     let deleted = 0;
     let failed = 0;
+    const deletedIds: string[] = [];
+    let didTriggerRefresh = false;
 
     try {
       await Promise.all(Array.from(selectedFileIds).map(async (id) => {
         try {
           await deleteFolderMutation.mutateAsync({ id, force: false, apiURL });
           deleted += 1;
+          deletedIds.push(id);
         } catch {
           failed += 1;
         }
@@ -753,11 +796,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         showToast(t('errorDeleting') || `${failed} file(s) could not be deleted.`, 'error');
       }
 
+      hideItemsFromCurrentView(deletedIds);
+
       clearSelection();
+      didTriggerRefresh = true;
       refreshCurrentView(true);
     } finally {
       setIsBatchDeleting(false);
-      setIsOperationLoading(false);
+      if (!didTriggerRefresh) {
+        setIsOperationLoading(false);
+      }
     }
   };
 
@@ -913,22 +961,36 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
 
     setIsRenaming(true);
+    setIsOperationLoading(true);
+    let didTriggerRefresh = false;
     try {
+      const nextName = renameValue;
+
       await renameFolderMutation.mutateAsync({
         id: itemToRename.id,
-        name: renameValue,
+        name: nextName,
         system_id: itemToRename.system_id,
         apiURL
       });
 
+      updateItemsInCurrentView((item) => (
+        item.id === itemToRename.id ? { ...item, name: nextName } : item
+      ));
+
       showToast(t('successRenaming'), 'success');
       setIsRenameModalOpen(false);
       setItemToRename(null);
+      didTriggerRefresh = true;
+      refreshCurrentView(true);
     } catch (e: any) {
       console.error("Rename error:", e);
+      setIsOperationLoading(false);
       showToast(t('errorRenaming') || `Error: ${e.message}`, 'error');
     } finally {
       setIsRenaming(false);
+      if (!didTriggerRefresh) {
+        setIsOperationLoading(false);
+      }
     }
   };
 
@@ -936,6 +998,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (!itemToDelete) return;
 
     setIsOperationLoading(true);
+    let didTriggerRefresh = false;
 
     if (deleteMode === 'standard') {
       setConfirmModalOpen(false);
@@ -948,9 +1011,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         apiURL
       });
 
+      hideItemsFromCurrentView([itemToDelete.id]);
+
       setItemToDelete(null);
       setConfirmModalOpen(false);
       showToast(t('successDeleting'), 'success');
+      didTriggerRefresh = true;
+      refreshCurrentView(true);
 
     } catch (e: any) {
       let errMsg = "";
@@ -975,7 +1042,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
       }
     } finally {
-      setIsOperationLoading(false);
+      if (!didTriggerRefresh) {
+        setIsOperationLoading(false);
+      }
     }
   };
 
@@ -1151,7 +1220,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         onMouseDown={startMarqueeSelection}
       >
         {isLoading ? (
-          <FolderSkeleton />
+          <div className="py-8">
+            <Spinner size="lg" center label={t('loading') || 'Loading...'} />
+          </div>
         ) : (
           <div className="flex flex-col gap-8">
 
@@ -1563,6 +1634,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                   </button>
                 </React.Fragment>
               ))}
+              {isMoveFoldersRefreshing && (
+                <div className="ml-auto flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <Spinner size="sm" />
+                  <span>{t('loadingFolders') || 'Loading subfolders...'}</span>
+                </div>
+              )}
             </div>
 
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex-1 overflow-y-auto min-h-[220px]">
@@ -1575,8 +1652,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 </div>
               </button>
 
-              {isMoveFoldersLoading ? (
-                <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">{t('loading') || 'Loading...'}</div>
+              {isMoveFoldersInitialLoading ? (
+                <div className="py-6 flex items-center justify-center">
+                  <Spinner size="md" label={t('loadingFolders') || 'Loading subfolders...'} />
+                </div>
               ) : moveFolderItems.length === 0 ? (
                 <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">{t('noSubfolders') || 'No subfolders here'}</div>
               ) : (

@@ -21,6 +21,13 @@ interface DeleteFolderParams {
     apiURL?: string;
 }
 
+interface MoveItemsParams {
+    item_ids: string[];
+    destination_parent_id: string | null;
+    item_names: Record<string, string>;
+    apiURL?: string;
+}
+
 export function useCreateFolder() {
     const queryClient = useQueryClient();
 
@@ -59,6 +66,32 @@ export function useDeleteFolder() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['folders'] });
+            queryClient.invalidateQueries({ queryKey: ['documents'] });
+            queryClient.invalidateQueries({ queryKey: ['quota'] });
+            queryClient.invalidateQueries({ queryKey: ['user'] });
+        }
+    });
+}
+
+/**
+ * Hook for batch moving items to a destination folder with automatic cache invalidation.
+ * Invalidates relevant queries to ensure UI reflects the move operation.
+ */
+export function useMoveItemsMutation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ item_ids, destination_parent_id, item_names, apiURL = '/api' }: MoveItemsParams) => {
+            return apiClient.post(`${apiURL}/folders/move-items`, {
+                item_ids,
+                destination_parent_id,
+                item_names,
+            });
+        },
+        onSuccess: () => {
+            // Invalidate all folder and document queries to ensure fresh data
+            queryClient.invalidateQueries({ queryKey: ['folders'] });
+            queryClient.invalidateQueries({ queryKey: ['move-modal-folders'] });
             queryClient.invalidateQueries({ queryKey: ['documents'] });
             queryClient.invalidateQueries({ queryKey: ['quota'] });
             queryClient.invalidateQueries({ queryKey: ['user'] });

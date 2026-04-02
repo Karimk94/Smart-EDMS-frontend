@@ -62,6 +62,7 @@
   "login": "Login",
   "loggingIn": "Logging in...",
   "loading": "Loading...",
+  "loadingFolders": "Loading subfolders...",
   "matchCondition": "Match condition",
   "filterByTags": "Filter by Tags",
   "clearAllTags": "Clear All Tags",

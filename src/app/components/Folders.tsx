@@ -142,6 +142,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   const [moveCurrentFolderId, setMoveCurrentFolderId] = useState<string | null>(null);
   const [moveBreadcrumbs, setMoveBreadcrumbs] = useState<{ id: string | null; name: string }[]>([{ id: null, name: t('home') || 'Home' }]);
   const [targetMoveFolderId, setTargetMoveFolderId] = useState<string | null>(null);
+  const [moveItemIds, setMoveItemIds] = useState<string[]>([]);
   const [isBatchMoving, setIsBatchMoving] = useState(false);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   
@@ -736,7 +737,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     // This function is kept as a no-op for backward compatibility
   };
 
-  const openMoveModal = async () => {
+  const closeMoveModal = () => {
+    setIsMoveModalOpen(false);
+    setMoveItemIds([]);
+  };
+
+  const openMoveModal = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return;
+
+    setMoveItemIds(fileIds);
     setIsMoveModalOpen(true);
     setMoveCurrentFolderId(null);
     setMoveBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
@@ -929,8 +938,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     else if (action === 'download') {
       handleDownload(targetItem);
     }
+    else if (action === 'moveFile' && targetItem.type === 'file') {
+      openMoveModal([targetItem.id]);
+    }
     else if (action === 'moveSelected') {
-      openMoveModal();
+      openMoveModal(Array.from(selectedFileIds));
     }
     else if (action === 'deleteSelected') {
       handleBatchDelete();
@@ -1103,7 +1115,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={openMoveModal}
+              onClick={() => openMoveModal(Array.from(selectedFileIds))}
               disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
               className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
             >
@@ -1453,7 +1465,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                   <Image src="/icons/select.svg" width={16} height={16} className="dark:invert" alt="" />
                   {selectedFileIds.has(contextMenu.item.id)
                     ? (t('deselect') || 'Deselect')
-                    : (t('select') || 'Select')}
+                    : (
+                      <span className="flex w-full items-center justify-between gap-3">
+                        <span>{t('select') || 'Select'}</span>
+                        <span className="text-gray-400 dark:text-gray-500">Ctrl + Click</span>
+                      </span>
+                    )}
                 </button>
               )}
 
@@ -1478,13 +1495,22 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               )}
 
               {contextMenu.item.type !== 'folder' && (
-                <button
-                  onClick={() => handleContextMenuAction('download')}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-                >
-                  <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
-                  {t('download') || 'Download'}
-                </button>
+                <>
+                  <button
+                    onClick={() => handleContextMenuAction('moveFile')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                  >
+                    <Image src="/icons/move-selected.svg" width={16} height={16} className="dark:invert" alt="" />
+                    {t('moveFile') || 'Move file'}
+                  </button>
+                  <button
+                    onClick={() => handleContextMenuAction('download')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                  >
+                    <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
+                    {t('download') || 'Download'}
+                  </button>
+                </>
               )}
 
               <button
@@ -1615,12 +1641,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4 animate-fade-in"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setIsMoveModalOpen(false);
+              closeMoveModal();
             }
           }}
         >
           <div className="bg-white dark:bg-[#333] rounded-lg p-5 max-w-xl w-full shadow-xl border border-gray-200 dark:border-gray-600 max-h-[80vh] flex flex-col">
             <h3 className="text-lg font-bold mb-3 dark:text-white">{t('moveToFolder') || 'Move to folder'}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+              {t('doubleClickFolderHint')}
+            </p>
 
             <div className="flex items-center flex-wrap gap-2 text-sm mb-3">
               {moveBreadcrumbs.map((crumb, index) => (
@@ -1664,6 +1693,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     <div key={folder.id} className="flex items-center gap-2">
                       <button
                         onClick={() => setTargetMoveFolderId(folder.id)}
+                        onDoubleClick={() => handleMoveModalNavigate(folder)}
                         className={`flex-1 text-left px-3 py-2 rounded-md border ${targetMoveFolderId === folder.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                       >
                         <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{folder.name}</div>
@@ -1683,17 +1713,17 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
             <div className="mt-4 flex justify-end gap-3">
               <button
-                onClick={() => setIsMoveModalOpen(false)}
+                onClick={closeMoveModal}
                 className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
                 {t('cancel') || 'Cancel'}
               </button>
               <button
                 onClick={async () => {
-                  await moveFilesToFolder(Array.from(selectedFileIds), targetMoveFolderId);
-                  setIsMoveModalOpen(false);
+                  await moveFilesToFolder(moveItemIds, targetMoveFolderId);
+                  closeMoveModal();
                 }}
-                disabled={isBatchMoving || selectedFileCount === 0}
+                disabled={isBatchMoving || moveItemIds.length === 0}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
               >
                 {isBatchMoving ? (t('moving') || 'Moving...') : (t('moveHere') || 'Move here')}

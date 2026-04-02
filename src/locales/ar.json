@@ -402,5 +402,15 @@
   "userRemoved": "تمت إزالة المستخدم بنجاح",
   "groupRemoved": "تمت إزالة المجموعة بنجاح",
   "errorAddingUser": "فشل في إضافة المستخدم",
-  "errorAddingGroup": "فشل في إضافة المجموعة"
+  "errorAddingGroup": "فشل في إضافة المجموعة",
+  "moveFiles": "نقل الملفات",
+  "deleteFiles": "حذف الملفات",
+  "confirmDeleteFiles": "هل أنت متأكد أنك تريد حذف الملفات المحددة؟ لا يمكن التراجع عن هذا الإجراء.",
+  "filesDeleted": "تم حذف الملفات بنجاح",
+  "errorDeletingFiles": "فشل في حذف الملفات",
+  "confirmMoveFiles": "هل أنت متأكد أنك تريد نقل الملفات المحددة إلى '{destinationFolder}'؟",
+  "filesMoved": "تم نقل الملفات بنجاح",
+  "errorMovingFiles": "فشل في نقل الملفات",
+  "moveFile": "نقل الملف",
+  "doubleClickFolderHint" : "انقر مرة واحدة لتحديد الوجهة. انقر نقراً مزدوجاً على المجلد لفتحه"
 }

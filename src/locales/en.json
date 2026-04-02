@@ -403,5 +403,16 @@
   "userRemoved": "User removed successfully",
   "groupRemoved": "Group removed successfully",
   "errorAddingUser": "Failed to add user",
-  "errorAddingGroup": "Failed to add group"
+  "errorAddingGroup": "Failed to add group",
+  "moveFiles": "Move Files",
+  "deleteFiles": "Delete Files",
+  "confirmDeleteFiles": "Are you sure you want to delete the selected files? This action cannot be undone.",
+  "filesDeleted": "Files deleted successfully",
+  "errorDeletingFiles": "Failed to delete files",
+  "confirmMoveFiles": "Are you sure you want to move the selected files to '{destinationFolder}'?",
+  "filesMoved": "Files moved successfully",
+  "errorMovingFiles": "Failed to move files",
+  "moveFile": "Move File",
+  "doubleClickFolderHint" : "Single-click selects a destination. Double-click a folder to open it."
+
 }

@@ -199,7 +199,7 @@ const InfiniteSelect = ({
                     </span>
                     {option.value === value ? (
                       <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
-                        <Image src="/icons/check.svg" alt="" width={20} height={20} />
+                        <Image src="/icons/check.svg" alt="" width={20} height={20} className="dark:invert" />
                       </span>
                     ) : null}
                   </div>
@@ -476,7 +476,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
           <div className="flex items-center gap-2">
-            <Image src="/icons/lock.svg" alt="" width={20} height={20} />
+            <Image src="/icons/lock.svg" alt="" width={20} height={20} className="dark:invert" />
             <h2 className="text-lg font-semibold dark:text-white">
               {t('securityPermissions')} - {itemName}
             </h2>
@@ -488,9 +488,9 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
               title={isExpanded ? 'Shrink view' : 'Expand view'}
             >
               {isExpanded ? (
-                <Image src="/icons/chevron-left.svg" alt="" width={14} height={14} />
+                <Image src="/icons/chevron-left.svg" alt="" width={14} height={14} className="dark:invert" />
               ) : (
-                <Image src="/icons/external-link.svg" alt="" width={14} height={14} />
+                <Image src="/icons/external-link.svg" alt="" width={14} height={14} className="dark:invert" />
               )}
               {isExpanded ? (t('shrink') || 'Shrink') : (t('expand') || 'Expand')}
             </button>
@@ -632,7 +632,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                             title={t('authorCannotBeRemoved') || 'Author – cannot be removed'}
                             className="inline-flex items-center justify-center p-1 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                           >
-                            <Image src="/icons/lock.svg" alt="" width={16} height={16} />
+                            <Image src="/icons/lock.svg" alt="" width={16} height={16} className="dark:invert" />
                           </span>
                         ) : (
                           <button

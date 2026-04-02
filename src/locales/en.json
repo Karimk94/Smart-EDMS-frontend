@@ -413,6 +413,12 @@
   "filesMoved": "Files moved successfully",
   "errorMovingFiles": "Failed to move files",
   "moveFile": "Move File",
-  "doubleClickFolderHint" : "Single-click selects a destination. Double-click a folder to open it."
+  "doubleClickFolderHint" : "Single-click selects a destination. Double-click a folder to open it.",
+  "downloadAsZip": "Download as ZIP",
+  "downloadingZip": "Preparing ZIP download...",
+  "zipSkipsSubfolders": "Files only, subfolders skipped",
+  "zipSkipsFoldersNotice": "Note: only files in this folder will be downloaded. Subfolders are skipped.",
+  "folderTooLarge": "Folder exceeds 100 MB limit. Please download individual files instead.",
+  "zipDownloadError": "Failed to download folder as ZIP"
 
 }

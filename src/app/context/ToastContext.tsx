@@ -132,16 +132,16 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             {/* Icon */}
             <div className={`flex-shrink-0 ${getIconColor(toast.type, toast.variant)}`}>
               {toast.type === 'success' && (
-                <Image src="/icons/check.svg" alt="" width={24} height={24} className="w-6 h-6" />
+                <Image src="/icons/check.svg" alt="" width={24} height={24} className={`w-6 h-6 ${toast.variant === 'solid' ? 'invert' : 'dark:invert'}`} />
               )}
               {toast.type === 'error' && (
-                <Image src="/icons/close.svg" alt="" width={24} height={24} className="w-6 h-6" />
+                <Image src="/icons/close.svg" alt="" width={24} height={24} className={`w-6 h-6 ${toast.variant === 'solid' ? 'invert' : 'dark:invert'}`} />
               )}
               {toast.type === 'warning' && (
-                <Image src="/icons/warning.svg" alt="" width={24} height={24} className="w-6 h-6" />
+                <Image src="/icons/warning.svg" alt="" width={24} height={24} className={`w-6 h-6 ${toast.variant === 'solid' ? 'invert' : 'dark:invert'}`} />
               )}
               {toast.type === 'info' && (
-                <Image src="/icons/info.svg" alt="" width={24} height={24} className="w-6 h-6" />
+                <Image src="/icons/info.svg" alt="" width={24} height={24} className={`w-6 h-6 ${toast.variant === 'solid' ? 'invert' : 'dark:invert'}`} />
               )}
             </div>
 
@@ -150,7 +150,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
             {/* Close Icon (Subtle) */}
             <div className="ml-auto pl-2">
-              <Image src="/icons/close.svg" alt="" width={16} height={16} className={`w-4 h-4 opacity-40 hover:opacity-100 ${toast.variant === 'solid' ? 'invert' : ''}`} />
+              <Image src="/icons/close.svg" alt="" width={16} height={16} className={`w-4 h-4 opacity-40 hover:opacity-100 ${toast.variant === 'solid' ? 'invert' : 'dark:invert'}`} />
             </div>
           </div>
         ))}

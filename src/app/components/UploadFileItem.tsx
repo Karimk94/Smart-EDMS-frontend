@@ -48,9 +48,9 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
       case 'processing':
         return <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>;
       case 'success':
-        return <Image src="/icons/check.svg" alt="" width={24} height={24} className="text-green-500" />;
+        return <Image src="/icons/check.svg" alt="" width={24} height={24} className="text-green-500 dark:invert" />;
       case 'error':
-        return <Image src="/icons/close.svg" alt="" width={24} height={24} className="text-red-500" />;
+        return <Image src="/icons/close.svg" alt="" width={24} height={24} className="text-red-500 dark:invert" />;
       default:
         return <div className="w-6 h-6 bg-gray-600 rounded-full"></div>;
     }

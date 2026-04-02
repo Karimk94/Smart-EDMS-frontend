@@ -1258,7 +1258,7 @@ export default function SharedDocumentPage() {
         {/* Footer with access info */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
           <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
-            <Image src="/icons/check.svg" alt="" width={20} height={20} className="w-5 h-5" />
+            <Image src="/icons/check.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
             <span>{t('VerifiedAccessFor')} <strong>{email}</strong></span>
           </div>
         </div>
@@ -1480,7 +1480,7 @@ export default function SharedDocumentPage() {
 
                 {/* Access Confirmation */}
                 <div className="border border-green-300 dark:border-green-600 rounded-lg p-4 bg-green-50 dark:bg-green-900/20 inline-block text-green-800 dark:text-green-200 text-center">
-                  <Image src="/icons/check.svg" alt="" width={24} height={24} className="w-6 h-6 mx-auto mb-2" />
+                  <Image src="/icons/check.svg" alt="" width={24} height={24} className="w-6 h-6 mx-auto mb-2 dark:invert" />
                   {t('VerifiedAccessFor')} <strong>{email}</strong>
                   <br />
                   <span className="text-xs opacity-75">{t('AccessLoggedAt')} {new Date().toLocaleTimeString()}</span>
@@ -1528,7 +1528,7 @@ export default function SharedDocumentPage() {
             {shareInfo?.is_restricted && (
               <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Image src="/icons/lock.svg" alt="" width={20} height={20} className="w-5 h-5" />
+                  <Image src="/icons/lock.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
                   <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
                     {t('restrictedLink') || 'Restricted Access'}
                   </span>

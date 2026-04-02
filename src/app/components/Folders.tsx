@@ -81,7 +81,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     }
 
     let actions = 4; // share, rename, permissions, delete
-    if (item.type === 'folder') actions += 1; // create subfolder
+    if (item.type === 'folder') actions += 2; // create subfolder + download as zip
     if (item.type !== 'folder') actions += 1; // download
 
     return header + actions * row + 8;
@@ -938,6 +938,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     else if (action === 'download') {
       handleDownload(targetItem);
     }
+    else if (action === 'downloadZip') {
+      handleDownloadFolderZip(targetItem);
+    }
     else if (action === 'moveFile' && targetItem.type === 'file') {
       openMoveModal([targetItem.id]);
     }
@@ -963,6 +966,41 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
       }
     );
+  };
+
+  const handleDownloadFolderZip = async (item: FolderItem) => {
+    showToast(t('zipSkipsFoldersNotice') || "Note: only files in this folder will be downloaded. Subfolders are skipped.", 'info');
+    const toastId = showToast(t('downloadingZip') || "Preparing ZIP download...", 'info', 'subtle', 0);
+    try {
+      const response = await fetch(`${apiURL}/folders/${item.id}/download-zip`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (response.status === 413) {
+        removeToast(toastId);
+        showToast(t('folderTooLarge') || "Folder exceeds 100 MB limit. Please download individual files instead.", 'error');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${item.name}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      removeToast(toastId);
+    } catch (err) {
+      removeToast(toastId);
+      showToast(t('zipDownloadError') || "Failed to download folder as ZIP", 'error');
+    }
   };
 
   const handleRenameSubmit = async (e: React.FormEvent) => {
@@ -1452,6 +1490,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             >
               <Image src="/icons/plus.svg" width={16} height={16} className="dark:invert" alt="" />
               {t('createSubfolder') || 'Create Subfolder'}
+            </button>
+          )}
+
+          {contextMenu.item?.type === 'folder' && (
+            <button
+              onClick={() => handleContextMenuAction('downloadZip')}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+            >
+              <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
+              <span className="flex flex-col">
+                <span>{t('downloadAsZip') || 'Download as ZIP'}</span>
+              </span>
             </button>
           )}
 

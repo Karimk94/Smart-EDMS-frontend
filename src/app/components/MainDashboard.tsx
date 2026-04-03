@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image';
 import { useQueryClient } from '@tanstack/react-query';
 import { enGB } from 'date-fns/locale/en-GB';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -61,7 +62,15 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     // Route guard
     useEffect(() => {
         if (user && !isLoadingUser && !allowedSections.includes(initialSection)) {
-            router.push('/dashboard');
+            const sectionRoutes: Record<string, string> = {
+                recent: '/dashboard',
+                favorites: '/favorites',
+                folders: '/folders',
+                profilesearch: '/profilesearch',
+            };
+            const order = ['recent', 'favorites', 'folders', 'profilesearch'];
+            const firstAllowed = order.find(s => allowedSections.includes(s as any));
+            router.push(firstAllowed ? sectionRoutes[firstAllowed] : '/dashboard');
         }
     }, [user, isLoadingUser, allowedSections, initialSection, router]);
 

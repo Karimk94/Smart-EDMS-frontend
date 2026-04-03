@@ -8,6 +8,34 @@ import { PageSpinner } from '../components/Spinner';
 import { useToast } from '../context/ToastContext';
 import { useTranslations } from '../hooks/useTranslations';
 
+const SECTION_ROUTES: Record<string, string> = {
+  recent: '/dashboard',
+  favorites: '/favorites',
+  folders: '/folders',
+  profilesearch: '/profilesearch',
+};
+
+// Derive the default landing route from tab_permissions, falling back to /dashboard
+function getDefaultRoute(tabPermissions?: { tab_key: string; can_read: boolean }[]): string {
+  if (!tabPermissions || tabPermissions.length === 0) return '/dashboard';
+  const order = ['recent', 'favorites', 'folders', 'profilesearch'];
+  for (const key of order) {
+    const perm = tabPermissions.find(p => p.tab_key === key);
+    if (perm?.can_read) return SECTION_ROUTES[key];
+  }
+  return '/dashboard';
+}
+
+// Safe redirect: only allow relative paths starting with /
+function getSafeRedirect(url: string | null, tabPermissions?: { tab_key: string; can_read: boolean }[]): string {
+  if (!url) return getDefaultRoute(tabPermissions);
+  // Block absolute URLs, protocol-relative URLs, and data URIs
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url) || url.startsWith('//')) return getDefaultRoute(tabPermissions);
+  // Must start with /
+  if (!url.startsWith('/')) return getDefaultRoute(tabPermissions);
+  return url;
+}
+
 function LoginContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -39,20 +67,10 @@ function LoginContent() {
   const { showToast } = useToast();
   const { login, isLoggingIn, isAuthenticated, isLoadingUser, user } = useAuth();
 
-  // Safe redirect: only allow relative paths starting with /
-  const getSafeRedirect = (url: string | null): string => {
-    if (!url) return '/dashboard';
-    // Block absolute URLs, protocol-relative URLs, and data URIs
-    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url) || url.startsWith('//')) return '/dashboard';
-    // Must start with /
-    if (!url.startsWith('/')) return '/dashboard';
-    return url;
-  };
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoadingUser) {
-      const redirectPath = getSafeRedirect(searchParams.get('redirect'));
+      const redirectPath = getSafeRedirect(searchParams.get('redirect'), user?.tab_permissions);
       // If we have user preferences, apply them before redirecting
       // This is crucial because the layout/context might be using these values
       if (user) {
@@ -65,21 +83,19 @@ function LoginContent() {
       }
       router.push(redirectPath);
     }
-  }, [isAuthenticated, isLoadingUser, router, searchParams, user, lang, theme]);
+  }, [isAuthenticated, isLoadingUser, router, searchParams, user, lang, theme, getSafeRedirect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
       const data = await login({ username, password });
-      // The socket/context might update via query invalidation, but let's try to set local state if we have it
       if (data?.user) {
         if (data.user.lang) setLang(data.user.lang);
         if (data.user.theme) setTheme(data.user.theme);
       }
 
-      // Redirect handled by useEffect or onSuccess of mutation, but let's ensure it here too or just wait for effect
-      const redirectPath = getSafeRedirect(searchParams.get('redirect'));
+      const redirectPath = getSafeRedirect(searchParams.get('redirect'), data?.user?.tab_permissions);
       router.push(redirectPath);
     } catch (err: any) {
       console.error('Login exception:', err);

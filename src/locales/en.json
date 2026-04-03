@@ -418,7 +418,7 @@
   "downloadingZip": "Preparing ZIP download...",
   "zipSkipsSubfolders": "Files only, subfolders skipped",
   "zipSkipsFoldersNotice": "Note: only files in this folder will be downloaded. Subfolders are skipped.",
-  "folderTooLarge": "Folder exceeds 100 MB limit. Please download individual files instead.",
+  "folderTooLarge": "Unable to download: folder size exceeds the 300 MB limit. Please download individual files instead.",
   "zipDownloadError": "Failed to download folder as ZIP"
 
 }

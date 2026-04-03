@@ -225,6 +225,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
           {/* Right: Actions */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {/* Download Button */}
+            {isEditor && (
             <button onClick={handleDownload} disabled={isDownloading} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Download">
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
@@ -232,6 +233,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
                 <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
+            )}
 
             {/* Full Screen Button */}
             <button onClick={handleFullScreen} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Full Screen">

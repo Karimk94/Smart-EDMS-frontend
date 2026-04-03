@@ -297,6 +297,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+            {isEditor && (
             <button onClick={handleDownload} disabled={isDownloading} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
@@ -304,6 +305,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
                 <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
+            )}
 
             <button
               onClick={() => setIsDetailsVisible(!isDetailsVisible)}
@@ -355,7 +357,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({ doc, onClose, 
                   {parseError ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-8">
                       <p className="text-gray-500 mb-4">{parseError}</p>
-                      <button onClick={handleDownload} className="text-blue-600 hover:underline text-sm">Download File to View</button>
+                      {isEditor && <button onClick={handleDownload} className="text-blue-600 hover:underline text-sm">Download File to View</button>}
                     </div>
                   ) : (
                     slides.map((slide) => (

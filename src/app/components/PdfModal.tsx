@@ -199,6 +199,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
           {/* Right: Actions */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {/* Download Button */}
+            {isEditor && (
             <button onClick={handleDownload} disabled={isDownloading} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
               {isDownloading ? (
                 <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
@@ -206,6 +207,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
                 <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
               )}
             </button>
+            )}
 
             {/* Full Screen Button */}
             <button onClick={handleFullScreen} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Full Screen">

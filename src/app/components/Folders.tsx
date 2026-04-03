@@ -979,7 +979,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
       if (response.status === 413) {
         removeToast(toastId);
-        showToast(t('folderTooLarge') || "Folder exceeds 100 MB limit. Please download individual files instead.", 'error');
+        showToast(t('folderTooLarge') || "Unable to download: folder size exceeds the 300 MB limit. Please download individual files instead.", 'error');
         return;
       }
 

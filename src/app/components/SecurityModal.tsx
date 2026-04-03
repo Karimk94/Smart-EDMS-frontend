@@ -279,7 +279,6 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
       hasLoadedInitialTrustees.current = true;
     }
   // Only react to the loading flag — trusteesData/currentUsername are read via refs
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoadingTrustees]);
 
   useEffect(() => {
@@ -619,11 +618,11 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                         <select
                           value={trustee.rights}
                           onChange={(e) => handleRightsChange(trustee.username, e.target.value)}
-                          className="w-full bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-300 text-sm"
+                          className="w-full rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm px-2 py-1 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none"
                         >
-                          <option value="255">{t('fullControl')}</option>
-                          <option value="63">{t('readWrite')}</option>
-                          <option value="45">{t('readOnly')}</option>
+                          <option value="255" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{t('fullControl')}</option>
+                          <option value="63" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{t('readWrite')}</option>
+                          <option value="45" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{t('readOnly')}</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-right">

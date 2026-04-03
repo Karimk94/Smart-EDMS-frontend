@@ -26,7 +26,7 @@ const TAB_PERMISSION_ITEMS: { key: AdminTabKey; label: string }[] = [
     { key: 'recent', label: 'Smart EDMS & Favorites' },
     { key: 'folders', label: 'Folders' },
     { key: 'profilesearch', label: 'Profile Search' },
-    { key: 'ems_admin', label: 'EMS Admin (Enterprise Management System)' },
+    { key: 'ems_admin', label: 'EMS Admin' },
 ];
 
 type TabToggleState = { can_read: boolean; can_write: boolean };
@@ -1160,9 +1160,6 @@ export default function AdminPage() {
                                             );
                                         })}
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Users in group EMS_ADMIN are always enabled for EMS Admin visibility.
-                                    </p>
                                 </div>
                             )}
                             {editTarget.security_level === 'Admin' && (

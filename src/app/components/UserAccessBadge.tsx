@@ -100,11 +100,11 @@ export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({ user, lang = '
 
           <div className="mt-3">
             <p className="text-gray-500 dark:text-gray-400 mb-1">{tabAccessLabel}</p>
-            {tabPermissions.length === 0 ? (
+            {tabPermissions.filter((p) => p.can_read || p.can_write).length === 0 ? (
               <p className="text-gray-700 dark:text-gray-300">{noPermissionsText}</p>
             ) : (
               <ul className="space-y-1 max-h-48 overflow-auto pr-1">
-                {tabPermissions.map((permission) => (
+                {tabPermissions.filter((p) => p.can_read || p.can_write).map((permission) => (
                   <li
                     key={permission.tab_key}
                     className="flex items-center justify-between text-gray-800 dark:text-gray-200"

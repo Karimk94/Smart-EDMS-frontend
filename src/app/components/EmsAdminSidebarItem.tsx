@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
+import { useEmsAdminAuth } from '../../hooks/useEmsAdminAuth';
 import Image from 'next/image';
 
 
@@ -13,16 +14,11 @@ interface EmsAdminSidebarItemProps {
 
 export const EmsAdminSidebarItem: React.FC<EmsAdminSidebarItemProps> = ({ isSidebarOpen, lang }) => {
   const router = useRouter();
-  const { user, isLoadingUser } = useAuth();
+  const { user } = useAuth();
+  const { useCheckAccess } = useEmsAdminAuth();
+  const { data: accessData, isLoading } = useCheckAccess();
 
-  const hasEmsTabAccess = (user?.tab_permissions || []).some(
-    (perm) => perm.tab_key === 'ems_admin' && perm.can_read
-  );
-  const hasEmsGroupAccess = user?.is_ems_admin_group_member === true;
-  const hasAdminLevelAccess = user?.security_level === 'Admin' || user?.security_level === 'Editor';
-  const hasEmsAdminAccess = hasEmsTabAccess || hasEmsGroupAccess || hasAdminLevelAccess;
-
-  if (isLoadingUser || !hasEmsAdminAccess) {
+  if (isLoading || !accessData?.has_access) {
     return null;
   }
 

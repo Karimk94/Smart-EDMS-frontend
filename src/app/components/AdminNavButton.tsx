@@ -2,37 +2,17 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useEmsAdminAuth } from '../../hooks/useEmsAdminAuth';
 
 /**
  * Admin Navigation Button - Shows link to EMS Admin if user has access
  */
 export const AdminNavButton: React.FC = () => {
-    const [hasAdminAccess, setHasAdminAccess] = useState(false);
-    const [isChecking, setIsChecking] = useState(true);
+    const { useCheckAccess } = useEmsAdminAuth();
+    const { data: accessData, isLoading } = useCheckAccess();
 
-    useEffect(() => {
-        const checkAdminAccess = async () => {
-            try {
-                const response = await fetch('/api/admin/check-access', {
-                    credentials: 'include'
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    setHasAdminAccess(data.has_access === true);
-                }
-            } catch (error) {
-                console.error('Failed to check admin access:', error);
-            } finally {
-                setIsChecking(false);
-            }
-        };
-
-        checkAdminAccess();
-    }, []);
-
-    if (isChecking || !hasAdminAccess) {
+    if (isLoading || !accessData?.has_access) {
         return null;
     }
 

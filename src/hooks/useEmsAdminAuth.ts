@@ -15,6 +15,10 @@ export function useEmsAdminAuth() {
             return apiClient.get('/api/ems-admin/check-access') as Promise<EmsAdminAccessResponse>;
         },
         retry: false,
+        staleTime: 0,
+        gcTime: 0,
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
     });
 
     return {

@@ -18,7 +18,7 @@ interface EmsAdminLayoutProps {
 export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
     const router = useRouter();
     const { useCheckAccess } = useEmsAdminAuth();
-    const { data: accessData, isLoading } = useCheckAccess();
+    const { data: accessData, isLoading, isError } = useCheckAccess();
     const { user } = useAuth();
     const { updateLanguage, updateTheme } = useUserPreferences();
 
@@ -38,6 +38,23 @@ export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
     if (isLoading) {
         return (
             <PageSpinner />
+        );
+    }
+
+    if (isError) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+                <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+                    <h1 className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-4">Unable to Verify Access</h1>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6">Could not connect to the server. Please try again.</p>
+                    <button
+                        onClick={() => router.push("/dashboard")}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        {t('backToDashboard')}
+                    </button>
+                </div>
+            </div>
         );
     }
 

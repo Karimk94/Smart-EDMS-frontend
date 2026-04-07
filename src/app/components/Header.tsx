@@ -115,14 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{t('upload')}</span>
             </button>
           )}
-          <UserAccessBadge user={user} lang={lang} />
-          <button
-            onClick={() => logout()}
-            className="px-4 py-2 bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-white text-sm font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-700 transition flex items-center gap-2"
-          >
-            <Image src="/logout.svg" alt="Logout" width={20} height={20} className="dark:brightness-0 dark:invert" />
-            <span>{t('logout')}</span>
-          </button>
+          <UserAccessBadge user={user} lang={lang} onLogout={logout} logoutText={t('logout')} />
         </div>
       </div>
     </header>

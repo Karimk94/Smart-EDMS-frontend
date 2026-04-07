@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 
 type UserPermission = {
   tab_key: string;
@@ -15,6 +16,8 @@ type HeaderUser = {
 interface UserAccessBadgeProps {
   user?: HeaderUser;
   lang?: 'en' | 'ar';
+  onLogout?: () => void;
+  logoutText?: string;
 }
 
 const TAB_LABELS: Record<string, string> = {
@@ -39,7 +42,7 @@ const formatAccess = (permission: UserPermission): string => {
   return 'No Access';
 };
 
-export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({ user, lang = 'en' }) => {
+export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({ user, lang = 'en', onLogout, logoutText = 'Logout' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -90,34 +93,51 @@ export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({ user, lang = '
       </button>
 
       <div
-        className={`absolute right-0 mt-2 w-72 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg translate-y-1 transition-all duration-150 z-50 ${isOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none'} group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0`}
+        className={`absolute right-0 top-full pt-2 w-72 z-50 transition-all duration-150 ${isOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-1'} group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0`}
       >
-        <div className="p-3 text-sm">
-          <p className="text-gray-500 dark:text-gray-400">{securityLabel}</p>
-          <p className="font-semibold text-gray-900 dark:text-gray-100">
-            {user.security_level || 'N/A'}
-          </p>
-
-          <div className="mt-3">
-            <p className="text-gray-500 dark:text-gray-400 mb-1">{tabAccessLabel}</p>
-            {tabPermissions.filter((p) => p.can_read || p.can_write).length === 0 ? (
-              <p className="text-gray-700 dark:text-gray-300">{noPermissionsText}</p>
-            ) : (
-              <ul className="space-y-1 max-h-48 overflow-auto pr-1">
-                {tabPermissions.filter((p) => p.can_read || p.can_write).map((permission) => (
-                  <li
-                    key={permission.tab_key}
-                    className="flex items-center justify-between text-gray-800 dark:text-gray-200"
-                  >
-                    <span>{formatTabLabel(permission.tab_key)}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                      {formatAccess(permission)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden">
+          <div className="p-3 text-sm">
+            <p className="text-gray-500 dark:text-gray-400">{securityLabel}</p>
+            <p className="font-semibold text-gray-900 dark:text-gray-100">
+              {user.security_level || 'N/A'}
+            </p>
+  
+            <div className="mt-3">
+              <p className="text-gray-500 dark:text-gray-400 mb-1">{tabAccessLabel}</p>
+              {tabPermissions.filter((p) => p.can_read || p.can_write).length === 0 ? (
+                <p className="text-gray-700 dark:text-gray-300">{noPermissionsText}</p>
+              ) : (
+                <ul className="space-y-1 max-h-48 overflow-auto pr-1">
+                  {tabPermissions.filter((p) => p.can_read || p.can_write).map((permission) => (
+                    <li
+                      key={permission.tab_key}
+                      className="flex items-center justify-between text-gray-800 dark:text-gray-200"
+                    >
+                      <span>{formatTabLabel(permission.tab_key)}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                        {formatAccess(permission)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
+          
+          {onLogout && (
+            <div className="border-t border-gray-200 dark:border-gray-700 p-2">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onLogout();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition"
+              >
+                <Image src="/logout.svg" alt="Logout" width={18} height={18} className="dark:brightness-0 dark:invert" />
+                <span>{logoutText}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

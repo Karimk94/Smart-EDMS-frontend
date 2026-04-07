@@ -43,23 +43,28 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const initialLang = (searchParams.get('lang') as 'en' | 'ar') || 'en';
 
-  const [lang, setLang] = useState<'en' | 'ar'>(() => {
-    if (typeof window !== 'undefined') {
-      const savedLang = localStorage.getItem('lang') as 'en' | 'ar';
-      const paramLang = searchParams.get('lang') as 'en' | 'ar';
-      return paramLang || savedLang || initialLang;
-    }
-    return initialLang;
-  });
+  const [lang, setLang] = useState<'en' | 'ar'>(initialLang);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [mounted, setMounted] = useState(false);
 
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
-      const paramTheme = searchParams.get('theme') as 'light' | 'dark';
-      return paramTheme || savedTheme || 'light';
-    }
-    return 'light';
-  });
+  useEffect(() => {
+    setMounted(true);
+    const savedLang = localStorage.getItem('lang') as 'en' | 'ar';
+    const paramLang = searchParams.get('lang') as 'en' | 'ar';
+    const finalLang = paramLang || savedLang || initialLang;
+    setLang(finalLang);
+
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+    const paramTheme = searchParams.get('theme') as 'light' | 'dark';
+    const finalTheme = paramTheme || savedTheme || 'light';
+    setTheme(finalTheme);
+
+    if (finalTheme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+
+    document.documentElement.lang = finalLang;
+    document.documentElement.dir = 'ltr';
+  }, [initialLang, searchParams]);
 
   const t = useTranslations(lang);
 

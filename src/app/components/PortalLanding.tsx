@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useTranslations } from '../hooks/useTranslations';
@@ -53,18 +53,24 @@ const getSystems = (t: TFunction): SystemCard[] => [
 ];
 
 export function PortalLanding() {
-    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-        if (typeof window !== 'undefined') {
-            return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
-        }
-        return 'light';
-    });
-    const [lang, setLang] = useState<'en' | 'ar'>(() => {
-        if (typeof window !== 'undefined') {
-            return (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
-        }
-        return 'en';
-    });
+    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [lang, setLang] = useState<'en' | 'ar'>('en');
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        const storedTheme = (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+        const storedLang = (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
+        
+        setTheme(storedTheme);
+        setLang(storedLang);
+
+        if (storedTheme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+
+        document.documentElement.lang = storedLang;
+        document.documentElement.dir = 'ltr'; // Consider updating this based on RTL languages if necessary
+    }, []);
     const t = useTranslations(lang);
 
     const toggleTheme = () => {

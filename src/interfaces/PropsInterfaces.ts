@@ -101,6 +101,7 @@ export interface PersonSelectorProps {
     fetchUrl?: string;
     headers?: Record<string, string>;
     onSelect?: (person: { USER_ID: string; FULL_NAME: string }) => void;
+    mode?: 'persons' | 'groups';
 }
 
 export interface YearFilterProps {

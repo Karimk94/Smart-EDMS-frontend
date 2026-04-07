@@ -20,7 +20,7 @@ const InfiniteSelect = ({
   searchValue,
   t
 }: {
-  options: { label: string; value: string }[];
+  options: { label: string; value: string; sublabel?: string }[];
   value: string;
   onChange: (val: string) => void;
   placeholder: string;
@@ -140,7 +140,14 @@ const InfiniteSelect = ({
           }`}
       >
         <span className={`block truncate pr-7 ${selectedOption ? 'font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-          {selectedOption ? selectedOption.label : placeholder}
+          {selectedOption ? (
+            <span className="flex flex-col leading-tight">
+              <span>{selectedOption.label}</span>
+              {selectedOption.sublabel && (
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-normal truncate">{selectedOption.sublabel}</span>
+              )}
+            </span>
+          ) : placeholder}
         </span>
         <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
           <Image src="/icons/chevron-down.svg" alt="" width={20} height={20} className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} dark:invert`} />
@@ -194,8 +201,15 @@ const InfiniteSelect = ({
                       setIsOpen(false);
                     }}
                   >
-                    <span className={`block truncate ${option.value === value ? 'font-semibold' : 'font-medium'}`}>
-                      {option.label}
+                    <span className="flex flex-col">
+                      <span className={`block truncate ${option.value === value ? 'font-semibold' : 'font-medium'}`}>
+                        {option.label}
+                      </span>
+                      {option.sublabel && (
+                        <span className="block truncate text-xs text-gray-400 dark:text-gray-400 font-normal">
+                          {option.sublabel}
+                        </span>
+                      )}
                     </span>
                     {option.value === value ? (
                       <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
@@ -530,8 +544,9 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
               <div className="flex-1">
                 <InfiniteSelect
                   options={groupMembers.map((m: any) => ({
-                    label: m.name_english || m.name_arabic || m.user_id,
-                    value: m.user_id
+                    label: m.user_id,
+                    value: m.user_id,
+                    sublabel: m.name_english || m.name_arabic || ''
                   }))}
                   value={selectedMemberId}
                   onChange={setSelectedMemberId}

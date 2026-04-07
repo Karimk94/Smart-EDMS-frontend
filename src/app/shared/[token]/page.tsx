@@ -182,19 +182,25 @@ export default function SharedDocumentPage() {
   const token = params.token as string;
 
   // Language State
-  const [lang, setLang] = useState<'en' | 'ar'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
-    }
-    return 'en';
-  });
+  const [lang, setLang] = useState<'en' | 'ar'>('en');
   // Theme State
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
-    }
-    return 'light';
-  });
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const storedLang = (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
+    const storedTheme = (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+    
+    setLang(storedLang);
+    setTheme(storedTheme);
+
+    if (storedTheme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+
+    document.documentElement.lang = storedLang;
+    document.documentElement.dir = 'ltr';
+  }, []);
 
   const t = useTranslations(lang);
   const { showToast } = useToast();

@@ -5,12 +5,50 @@ interface DownloadParams {
     docId: number | string;
     docname: string;
     apiURL: string;
+    mediaType?: string;
+}
+
+const WATERMARKED_MEDIA_TYPES = new Set(['image', 'pdf', 'video']);
+const WATERMARKED_EXTENSIONS = new Set([
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg',
+    'pdf',
+    'mp4', 'mov', 'avi', 'mkv', 'webm'
+]);
+
+function shouldUseWatermarkedDownload(docname: string, mediaType?: string) {
+    const normalizedMediaType = mediaType?.toLowerCase();
+    if (normalizedMediaType && normalizedMediaType !== 'file' && normalizedMediaType !== 'folder') {
+        return WATERMARKED_MEDIA_TYPES.has(normalizedMediaType);
+    }
+
+    const extension = docname.split('.').pop()?.toLowerCase();
+    return extension ? WATERMARKED_EXTENSIONS.has(extension) : false;
+}
+
+function triggerBrowserDownload(url: string, filename?: string) {
+    const link = document.createElement('a');
+    link.href = url;
+    if (filename) {
+        link.setAttribute('download', filename);
+    }
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 }
 
 export function useDownload() {
     const downloadMutation = useMutation({
-        mutationFn: async ({ docId, docname, apiURL }: DownloadParams) => {
-            const response = await apiClient.raw(`${apiURL}/download_watermarked/${docId}`);
+        mutationFn: async ({ docId, docname, apiURL, mediaType }: DownloadParams) => {
+            const shouldWatermark = shouldUseWatermarkedDownload(docname, mediaType);
+            const endpoint = shouldWatermark
+                ? `${apiURL}/download_watermarked/${docId}`
+                : `${apiURL}/document/${docId}`;
+
+            if (!shouldWatermark) {
+                return { directUrl: endpoint, filename: docname, useNativeDownload: true };
+            }
+
+            const response = await apiClient.raw(endpoint);
             const contentDisposition = response.headers.get('Content-Disposition');
             let filename = docname;
             if (contentDisposition) {
@@ -23,15 +61,16 @@ export function useDownload() {
             const blob = await response.blob();
             return { blob, filename };
         },
-        onSuccess: ({ blob, filename }) => {
+        onSuccess: ({ blob, filename, directUrl, useNativeDownload }) => {
+            if (useNativeDownload && directUrl) {
+                triggerBrowserDownload(directUrl, filename);
+                return;
+            }
+
             // Create download link
+            if (!blob) return;
             const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', filename || 'download');
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
+            triggerBrowserDownload(url, filename || 'download');
             window.URL.revokeObjectURL(url);
         },
     });

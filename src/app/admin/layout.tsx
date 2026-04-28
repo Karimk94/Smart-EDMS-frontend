@@ -19,7 +19,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     const router = useRouter();
     const { useCheckAccess } = useAdmin();
     const { data: accessData, isLoading } = useCheckAccess();
-    const { user } = useAuth();
+    const { user, logout, isLoggingOut } = useAuth();
     const { updateLanguage, updateTheme } = useUserPreferences();
 
     const lang = user?.lang || 'en';
@@ -100,7 +100,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
                     {/* Right: Empty */}
                     <div className="flex items-center gap-4 ml-auto">
-                        <UserAccessBadge user={user} lang={lang} />
+                        <UserAccessBadge user={user} lang={lang} onLogout={logout} logoutText={t('logout')} isLoggingOut={isLoggingOut} loggingOutText={t('loggingOut')} />
                     </div>
                 </div>
             </header>

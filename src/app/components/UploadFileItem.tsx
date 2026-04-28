@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import DatePicker from 'react-datepicker';
 import { UploadFileItemProps } from '../../interfaces';
+import { Spinner } from './Spinner';
 
 const formatDateForInput = (date: Date | null): string => {
   if (!date) return '';
@@ -44,9 +45,9 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
   const getStatusIndicator = () => {
     switch (status) {
       case 'uploading':
-        return <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>;
+        return <Spinner size="sm" />;
       case 'processing':
-        return <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>;
+        return <Spinner size="sm" />;
       case 'success':
         return <Image src="/icons/check.svg" alt="" width={24} height={24} className="text-green-500 dark:invert" />;
       case 'error':

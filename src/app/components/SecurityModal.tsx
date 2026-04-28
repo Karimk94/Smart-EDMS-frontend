@@ -1,237 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { createPortal } from 'react-dom';
 import { useToast } from '../context/ToastContext';
+import { LoadingButton } from './LoadingButton';
+import { Spinner } from './Spinner';
 
 import { SecurityModalProps, Trustee } from '../../interfaces/PropsInterfaces';
 import { useGroups, fetchGroupMembers } from '../../hooks/usePersons';
 import { useTrustees, useSecurityMutation } from '../../hooks/useSecurity';
 import { useAuth } from '../../hooks/useAuth';
+import { InfiniteSelect } from './InfiniteSelect';
 
-const InfiniteSelect = ({
-  options,
-  value,
-  onChange,
-  placeholder,
-  onLoadMore,
-  isLoading,
-  disabled,
-  onSearch,
-  searchValue,
-  t
-}: {
-  options: { label: string; value: string; sublabel?: string }[];
-  value: string;
-  onChange: (val: string) => void;
-  placeholder: string;
-  onLoadMore?: () => void;
-  isLoading?: boolean;
-  disabled?: boolean;
-  onSearch?: (val: string) => void;
-  searchValue?: string;
-  t: Function;
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number; maxHeight: number }>({
-    top: 0,
-    left: 0,
-    width: 0,
-    maxHeight: 240,
-  });
-  const [openUpward, setOpenUpward] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop <= clientHeight + 20 && !isLoading && onLoadMore) {
-      onLoadMore();
-    }
-  };
-
-  const updateDropdownPosition = useCallback(() => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const viewportPadding = 8;
-    const headerHeight = onSearch ? 52 : 0;
-    const listMaxHeight = 240;
-    const estimatedHeight = headerHeight + listMaxHeight + 10;
-    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
-    const spaceAbove = rect.top - viewportPadding;
-    const shouldOpenUp = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
-
-    const desiredWidth = rect.width;
-    const maxWidth = window.innerWidth - viewportPadding * 2;
-    const width = Math.min(desiredWidth, maxWidth);
-    const left = Math.min(
-      Math.max(rect.left, viewportPadding),
-      window.innerWidth - width - viewportPadding
-    );
-
-    const maxAvailableHeight = shouldOpenUp
-      ? Math.max(140, spaceAbove - 8)
-      : Math.max(140, spaceBelow - 8);
-
-    const top = shouldOpenUp
-      ? Math.max(viewportPadding, rect.top - Math.min(estimatedHeight, maxAvailableHeight + headerHeight + 8))
-      : Math.min(window.innerHeight - viewportPadding - 140, rect.bottom + 8);
-
-    setOpenUpward(shouldOpenUp);
-    setDropdownStyle({
-      top,
-      left,
-      width,
-      maxHeight: Math.min(listMaxHeight, Math.max(120, maxAvailableHeight - headerHeight)),
-    });
-  }, [onSearch]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const clickedInsideTrigger = containerRef.current?.contains(target);
-      const clickedInsideDropdown = dropdownRef.current?.contains(target);
-      if (!clickedInsideTrigger && !clickedInsideDropdown) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    updateDropdownPosition();
-    window.addEventListener('resize', updateDropdownPosition);
-    window.addEventListener('scroll', updateDropdownPosition, true);
-
-    return () => {
-      window.removeEventListener('resize', updateDropdownPosition);
-      window.removeEventListener('scroll', updateDropdownPosition, true);
-    };
-  }, [isOpen, options.length, isLoading, updateDropdownPosition]);
-
-  const selectedOption = options.find(o => o.value === value);
-
-  return (
-    <div className="relative w-full" ref={containerRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-        className={`group relative w-full rounded-xl border px-3 py-2.5 text-left shadow-sm transition-all duration-200 sm:text-sm ${disabled
-          ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500 opacity-80'
-          : 'cursor-pointer border-gray-300 bg-white text-gray-800 hover:border-blue-400 hover:shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:border-blue-500'
-          }`}
-      >
-        <span className={`block truncate pr-7 ${selectedOption ? 'font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-          {selectedOption ? (
-            <span className="flex flex-col leading-tight">
-              <span>{selectedOption.label}</span>
-              {selectedOption.sublabel && (
-                <span className="text-xs text-gray-400 dark:text-gray-500 font-normal truncate">{selectedOption.sublabel}</span>
-              )}
-            </span>
-          ) : placeholder}
-        </span>
-        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-          <Image src="/icons/chevron-down.svg" alt="" width={20} height={20} className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} dark:invert`} />
-        </span>
-      </button>
-
-      {isOpen && createPortal(
-        <div
-          ref={dropdownRef}
-          className="fixed z-[1000] rounded-xl border border-gray-200 bg-white py-1 text-base shadow-2xl ring-1 ring-black/5 focus:outline-none sm:text-sm dark:border-gray-600 dark:bg-gray-700"
-          style={{
-            top: dropdownStyle.top,
-            left: dropdownStyle.left,
-            width: dropdownStyle.width,
-            transformOrigin: openUpward ? 'bottom left' : 'top left',
-          }}
-        >
-          {onSearch && (
-            <div className="relative z-30 bg-white dark:bg-gray-700 p-2 border-b border-gray-100 dark:border-gray-600 shadow-sm rounded-t-xl">
-              <input
-                type="text"
-                value={searchValue || ''}
-                onChange={(e) => onSearch(e.target.value)}
-                placeholder={t('search')}
-                className="w-full rounded-lg px-3 py-2 text-sm border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200"
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-            </div>
-          )}
-          <div
-            className="overflow-auto custom-scrollbar"
-            onScroll={handleScroll}
-            style={{ maxHeight: dropdownStyle.maxHeight }}
-          >
-            {options.length === 0 && !isLoading ? (
-              <div className="relative cursor-default select-none py-3 px-4 text-gray-500 dark:text-gray-400 italic text-center">
-                No options found
-              </div>
-            ) : (
-              <div className={onSearch ? 'pt-1' : ''}>
-                {options.map((option, index) => (
-                  <div
-                    key={index}
-                    className={`relative cursor-pointer select-none py-2.5 pl-3 pr-9 transition-colors ${option.value === value
-                      ? 'bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100'
-                      : 'text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600/80'
-                      }`}
-                    onClick={() => {
-                      onChange(option.value);
-                      setIsOpen(false);
-                    }}
-                  >
-                    <span className="flex flex-col">
-                      <span className={`block truncate ${option.value === value ? 'font-semibold' : 'font-medium'}`}>
-                        {option.label}
-                      </span>
-                      {option.sublabel && (
-                        <span className="block truncate text-xs text-gray-400 dark:text-gray-400 font-normal">
-                          {option.sublabel}
-                        </span>
-                      )}
-                    </span>
-                    {option.value === value ? (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
-                        <Image src="/icons/check.svg" alt="" width={20} height={20} className="dark:invert" />
-                      </span>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-            {isLoading && (
-              <div className="relative cursor-default select-none py-3 px-4 text-gray-700 dark:text-gray-400 text-center">
-                <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin mx-auto" />
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-};
 
 export default function SecurityModal({ isOpen, onClose, docId, library, itemName, t }: SecurityModalProps) {
   const { user } = useAuth();
@@ -583,7 +362,7 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                   className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-blue-600 dark:text-blue-300 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
                 >
                   {isAddingAllMembers ? (
-                    <Image src="/icons/spinner.svg" alt="" width={14} height={14} className="animate-spin" />
+                    <Spinner size="xs" />
                   ) : (
                     <Image src="/icons/users-plus.svg" alt="" width={14} height={14} />
                   )}
@@ -614,7 +393,9 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
                 {isLoadingTrustees ? (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
-                      <Image src="/icons/spinner.svg" alt="" width={20} height={20} className="animate-spin mx-auto" />
+                      <div className="flex justify-center">
+                        <Spinner size="sm" />
+                      </div>
                     </td>
                   </tr>
                 ) : trustees.length === 0 ? (
@@ -675,16 +456,13 @@ export default function SecurityModal({ isOpen, onClose, docId, library, itemNam
           >
             {t('cancel')}
           </button>
-          <button
+          <LoadingButton
             onClick={handleSave}
-            disabled={saving || isUpdatingSecurity}
+            isLoading={saving || isUpdatingSecurity}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-sm"
           >
-            {(saving || isUpdatingSecurity) && (
-              <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin invert" />
-            )}
             {t('savePermissions')}
-          </button>
+          </LoadingButton>
         </div>
       </div>
     </div>

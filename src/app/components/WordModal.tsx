@@ -8,8 +8,19 @@ import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDownload } from '../../hooks/useDownload';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { CollapsibleSection } from './CollapsibleSection';
+import { LoadingButton } from './LoadingButton';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
+import { Spinner } from './Spinner';
 import { TagEditor } from './TagEditor';
+
+const getFileExtension = (name: string | undefined | null): string => {
+  return name?.split('.').pop()?.toLowerCase() || '';
+};
+
+const canPreviewWordDocument = (name: string | undefined | null, mimeType?: string | null): boolean => {
+  const ext = getFileExtension(name);
+  return ext === 'docx' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+};
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -61,6 +72,7 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const canPreview = canPreviewWordDocument(doc.docname, (doc as any).mime_type);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const { download, isDownloading } = useDownload();
@@ -91,7 +103,16 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
     let isMounted = true;
 
     const renderDoc = async () => {
-      if (!containerRef.current || !blob) return;
+      if (!containerRef.current) return;
+
+      if (!canPreview) {
+        containerRef.current.innerHTML = '';
+        setLoadError(t('PreviewNotAvailable') || 'Preview not available for this file type.');
+        setIsLoadingContent(false);
+        return;
+      }
+
+      if (!blob) return;
 
       setIsLoadingContent(true);
       setLoadError(null);
@@ -110,8 +131,9 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
           });
         }
       } catch (err: any) {
-        console.error("Error loading Word doc:", err);
-        if (isMounted) setLoadError("Failed to load document preview.");
+        if (isMounted) {
+          setLoadError(t('PreviewNotAvailable') || 'Preview not available for this file type.');
+        }
       } finally {
         if (isMounted) setIsLoadingContent(false);
       }
@@ -120,7 +142,7 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
     renderDoc();
 
     return () => { isMounted = false; };
-  }, [blob]);
+  }, [blob, canPreview, t]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -210,7 +232,7 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
   };
 
   const handleDownload = () => {
-    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL, mediaType: doc.media_type });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';
@@ -241,13 +263,9 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
           {/* Right: Actions */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {isEditor && (
-            <button onClick={handleDownload} disabled={isDownloading} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
-              {isDownloading ? (
-                <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
-              )}
-            </button>
+            <LoadingButton onClick={handleDownload} isLoading={isDownloading} loadingText={null} spinnerSize="sm" className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
+              <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
+            </LoadingButton>
             )}
 
             <button
@@ -275,14 +293,18 @@ export const WordModal: React.FC<WordModalProps> = ({ doc, onClose, apiURL, onUp
 
             {isLoadingContent && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
-                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                <span className="text-gray-500 dark:text-gray-400">Loading document...</span>
+                <Spinner size="md" label={t('LoadingDocument')} />
               </div>
             )}
 
             {loadError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-red-500">
-                {loadError}
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-[#1f1f1f] z-10 text-center px-6">
+                <p className="text-gray-600 dark:text-gray-300">{loadError}</p>
+                {isEditor && (
+                  <LoadingButton onClick={handleDownload} isLoading={isDownloading} loadingText={t('downloading') || 'Downloading...'} className="text-blue-600 hover:underline text-sm disabled:opacity-60">
+                    {t('download') || 'Download'}
+                  </LoadingButton>
+                )}
               </div>
             )}
           </div>

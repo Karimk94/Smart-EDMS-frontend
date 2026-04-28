@@ -5,7 +5,9 @@ import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDownload } from '../../hooks/useDownload';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { CollapsibleSection } from './CollapsibleSection';
+import { LoadingButton } from './LoadingButton';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
+import { Spinner } from './Spinner';
 import { TagEditor } from './TagEditor';
 
 import Image from 'next/image';
@@ -187,7 +189,7 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
   };
 
   const handleDownload = () => {
-    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL, mediaType: doc.media_type });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';
@@ -225,13 +227,9 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
           {/* Right: Actions */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {isEditor && (
-            <button onClick={handleDownload} disabled={isDownloading} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
-              {isDownloading ? (
-                <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
-              )}
-            </button>
+            <LoadingButton onClick={handleDownload} isLoading={isDownloading} loadingText={null} spinnerSize="sm" className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
+              <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
+            </LoadingButton>
             )}
 
             <button onClick={handleFullScreen} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Full Screen">
@@ -259,8 +257,7 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
           <div className={`${isFullScreen ? 'fixed inset-0 z-[60]' : (isDetailsVisible ? 'md:col-span-2' : 'col-span-1')} h-full bg-gray-100 dark:bg-[#1a1a1a] rounded-lg flex flex-col items-center justify-center relative overflow-hidden`}>
             {loadingContent ? (
               <div className="flex flex-col items-center">
-                <div className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mb-3"></div>
-                <span className="text-gray-500">Loading content...</span>
+                <Spinner size="md" label={t('loadingContent')} />
               </div>
             ) : (
               <div className="w-full h-full p-6 overflow-auto">

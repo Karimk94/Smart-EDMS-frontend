@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import { LoadingButton } from './LoadingButton';
 
 type UserPermission = {
   tab_key: string;
@@ -18,6 +19,8 @@ interface UserAccessBadgeProps {
   lang?: 'en' | 'ar';
   onLogout?: () => void;
   logoutText?: string;
+  isLoggingOut?: boolean;
+  loggingOutText?: string;
 }
 
 const TAB_LABELS: Record<string, string> = {
@@ -42,7 +45,14 @@ const formatAccess = (permission: UserPermission): string => {
   return 'No Access';
 };
 
-export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({ user, lang = 'en', onLogout, logoutText = 'Logout' }) => {
+export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({
+  user,
+  lang = 'en',
+  onLogout,
+  logoutText = 'Logout',
+  isLoggingOut = false,
+  loggingOutText = 'Logging out...',
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -126,16 +136,23 @@ export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({ user, lang = '
           
           {onLogout && (
             <div className="border-t border-gray-200 dark:border-gray-700 p-2">
-              <button
+              <LoadingButton
                 onClick={() => {
+                  if (isLoggingOut) {
+                    return;
+                  }
                   setIsOpen(false);
                   onLogout();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition"
+                isLoading={isLoggingOut}
+                loadingText={loggingOutText}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                <Image src="/logout.svg" alt="Logout" width={18} height={18} className="dark:brightness-0 dark:invert" />
-                <span>{logoutText}</span>
-              </button>
+                {!isLoggingOut && (
+                  <Image src="/logout.svg" alt="Logout" width={18} height={18} className="dark:brightness-0 dark:invert" />
+                )}
+                {logoutText}
+              </LoadingButton>
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@ import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useToast } from '../context/ToastContext';
 import { DocumentItemProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
+import { Spinner } from './Spinner';
 
 export const DocumentItem: React.FC<DocumentItemProps> = ({
   doc,
@@ -169,7 +170,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
     >
       {isProcessing && (
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg z-10">
-          <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+          <Spinner size="sm" />
         </div>
       )}
       <div className="relative aspect-w-16 aspect-h-9 mb-2">

@@ -1,6 +1,39 @@
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 
+function parseDownloadFilename(contentDisposition: string | null, fallback: string) {
+    if (!contentDisposition) {
+        return fallback;
+    }
+
+    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+        try {
+            return decodeURIComponent(utf8Match[1]);
+        } catch {
+            // Fall through to the plain filename parser.
+        }
+    }
+
+    const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+    if (plainMatch?.[1]) {
+        return plainMatch[1];
+    }
+
+    return fallback;
+}
+
+function triggerBrowserDownload(url: string, filename?: string) {
+    const link = document.createElement('a');
+    link.href = url;
+    if (filename) {
+        link.setAttribute('download', filename);
+    }
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
 interface SharedFileDownloadParams {
     token: string;
     viewerEmail: string;
@@ -117,34 +150,13 @@ export function useSharedFileRestore() {
 
 // Hook for downloading folder items
 export function useSharedFolderItemDownload() {
-    const downloadMutation = useMutation<{ blob: Blob; filename: string }, Error, { token: string; viewerEmail: string; itemId: string; itemName: string }>({
+    const downloadMutation = useMutation<{ url: string; filename: string }, Error, { token: string; viewerEmail: string; itemId: string; itemName: string }>({
         mutationFn: async ({ token, viewerEmail, itemId, itemName }) => {
             const downloadUrl = `/api/share/download/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&doc_id=${itemId}`;
-            const downloadResponse = await apiClient.raw(downloadUrl);
-
-            // Extract filename from Content-Disposition header (same as useDownload)
-            const contentDisposition = downloadResponse.headers.get('Content-Disposition');
-            let filename = itemName;
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            const blob = await downloadResponse.blob();
-            return { blob, filename };
+            return { url: downloadUrl, filename: itemName };
         },
-        onSuccess: ({ blob, filename }) => {
-            // Trigger browser download
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', filename || 'download');
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
+        onSuccess: ({ url, filename }) => {
+            triggerBrowserDownload(url, filename || 'download');
         }
     });
 

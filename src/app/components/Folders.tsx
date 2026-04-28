@@ -8,6 +8,7 @@ import { useDownload } from '../../hooks/useDownload';
 import { apiClient } from '../../lib/apiClient';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
+import { LoadingButton } from './LoadingButton';
 import { Spinner } from './Spinner';
 import { CreateFolderModal } from './CreateFolderModal';
 import SecurityModal from './SecurityModal';
@@ -954,15 +955,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
   const handleDownload = (item: FolderItem) => {
     const toastId = showToast(t('downloading') || "Downloading...", 'info', 'subtle', 0);
+    const mediaType = getMediaType(item);
     download(
-      { docId: item.id, docname: item.name, apiURL },
+      { docId: item.id, docname: item.name, apiURL, mediaType },
       {
         onSuccess: () => {
           removeToast(toastId);
         },
         onError: () => {
           removeToast(toastId);
-          showToast(t('errorDownloading') || "Error downloading file.", 'error');
+          showToast(t('errorDownloading'), 'error');
         }
       }
     );
@@ -1081,7 +1083,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         errDetail = e.message;
       }
 
-      if (deleteMode === 'standard' && (e.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate"))) {
+      const hasSubfolders = errMsg.includes("contains subfolders");
+
+      if (hasSubfolders) {
+        setDeleteMode('standard');
+        setItemToDelete(null);
+        setConfirmModalOpen(false);
+        showToast(t('folderContainsSubfolders') || errDetail || 'This folder cannot be deleted because it contains subfolders.', 'warning');
+      } else if (deleteMode === 'standard' && (e.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate"))) {
         setDeleteMode('force');
         setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records or is not empty.");
         setConfirmModalOpen(true);
@@ -1157,15 +1166,17 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
               className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
             >
-              {isBatchMoving ? (t('moving') || 'Moving...') : (t('move') || 'Move')}
+              {isBatchMoving ? (t('moving')) : (t('move') || 'Move')}
             </button>
-            <button
+            <LoadingButton
               onClick={handleBatchDelete}
-              disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
+              isLoading={isBatchDeleting}
+              loadingText={t('deleting') || 'Deleting...'}
+              disabled={isBatchMoving || selectedFileCount === 0}
               className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
             >
-              {isBatchDeleting ? (t('deleting') || 'Deleting...') : (t('delete') || 'Delete')}
-            </button>
+              {t('delete') || 'Delete'}
+            </LoadingButton>
             <button
               onClick={clearSelection}
               disabled={isBatchMoving || isBatchDeleting}
@@ -1673,14 +1684,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               >
                 {t('cancel') || 'Cancel'}
               </button>
-              <button
+              <LoadingButton
                 onClick={processDelete}
-                className={`px-4 py-2 text-sm text-white rounded transition-colors shadow-sm flex items-center gap-2 ${deleteMode === 'force' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
-                disabled={isLoading}
+                isLoading={isLoading}
+                className={`px-4 py-2 text-sm text-white rounded transition-colors shadow-sm ${deleteMode === 'force' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
               >
-                {isLoading && <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin" />}
                 {deleteMode === 'force' ? (t('yesDelete') || 'Yes, Delete') : (t('delete') || 'Delete')}
-              </button>
+              </LoadingButton>
             </div>
           </div>
         </div>
@@ -1768,16 +1778,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               >
                 {t('cancel') || 'Cancel'}
               </button>
-              <button
+              <LoadingButton
                 onClick={async () => {
                   await moveFilesToFolder(moveItemIds, targetMoveFolderId);
                   closeMoveModal();
                 }}
-                disabled={isBatchMoving || moveItemIds.length === 0}
+                isLoading={isBatchMoving}
+                loadingText={t('moving') || 'Moving...'}
+                disabled={moveItemIds.length === 0}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
               >
-                {isBatchMoving ? (t('moving') || 'Moving...') : (t('moveHere') || 'Move here')}
-              </button>
+                {t('moveHere') || 'Move here'}
+              </LoadingButton>
             </div>
           </div>
         </div>
@@ -1811,13 +1823,15 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 >
                   {t('cancel') || 'Cancel'}
                 </button>
-                <button
+                <LoadingButton
                   type="submit"
-                  disabled={isRenaming || !renameValue.trim()}
+                  isLoading={isRenaming}
+                  loadingText={t('saving')}
+                  disabled={!renameValue.trim()}
                   className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {isRenaming ? 'Saving...' : (t('save') || 'Save')}
-                </button>
+                  {t('save') || 'Save'}
+                </LoadingButton>
               </div>
             </form>
           </div>

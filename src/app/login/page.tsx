@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { LoadingButton } from '../components/LoadingButton';
 import { PageSpinner } from '../components/Spinner';
 import { useToast } from '../context/ToastContext';
 import { useTranslations } from '../hooks/useTranslations';
@@ -88,7 +89,7 @@ function LoginContent() {
       }
       router.push(redirectPath);
     }
-  }, [isAuthenticated, isLoadingUser, router, searchParams, user, lang, theme, getSafeRedirect]);
+  }, [isAuthenticated, isLoadingUser, router, searchParams, user, lang, theme]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,13 +204,14 @@ function LoginContent() {
                 className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-red-500 focus:outline-none"
               />
             </div>
-            <button
+            <LoadingButton
               type="submit"
-              disabled={isLoggingIn}
-              className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded-md font-semibold text-white disabled:bg-red-800"
+              isLoading={isLoggingIn}
+              loadingText={t('loggingIn')}
+              className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded-md font-semibold text-white disabled:bg-red-800 disabled:cursor-not-allowed"
             >
-              {isLoggingIn ? t('loggingIn') : t('login')}
-            </button>
+              {t('login')}
+            </LoadingButton>
           </form>
         </div>
       </div>

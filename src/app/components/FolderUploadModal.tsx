@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../context/ToastContext';
 import { UploadFileItem } from './UploadFileItem';
+import { LoadingButton } from './LoadingButton';
 import ExifReader from 'exifreader';
 import { UploadStatus, UploadableFile } from '../../interfaces';
 
@@ -62,7 +63,7 @@ const removeExtension = (filename: string) => {
 import { FolderUploadModalProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
 
-export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete }) => {
+export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete, t }) => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [files, setFiles] = useState<UploadableFile[]>([]);
@@ -320,20 +321,15 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             )}
           </div>
           <div className="flex-shrink-0 pt-4 md:pt-6 border-t border-gray-700 flex flex-col sm:flex-row justify-end gap-2 md:gap-4">
-            <button
+            <LoadingButton
               onClick={handleUpload}
-              disabled={pendingFilesCount === 0 || isUploading}
+              isLoading={isUploading}
+              loadingText={t('uploading')}
+              disabled={pendingFilesCount === 0}
               className="px-4 py-2 md:px-6 md:py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {isUploading ? (
-                <>
-                  <Image src="/icons/spinner.svg" alt="" width={16} height={16} className="animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                `Upload ${pendingFilesCount} Items`
-              )}
-            </button>
+              {`${t('upload')} ${pendingFilesCount} ${t('items')}`}
+            </LoadingButton>
             <button
               onClick={handleClose}
               disabled={isUploading}

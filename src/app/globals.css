@@ -41,9 +41,55 @@
 
 /* --- End CSS Variables --- */
 
+html {
+    zoom: 75%;
+}
+
 body {
     background-color: var(--color-bg-primary);
     color: var(--color-text-primary);
+}
+
+/* Fix viewport heights when zoomed out to 75% (1 / 0.75 = 1.3333) */
+.min-h-screen {
+    min-height: 133.33vh !important;
+}
+
+.h-screen {
+    height: 133.33vh !important;
+}
+
+/* Fix specific modal arbitrary viewport units for 75% zoom */
+.h-\[90vh\] {
+    height: 120vh !important;
+}
+
+.max-h-\[90vh\] {
+    max-height: 120vh !important;
+}
+
+.max-h-\[96vh\] {
+    max-height: 128vh !important;
+}
+
+.max-h-\[80vh\] {
+    max-height: 106.66vh !important;
+}
+
+.max-h-\[70vh\] {
+    max-height: 93.33vh !important;
+}
+
+.max-h-\[60vh\] {
+    max-height: 80vh !important;
+}
+
+.min-h-\[40vh\] {
+    min-height: 53.33vh !important;
+}
+
+.w-\[99vw\] {
+    width: 132vw !important;
 }
 
 /* Custom scrollbar */

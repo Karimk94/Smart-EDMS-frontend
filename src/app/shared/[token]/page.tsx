@@ -17,14 +17,21 @@ registerLocale('en-GB', enGB);
 import { useSharedAuth } from '../../../hooks/useSharedAuth';
 import { useSharedContent } from '../../../hooks/useSharedContent';
 import { useSharedFileDownload, useSharedFileRestore, useSharedFolderItemDownload } from '../../../hooks/useSharedFileDownload';
+import { Spinner } from '../../components/Spinner';
 
 registerLocale('en-GB', enGB);
 
 // Word Viewer Component
-const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?: string }) => {
+const canPreviewWordDocument = (name: string | null | undefined, mimeType?: string | null): boolean => {
+  const ext = getFileExtension(name || '');
+  return ext === 'docx' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+};
+
+const WordViewer = ({ fileUrl, fileName, fileType, className }: { fileUrl: string | null; fileName: string; fileType: string; className?: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const canPreview = canPreviewWordDocument(fileName, fileType);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,6 +43,15 @@ const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?
 
       setLoading(true);
       setError(null);
+
+      if (!canPreview) {
+        containerRef.current.innerHTML = '';
+        if (isMounted) {
+          setError('Preview not available for this file type.');
+          setLoading(false);
+        }
+        return;
+      }
 
       try {
         const res = await fetch(fileUrl);
@@ -56,8 +72,7 @@ const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?
           });
         }
       } catch (err: any) {
-        console.error("Error rendering Word doc:", err);
-        if (isMounted) setError(`Failed to render document preview: ${err.message}`);
+        if (isMounted) setError('Preview not available for this file type.');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -65,19 +80,18 @@ const WordViewer = ({ fileUrl, className }: { fileUrl: string | null; className?
 
     loadDoc();
     return () => { isMounted = false; };
-  }, [fileUrl]);
+  }, [canPreview, fileName, fileType, fileUrl]);
 
   return (
     <div className={`w-full h-full min-h-[500px] flex flex-col bg-white dark:bg-[#1a1a1a] rounded-lg relative overflow-hidden ${className}`}>
       {loading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
-          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-          <span className="text-gray-500 dark:text-gray-400">Loading document...</span>
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10">
+          <Spinner size="md" label="Loading document..." />
         </div>
       )}
 
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-red-500">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-[#1f1f1f] z-10 text-center px-6 text-gray-600 dark:text-gray-300">
           {error}
         </div>
       )}
@@ -140,6 +154,10 @@ const isPreviewable = (mimeType: string, name: string): boolean => {
     isPowerPoint(mimeType, name) ||
     isWord(mimeType, name) ||
     isText(mimeType, name);
+};
+
+const isDirectDownloadOnlyType = (mediaType: string): boolean => {
+  return mediaType === 'zip' || mediaType === 'archive';
 };
 
 const resolveMediaType = (item: FolderItem): string => {
@@ -227,7 +245,7 @@ export default function SharedDocumentPage() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   // Shared Content Hook
-  const { data: folderData, isLoading: isLoadingFolder } = useSharedContent({
+  const { data: folderData, isLoading: isLoadingFolder, isFetching: isFetchingFolder } = useSharedContent({
     token,
     folderId: currentFolderId,
     viewerEmail,
@@ -243,6 +261,34 @@ export default function SharedDocumentPage() {
   const { downloadFileAsync, isDownloading: isDownloadingFile } = useSharedFileDownload();
   const { restoreFileAsync, isRestoring } = useSharedFileRestore();
   const { downloadItem, isDownloading: isDownloadingItem } = useSharedFolderItemDownload();
+
+  const renderSmartEdmsBrand = () => (
+    <div className="w-full max-w-4xl mb-4 rounded-2xl border border-sky-200 bg-white/95 backdrop-blur shadow-sm dark:border-sky-900/60 dark:bg-[#111827]/90">
+      <div className="flex items-center gap-4 px-5 py-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950/50">
+          <Image
+            src="/logo.png"
+            alt="Smart EDMS"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain"
+            priority
+          />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700 dark:text-sky-300">
+            Smart EDMS
+          </p>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+            {t('sharedFolder') || 'Shared Access Workspace'}
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Secure files and folders shared through Smart EDMS.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
   // Derived loading states
   const isAuthLoading = isLoadingShareInfo || isVerifyingAccess;
@@ -440,7 +486,6 @@ export default function SharedDocumentPage() {
     e.preventDefault();
     setErrorMessage(null);
     try {
-      await requestAccess({ token, viewer_email: email });
       await requestAccess({ token, viewer_email: email });
       setStep('otp_input');
       showToast(t('OtpSentMessage' as any), 'success');
@@ -665,18 +710,30 @@ export default function SharedDocumentPage() {
   // Open file from folder
   const handleFileClick = async (file: FolderItem) => {
     if (!viewerEmail) return;
+
+    const resolvedMediaType = resolveMediaType(file);
+    if (isDirectDownloadOnlyType(resolvedMediaType)) {
+      downloadItem({
+        token,
+        viewerEmail,
+        itemId: file.id,
+        itemName: file.name
+      });
+      return;
+    }
+
     setSelectedFile(file);
 
     try {
       // Create a document-like object for the hook
       const documentObj = {
         docname: file.name,
-        media_type: resolveMediaType(file),
+        media_type: resolvedMediaType,
         mime_type: undefined, // Let the backend header determine the mime type
         id: file.id
       };
 
-      const isVideo = resolveMediaType(file) === 'video';
+      const isVideo = resolvedMediaType === 'video';
 
       if (isVideo) {
         const streamUrl = `/api/share/stream/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&doc_id=${file.id}`;
@@ -915,9 +972,8 @@ export default function SharedDocumentPage() {
   const renderExcelContent = () => {
     if (isLoadingExcel) {
       return (
-        <div className="flex flex-col items-center justify-center h-full py-10">
-          <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-          <span className="text-gray-500">Loading spreadsheet...</span>
+        <div className="flex items-center justify-center h-full py-10">
+          <Spinner size="md" center label="Loading spreadsheet..." />
         </div>
       );
     }
@@ -975,9 +1031,8 @@ export default function SharedDocumentPage() {
   const renderPowerPointContent = () => {
     if (isLoadingPpt) {
       return (
-        <div className="flex flex-col items-center justify-center h-full py-10">
-          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-          <span className="text-gray-500">Parsing presentation...</span>
+        <div className="flex items-center justify-center h-full py-10">
+          <Spinner size="md" center label="Parsing presentation..." />
         </div>
       );
     }
@@ -1054,9 +1109,8 @@ export default function SharedDocumentPage() {
   const renderTextContent = () => {
     if (isLoadingText) {
       return (
-        <div className="flex flex-col items-center justify-center h-full py-10">
-          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-          <span className="text-gray-500">Loading content...</span>
+        <div className="flex items-center justify-center h-full py-10">
+          <Spinner size="md" center label="Loading content..." />
         </div>
       );
     }
@@ -1072,7 +1126,32 @@ export default function SharedDocumentPage() {
 
   // Render folder contents view
   const renderFolderContents = () => {
-    // If a file is selected, show file preview
+    // If a file is selected but not yet loaded, show loading state
+    if (selectedFile && !fileUrl) {
+      return (
+        <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-4">
+            <button
+              onClick={closeFilePreview}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={t('back') || 'Back'}
+            >
+              <Image src="/icons/chevron-left.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {selectedFile.name}
+              </h1>
+            </div>
+          </div>
+          <div className="p-6 flex flex-col items-center justify-center min-h-[400px] bg-gray-50 dark:bg-gray-900/50">
+            <Spinner size="lg" center label={t('loading') || 'Loading file...'} />
+          </div>
+        </div>
+      );
+    }
+
+    // If a file is selected and loaded, show file preview
     if (selectedFile && fileUrl) {
       return (
         <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
@@ -1149,7 +1228,7 @@ export default function SharedDocumentPage() {
               )}
 
               {isWord(fileType, fileName) && (
-                <WordViewer fileUrl={fileUrl} />
+                <WordViewer fileUrl={fileUrl} fileName={fileName} fileType={fileType} />
               )}
 
               {isText(fileType, fileName) && (
@@ -1216,6 +1295,9 @@ export default function SharedDocumentPage() {
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                 {currentFolderName}
               </h1>
+              {isFetchingFolder && !isLoadingFolder && (
+                <Spinner size="xs" />
+              )}
             </div>
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {folderContents.length} {t('items') || 'items'}
@@ -1227,7 +1309,7 @@ export default function SharedDocumentPage() {
         <div className="p-6 min-h-[400px]">
           {isLoadingFolder ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+              <Spinner size="lg" center label={t('loading') || 'Loading...'} />
             </div>
           ) : folderContents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -1235,7 +1317,7 @@ export default function SharedDocumentPage() {
               <p>{t('emptyFolder') || 'This folder is empty'}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 transition-opacity duration-200 ${isFetchingFolder && !isLoadingFolder ? 'opacity-60 pointer-events-none' : ''}`}>
               {folderContents.map((item: FolderItem) => (
                 <div
                   key={item.id}
@@ -1255,6 +1337,11 @@ export default function SharedDocumentPage() {
                   <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2">
                     {item.name}
                   </span>
+                  {item.type !== 'folder' && isDirectDownloadOnlyType(resolveMediaType(item)) && (
+                    <span className="mt-2 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                      {t('download') || 'Download'}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -1296,12 +1383,7 @@ export default function SharedDocumentPage() {
     return (
       <>
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">
-              {t('loading') || 'Loading...'}
-            </p>
-          </div>
+          <Spinner size="lg" center label={t('loading') || 'Loading...'} />
         </div>
       </>
     );
@@ -1376,11 +1458,13 @@ export default function SharedDocumentPage() {
         shareInfo?.share_type === 'folder' || rootFolderId ? (
           // Folder Share View
           <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center">
+            {renderSmartEdmsBrand()}
             {renderFolderContents()}
           </div>
         ) : (shareInfo?.share_type === 'file' || documentData) ? (
           // File Share View (existing behavior)
           <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 flex flex-col items-center">
+            {renderSmartEdmsBrand()}
             <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
@@ -1404,9 +1488,8 @@ export default function SharedDocumentPage() {
                 {/* Document Preview */}
                 <div className="w-full max-h-[600px] overflow-auto mb-6">
                   {isInitialLoad && (
-                    <div className="flex flex-col items-center justify-center py-20 min-h-[300px]">
-                      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                      <p className="text-gray-500 dark:text-gray-400 font-medium">{t('LoadingDocument') || 'Loading document...'}</p>
+                    <div className="flex items-center justify-center py-20 min-h-[300px]">
+                      <Spinner size="lg" center label={t('LoadingDocument') || 'Loading document...'} />
                     </div>
                   )}
 
@@ -1458,7 +1541,7 @@ export default function SharedDocumentPage() {
 
                   {/* Word Preview */}
                   {fileUrl && isWord(fileType, fileName) && (
-                    <WordViewer fileUrl={fileUrl} />
+                    <WordViewer fileUrl={fileUrl} fileName={fileName} fileType={fileType} />
                   )}
 
                   {/* Text Preview */}
@@ -1498,18 +1581,17 @@ export default function SharedDocumentPage() {
       ) : (
         // View: Auth / OTP Forms
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
+          <div className="w-full max-w-4xl flex flex-col items-center">
+            {renderSmartEdmsBrand()}
+            <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
 
             <div className="flex justify-center mb-6">
               <Image
-                src="/icon.ico"
-                alt="Logo"
+                src="/logo.png"
+                alt="Smart EDMS"
                 width={80}
                 height={80}
                 className="h-20 w-auto object-contain"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
               />
             </div>
 
@@ -1635,6 +1717,7 @@ export default function SharedDocumentPage() {
                   {errorMessage}
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>

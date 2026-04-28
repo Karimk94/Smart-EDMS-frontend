@@ -9,6 +9,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { ImageModalProps } from '../../interfaces/PropsInterfaces';
 import { AnalysisView } from './AnalysisView';
 import { CollapsibleSection } from './CollapsibleSection';
+import { LoadingButton } from './LoadingButton';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
 
@@ -242,7 +243,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
   };
 
   const handleDownload = () => {
-    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL, mediaType: doc.media_type });
   };
 
   const modalBg = theme === 'dark' ? 'bg-[#282828]' : 'bg-white';
@@ -286,13 +287,9 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {/* Download Button */}
             {isEditor && (
-            <button onClick={handleDownload} disabled={isDownloading} className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Download">
-              {isDownloading ? (
-                <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
-              )}
-            </button>
+            <LoadingButton onClick={handleDownload} isLoading={isDownloading} loadingText={null} spinnerSize="sm" className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`} title="Download">
+              <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
+            </LoadingButton>
             )}
 
             {/* Full Screen Button */}
@@ -423,17 +420,14 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
               </div>
               {doc.media_type === 'image' && isEditor && (
                 <div className="text-center">
-                  <button
+                  <LoadingButton
                     onClick={handleAnalyze}
-                    disabled={isAnalyzing}
+                    isLoading={isAnalyzing}
+                    loadingText={t('processing')}
                     className="mt-6 px-8 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition w-64 h-14 flex items-center justify-center mx-auto disabled:bg-red-800 disabled:cursor-not-allowed"
                   >
-                    {isAnalyzing ? (
-                      <Image src="/icons/spinner.svg" alt="" width={20} height={20} className="animate-spin invert" />
-                    ) : (
-                      t('analyzeForFaces')
-                    )}
-                  </button>
+                    {t('analyzeForFaces')}
+                  </LoadingButton>
                 </div>
               )}
             </div>

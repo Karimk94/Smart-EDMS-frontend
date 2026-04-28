@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAnalysis } from '../../hooks/useAnalysis';
 import { useToast } from '../context/ToastContext';
+import { LoadingButton } from './LoadingButton';
 import { PersonSelector } from './PersonSelector';
 import Image from 'next/image';
 
@@ -138,17 +139,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
                   theme={theme}
                 />
 
-                <button
+                <LoadingButton
                   onClick={() => handleSaveFace(face)}
-                  disabled={savingFaceIndex === face.index}
+                  isLoading={savingFaceIndex === face.index}
+                  loadingText={null}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 transition disabled:bg-blue-800 flex items-center justify-center w-24"
                 >
-                  {savingFaceIndex === face.index ? (
-                    <Image src="/icons/spinner.svg" alt="" width={20} height={20} className="animate-spin" />
-                  ) : (
-                    'Save Face'
-                  )}
-                </button>
+                  Save Face
+                </LoadingButton>
               </div>
               {face.distance !== null && face.name !== 'Unknown' && (
                 <div className={`mt-2 text-right text-xs ${mutedTextColor}`}>
@@ -181,17 +179,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, docId, apiUR
       )}
 
       <div className={`pt-4 border-t ${borderColor}`}>
-        <button
+        <LoadingButton
           onClick={handleUpdateAbstractClick}
-          disabled={confirmedNames.length === 0 || isUpdating}
+          isLoading={isUpdating}
+          loadingText={t('processing')}
+          disabled={confirmedNames.length === 0}
           className="w-full py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-600 transition disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
         >
-          {isUpdating ? (
-            <Image src="/icons/spinner.svg" alt="" width={20} height={20} className="animate-spin" />
-          ) : (
-            'Save Confirmed Names to Title'
-          )}
-        </button>
+          Save Confirmed Names to Title
+        </LoadingButton>
       </div>
 
       {isConfirmOpen && (

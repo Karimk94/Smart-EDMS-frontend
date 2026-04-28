@@ -62,6 +62,7 @@ import { UploadModalProps } from '../../interfaces/PropsInterfaces';
 
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
+import { LoadingButton } from './LoadingButton';
 
 export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme, t }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);
@@ -314,13 +315,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
             )}
           </div>
           <div className="flex-shrink-0 pt-4 md:pt-6 border-t border-gray-700 flex flex-col sm:flex-row justify-end gap-2 md:gap-4">
-            <button
+            <LoadingButton
               onClick={handleUpload}
-              disabled={pendingFilesCount === 0 || isUploading}
+              isLoading={isUploading}
+              loadingText={t('uploading')}
+              disabled={pendingFilesCount === 0}
               className="px-4 py-2 md:px-6 md:py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
             >
-              {isUploading ? 'Uploading...' : `Upload Pending (${pendingFilesCount})`}
-            </button>
+              {`${t('uploadPending')} (${pendingFilesCount})`}
+            </LoadingButton>
             <button
               onClick={handleAnalyze}
               disabled={successfulUploadsCount === 0 || isUploading}

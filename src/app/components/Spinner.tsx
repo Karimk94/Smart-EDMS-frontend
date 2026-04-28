@@ -3,8 +3,8 @@
 import Image from 'next/image';
 
 interface SpinnerProps {
-    /** Size variant: 'sm' (20px), 'md' (40px), 'lg' (56px) */
-    size?: 'sm' | 'md' | 'lg';
+    /** Size variant: 'xs' (16px), 'sm' (24px), 'md' (40px), 'lg' (56px) */
+    size?: 'xs' | 'sm' | 'md' | 'lg';
     /** Optional label shown below the spinner */
     label?: string;
     /** Whether to center the spinner in its container */
@@ -12,6 +12,7 @@ interface SpinnerProps {
 }
 
 const sizeMap = {
+    xs: { ring: 'w-4 h-4 border-2', logo: 8 },
     sm: { ring: 'w-6 h-6 border-2', logo: 12 },
     md: { ring: 'w-10 h-10 border-4', logo: 20 },
     lg: { ring: 'w-14 h-14 border-4', logo: 28 },

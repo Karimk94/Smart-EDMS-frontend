@@ -5,6 +5,7 @@ import { useDocumentMutations } from '../../hooks/useDocumentMutations';
 import { useDownload } from '../../hooks/useDownload';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { PdfModalProps } from '../../interfaces/PropsInterfaces';
+import { LoadingButton } from './LoadingButton';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
 
@@ -171,7 +172,7 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
   };
 
   const handleDownload = () => {
-    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL });
+    download({ docId: doc.doc_id, docname: doc.docname || 'download', apiURL, mediaType: doc.media_type });
   };
 
   return (
@@ -200,13 +201,9 @@ export const PdfModal: React.FC<PdfModalProps> = ({ doc, onClose, apiURL, onUpda
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {/* Download Button */}
             {isEditor && (
-            <button onClick={handleDownload} disabled={isDownloading} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
-              {isDownloading ? (
-                <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
-              )}
-            </button>
+            <LoadingButton onClick={handleDownload} isLoading={isDownloading} loadingText={null} spinnerSize="sm" className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" title="Download">
+              <Image src="/download.svg" alt="Download" width={24} height={24} className="dark:invert" />
+            </LoadingButton>
             )}
 
             {/* Full Screen Button */}

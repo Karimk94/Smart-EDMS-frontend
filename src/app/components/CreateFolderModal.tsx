@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useCreateFolder } from '../../hooks/useFolderMutations';
 import { useToast } from '../context/ToastContext';
+import { LoadingButton } from './LoadingButton';
 
 import { CreateFolderModalProps } from '../../interfaces/PropsInterfaces';
 
@@ -90,13 +91,14 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({ onClose, a
             >
               {t('cancel')}
             </button>
-            <button
+            <LoadingButton
               type="submit"
+              isLoading={isSubmitting}
+              loadingText={t('processing')}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30"
-              disabled={isSubmitting}
             >
-              {isSubmitting ? t('processing') : t('create')}
-            </button>
+              {t('create')}
+            </LoadingButton>
           </div>
         </form>
       </div>

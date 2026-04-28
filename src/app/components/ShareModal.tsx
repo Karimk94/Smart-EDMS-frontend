@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useToast } from '../context/ToastContext';
 import { useSecurityMutation } from '../../hooks/useSecurity';
+import { LoadingButton } from './LoadingButton';
 
 import { ShareModalProps } from '../../interfaces/PropsInterfaces';
 
@@ -293,13 +294,15 @@ const ShareModal: React.FC<ShareModalProps> = ({
               >
                 {t('cancel') || 'Cancel'}
               </button>
-              <button
+              <LoadingButton
                 onClick={handleGenerateLink}
-                disabled={isGeneratingLink || (shareMode === 'restricted' && targetEmails.length === 0 && !validateEmail(targetEmail))}
+                isLoading={isGeneratingLink}
+                loadingText={t('generating')}
+                disabled={shareMode === 'restricted' && targetEmails.length === 0 && !validateEmail(targetEmail)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isGeneratingLink ? (t('generating')) : (t('generateLink'))}
-              </button>
+                {t('generateLink')}
+              </LoadingButton>
             </div>
           </>
         ) : (

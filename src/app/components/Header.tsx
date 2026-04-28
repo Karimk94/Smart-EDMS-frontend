@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useQuota } from '../../hooks/useQuota';
 import Image from 'next/image';
+import { Spinner } from './Spinner';
 import { UserAccessBadge } from './UserAccessBadge';
 import { QuotaAccessBadge } from './QuotaAccessBadge';
 
@@ -22,7 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   toggleSidebar,
   activeSection,
 }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoggingOut } = useAuth();
   const { updateLanguage, updateTheme } = useUserPreferences();
   const { data: quotaData } = useQuota({ enabled: activeSection === 'folders' });
 
@@ -102,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
           {isProcessing && (
             <div className="flex items-center gap-2 text-gray-900 dark:text-white text-sm">
-              <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+              <Spinner size="xs" />
               <span>{t('processing')}</span>
             </div>
           )}
@@ -115,7 +116,14 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{t('upload')}</span>
             </button>
           )}
-          <UserAccessBadge user={user} lang={lang} onLogout={logout} logoutText={t('logout')} />
+          <UserAccessBadge
+            user={user}
+            lang={lang}
+            onLogout={logout}
+            logoutText={t('logout')}
+            isLoggingOut={isLoggingOut}
+            loggingOutText={t('loggingOut')}
+          />
         </div>
       </div>
     </header>

@@ -18,6 +18,7 @@ export interface FolderUploadModalProps {
     parentId: string | null;
     parentName: string;
     onUploadComplete: () => void;
+    t: Function;
 }
 
 export interface UploadFileItemProps {
@@ -228,6 +229,7 @@ export interface FolderUploadModalProps {
     parentId: string | null;
     parentName: string;
     onUploadComplete: () => void;
+    t: Function;
 }
 
 export interface TagEditorProps {

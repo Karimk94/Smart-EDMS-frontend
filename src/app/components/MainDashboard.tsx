@@ -406,7 +406,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                 {isFolderUploadModalOpen && isSectionWritable('folders') && (
                     <FolderUploadModal
                         onClose={() => setIsFolderUploadModalOpen(false)} apiURL={API_PROXY_URL} theme={theme}
-                        parentId={uploadParentId} parentName={uploadParentName} onUploadComplete={handleFolderUploadComplete}
+                        parentId={uploadParentId} parentName={uploadParentName} onUploadComplete={handleFolderUploadComplete} t={t}
                     />
                 )}
 

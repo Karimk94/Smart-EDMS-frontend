@@ -3,10 +3,11 @@
 import { enGB } from 'date-fns/locale/en-GB';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { SearchCriterion, SearchType, useProfileMultiSearch, useProfileSearchScopes, useProfileSearchTypes } from '../../hooks/useProfileSearch';
+import { useDocumentGroups } from '../../hooks/useDocumentGroups';
 import { Document } from '../../models/Document';
 import { DocumentItemSkeleton } from '../components/DocumentItemSkeleton';
 import { DocumentList } from '../components/DocumentList';
@@ -100,6 +101,24 @@ function ProfileSearchPageContent() {
     // Data Fetching
     const { data: scopesData, isLoading: isScopesLoading } = useProfileSearchScopes();
     const { data: typesData, isLoading: isTypesLoading } = useProfileSearchTypes(searchScope || undefined);
+
+    // Merge duplicate scopes by label, combining their values
+    const mergedScopes = useMemo(() => {
+        if (!scopesData) return [];
+        const scopeMap = scopesData.reduce((acc, scope) => {
+            if (acc[scope.label]) {
+                // Combine and deduplicate values
+                const existingValues = acc[scope.label].value.split(',');
+                const newValues = scope.value.split(',');
+                const combined = [...new Set([...existingValues, ...newValues])];
+                acc[scope.label].value = combined.join(',');
+            } else {
+                acc[scope.label] = { ...scope };
+            }
+            return acc;
+        }, {} as Record<string, { label: string; value: string }>);
+        return Object.values(scopeMap);
+    }, [scopesData]);
 
     const { data: searchData, isFetching: isSearchLoading, error: searchError } = useProfileMultiSearch({
         scope: committedParams?.scope || '',
@@ -196,6 +215,58 @@ function ProfileSearchPageContent() {
         }
     };
 
+    // Document groups for collage/navigation support
+    const { getNextDocumentInGroup, getPreviousDocumentInGroup, getDocumentIndexInGroup, isGrouped } = useDocumentGroups(documents);
+
+    // Navigation helpers for modals
+    const createNavigationHandlers = (selectedDoc: Document | null, setSelectedDoc: (doc: Document | null) => void) => {
+        if (!selectedDoc) {
+            return {
+                onNavigateNext: undefined,
+                onNavigatePrevious: undefined,
+                canNavigateNext: false,
+                canNavigatePrevious: false,
+                currentDocIndex: 0,
+                totalInGroup: 1,
+                isGrouped: false,
+            };
+        }
+
+        const nextDoc = getNextDocumentInGroup(selectedDoc.docname, selectedDoc.doc_id);
+        const prevDoc = getPreviousDocumentInGroup(selectedDoc.docname, selectedDoc.doc_id);
+        const currentIndex = getDocumentIndexInGroup(selectedDoc.docname, selectedDoc.doc_id);
+        const groupDocs = documents.filter(d => d.docname === selectedDoc.docname);
+
+        return {
+            onNavigateNext: nextDoc ? () => setSelectedDoc(nextDoc) : undefined,
+            onNavigatePrevious: prevDoc ? () => setSelectedDoc(prevDoc) : undefined,
+            canNavigateNext: !!nextDoc,
+            canNavigatePrevious: !!prevDoc,
+            currentDocIndex: currentIndex >= 0 ? currentIndex : 0,
+            totalInGroup: groupDocs.length,
+            isGrouped: isGrouped(selectedDoc.docname),
+        };
+    };
+
+    // Get search term for highlighting (first active criterion)
+    const getSearchContext = (doc?: Document | null) => {
+        if (!committedParams || committedParams.criteria.length === 0) {
+            return { searchTerm: undefined, searchMatchType: undefined, searchMatchField: undefined, searchFieldValue: undefined };
+        }
+        
+        const firstCriterion = committedParams.criteria.find(c => c.type && c.keyword);
+        if (!firstCriterion) {
+            return { searchTerm: undefined, searchMatchType: undefined, searchMatchField: undefined, searchFieldValue: undefined };
+        }
+
+        return {
+            searchTerm: doc?.searchMatchValue || firstCriterion.keyword,
+            searchMatchType: firstCriterion.matchType,
+            searchMatchField: doc?.searchMatchField || firstCriterion.type?.value.display_field || undefined,
+            searchFieldValue: doc?.searchFieldValue || undefined,
+        };
+    };
+
     const API_PROXY_URL = '/api';
     const hasValidRow = searchRows.some(r => r.type !== null && r.keyword.trim().length > 0);
 
@@ -261,7 +332,7 @@ function ProfileSearchPageContent() {
                                                 onChange={(e) => handleScopeChange(e.target.value)}
                                             >
                                                 <option value="">{t('selectScope') || 'Select Scope'}</option>
-                                                {scopesData?.map((scope, idx) => (
+                                                {mergedScopes?.map((scope, idx) => (
                                                     <option key={idx} value={scope.value}>
                                                         {scope.label}
                                                     </option>
@@ -425,6 +496,8 @@ function ProfileSearchPageContent() {
                                         onTagSelect={() => { }}
                                         isLoading={false}
                                         processingDocs={[]}
+                                        enableCollage={true}
+                                        showFavoriteButton={false}
                                         lang={lang}
                                         t={t}
                                     />
@@ -457,14 +530,134 @@ function ProfileSearchPageContent() {
                 </div>
 
                 {/* Modals */}
-                {selectedDoc && <ImageModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
-                {selectedVideo && <VideoModal doc={selectedVideo} onClose={() => setSelectedVideo(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
-                {selectedPdf && <PdfModal doc={selectedPdf} onClose={() => setSelectedPdf(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
-                {selectedFile && <FileModal doc={selectedFile} onClose={() => setSelectedFile(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
-                {selectedTxt && <TxtModal doc={selectedTxt} onClose={() => setSelectedTxt(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
-                {selectedExcel && <ExcelModal doc={selectedExcel} onClose={() => setSelectedExcel(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
-                {selectedPPT && <PowerPointModal doc={selectedPPT} onClose={() => setSelectedPPT(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
-                {selectedWord && <WordModal doc={selectedWord} onClose={() => setSelectedWord(null)} apiURL={API_PROXY_URL} onUpdateAbstractSuccess={() => { }} isEditor={isEditor} t={t} lang={lang} theme={theme} />}
+                {selectedDoc && (() => {
+                    const navHandlers = createNavigationHandlers(selectedDoc, setSelectedDoc);
+                    const searchContext = getSearchContext(selectedDoc);
+                    return <ImageModal 
+                        doc={selectedDoc} 
+                        onClose={() => setSelectedDoc(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
+                {selectedVideo && (() => {
+                    const navHandlers = createNavigationHandlers(selectedVideo, setSelectedVideo);
+                    const searchContext = getSearchContext(selectedVideo);
+                    return <VideoModal 
+                        doc={selectedVideo} 
+                        onClose={() => setSelectedVideo(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
+                {selectedPdf && (() => {
+                    const navHandlers = createNavigationHandlers(selectedPdf, setSelectedPdf);
+                    const searchContext = getSearchContext(selectedPdf);
+                    return <PdfModal 
+                        doc={selectedPdf} 
+                        onClose={() => setSelectedPdf(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
+                {selectedFile && (() => {
+                    const navHandlers = createNavigationHandlers(selectedFile, setSelectedFile);
+                    const searchContext = getSearchContext(selectedFile);
+                    return <FileModal 
+                        doc={selectedFile} 
+                        onClose={() => setSelectedFile(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
+                {selectedTxt && (() => {
+                    const navHandlers = createNavigationHandlers(selectedTxt, setSelectedTxt);
+                    const searchContext = getSearchContext(selectedTxt);
+                    return <TxtModal 
+                        doc={selectedTxt} 
+                        onClose={() => setSelectedTxt(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
+                {selectedExcel && (() => {
+                    const navHandlers = createNavigationHandlers(selectedExcel, setSelectedExcel);
+                    const searchContext = getSearchContext(selectedExcel);
+                    return <ExcelModal 
+                        doc={selectedExcel} 
+                        onClose={() => setSelectedExcel(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
+                {selectedPPT && (() => {
+                    const navHandlers = createNavigationHandlers(selectedPPT, setSelectedPPT);
+                    const searchContext = getSearchContext(selectedPPT);
+                    return <PowerPointModal 
+                        doc={selectedPPT} 
+                        onClose={() => setSelectedPPT(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
+                {selectedWord && (() => {
+                    const navHandlers = createNavigationHandlers(selectedWord, setSelectedWord);
+                    const searchContext = getSearchContext(selectedWord);
+                    return <WordModal 
+                        doc={selectedWord} 
+                        onClose={() => setSelectedWord(null)} 
+                        apiURL={API_PROXY_URL} 
+                        onUpdateAbstractSuccess={() => { }} 
+                        isEditor={isEditor} 
+                        t={t} 
+                        lang={lang} 
+                        theme={theme}
+                        {...navHandlers}
+                        {...searchContext}
+                    />;
+                })()}
             </div>
         </>
     );

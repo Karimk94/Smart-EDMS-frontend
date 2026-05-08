@@ -634,7 +634,7 @@ export default function AdminPage() {
                                     type="text"
                                     value={userFilter}
                                     onChange={(e) => setUserFilter(e.target.value)}
-                                    placeholder="Search users..."
+                                    placeholder="Search users or names..."
                                     className="w-full sm:w-64 px-3 py-2 pl-9 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                                 />
                                 <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:invert" />
@@ -663,6 +663,9 @@ export default function AdminPage() {
                                     Username
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Full Name
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Security Level
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -689,6 +692,9 @@ export default function AdminPage() {
                                 >
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                                         {user.username}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                        {user.full_name || user.username}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                         <span className={`px-2 py-1 rounded text-xs font-medium ${user.security_level === 'Admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :

@@ -50,6 +50,31 @@ body {
     color: var(--color-text-primary);
 }
 
+html[lang="ar"] :where(
+    a,
+    button,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    label,
+    legend,
+    li,
+    p,
+    span,
+    strong,
+    th,
+    td,
+    textarea,
+    input,
+    select,
+    option
+) {
+    unicode-bidi: plaintext;
+}
+
 /* Fix viewport heights when zoomed out to 75% (1 / 0.75 = 1.3333) */
 .min-h-screen {
     min-height: 133.33vh !important;

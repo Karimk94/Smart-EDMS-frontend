@@ -4,6 +4,7 @@ import { apiClient } from '../lib/apiClient';
 
 export interface EdmsUser {
     username: string;
+    full_name: string;
     people_system_id: number;
     edms_user_id: number;
     user_ref_id: number;

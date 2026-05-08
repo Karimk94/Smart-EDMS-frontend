@@ -227,6 +227,8 @@
   "edmsPortal": "EDMS Portal",
   "welcomeToEdms": "Welcome to EDMS Portal",
   "selectSystem": "Select a system below to access your document management tools",
+  "admin": "Admin",
+  "adminDesc": "Manage EDMS users, tab permissions, quotas, and processing queues.",
   "smartEdmsTitle": "Smart EDMS",
   "smartEdmsDesc": "Electronic Document Management System with AI-powered analysis for organizing, searching, and managing your digital documents efficiently.",
   "ptaEdmsTitle": "PTAEDMS",
@@ -427,5 +429,7 @@
   "zipDownloadError": "Failed to download folder as ZIP",
   "errorDownloading": "Error downloading file.",
   "edmsUsers": "EDMS Users",
-  "edmsUsersDescription": "Manage user accounts in EDMS (PEOPLE table) from candidates"
+  "edmsUsersDescription": "Manage user accounts in EDMS (PEOPLE table) from candidates",
+  "documentGroup": "Document Group",
+  "documentGroupDescription": "Manage document groups (DOCCLASS table) to categorize documents in EDMS"
 }

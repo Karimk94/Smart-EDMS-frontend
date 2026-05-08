@@ -63,11 +63,24 @@ export function useProfileSearchTypes(scope?: string) {
     return useQuery({
         queryKey: ['profilesearch', 'types', scope || 'all'],
         queryFn: async (): Promise<SearchType[]> => {
-            const url = scope
-                ? `/api/profilesearch/types?scope=${encodeURIComponent(scope)}`
-                : '/api/profilesearch/types';
-            const data = await apiClient.get(url);
-            return data.types || [];
+            if (scope && scope.includes(',')) {
+                // Handle multiple scopes by fetching each and combining
+                const scopes = scope.split(',');
+                const promises = scopes.map(s => apiClient.get(`/api/profilesearch/types?scope=${encodeURIComponent(s)}`));
+                const results = await Promise.all(promises);
+                const allTypes = results.flatMap(data => data.types || []);
+                // Deduplicate by field_name
+                const uniqueTypes = allTypes.filter((type, index, self) =>
+                    index === self.findIndex(t => t.value.field_name === type.value.field_name)
+                );
+                return uniqueTypes;
+            } else {
+                const url = scope
+                    ? `/api/profilesearch/types?scope=${encodeURIComponent(scope)}`
+                    : '/api/profilesearch/types';
+                const data = await apiClient.get(url);
+                return data.types || [];
+            }
         },
         staleTime: 1000 * 60 * 60,
     });
@@ -109,7 +122,11 @@ export function useProfileMultiSearch(params: MultiSearchParams & { enabled?: bo
                 page_size: 20,
             };
 
-            return apiClient.post('/api/profilesearch/search', body);
+            const data = await apiClient.post('/api/profilesearch/search', body);
+            return {
+                ...data,
+                documents: (data.documents || []).map((doc: Partial<Document>) => new Document(doc)),
+            };
         },
         enabled: enabled && criteria.some(c => c.type !== null),
         placeholderData: keepPreviousData,

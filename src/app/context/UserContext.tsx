@@ -49,6 +49,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const storedLang = localStorage.getItem('lang') as 'en' | 'ar';
         if (storedLang) {
             setCurrentLang(storedLang);
+            document.documentElement.lang = storedLang;
+            document.documentElement.dir = 'ltr';
         }
         const storedTheme = localStorage.getItem('theme') as 'light' | 'dark';
         if (storedTheme) {

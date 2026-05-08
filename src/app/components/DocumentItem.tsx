@@ -13,6 +13,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
   isProcessing,
   itemTags = [],
   isTagsLoading = false,
+  showFavoriteButton = true,
   lang,
   t
 }) => {
@@ -209,12 +210,14 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
           </div>
         )}
 
-        <button
-          onClick={handleFavoriteClick}
-          className="absolute top-2 left-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black bg-opacity-30 text-white hover:text-yellow-400"
-        >
-          <Image src={isFavorite ? "/icons/star-filled.svg" : "/icons/star-outline.svg"} alt="" width={24} height={24} />
-        </button>
+        {showFavoriteButton && (
+          <button
+            onClick={handleFavoriteClick}
+            className="absolute top-2 left-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black bg-opacity-30 text-white hover:text-yellow-400"
+          >
+            <Image src={isFavorite ? "/icons/star-filled.svg" : "/icons/star-outline.svg"} alt="" width={24} height={24} />
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col flex-grow">

@@ -10,6 +10,7 @@ import { ImageModalProps } from '../../interfaces/PropsInterfaces';
 import { AnalysisView } from './AnalysisView';
 import { CollapsibleSection } from './CollapsibleSection';
 import { LoadingButton } from './LoadingButton';
+import { ModalNavigationBar } from './ModalNavigationBar';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
 
@@ -49,7 +50,26 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
+export const ImageModal: React.FC<ImageModalProps> = ({
+  doc,
+  onClose,
+  apiURL,
+  onUpdateAbstractSuccess,
+  isEditor,
+  t,
+  lang,
+  theme,
+  currentDocIndex,
+  totalInGroup,
+  isGrouped,
+  onNavigateNext,
+  onNavigatePrevious,
+  canNavigateNext,
+  canNavigatePrevious,
+  searchTerm,
+  searchMatchField,
+  searchFieldValue,
+}) => {
   const focusTrapRef = useFocusTrap(onClose);
   const [view, setView] = useState<'image' | 'analysis'>('image');
   const [isLoading, setIsLoading] = useState(true);
@@ -303,6 +323,22 @@ export const ImageModal: React.FC<ImageModalProps> = ({ doc, onClose, apiURL, on
             </button>
           </div>
         </div>
+
+        {/* Navigation Bar for Collaged Documents */}
+        <ModalNavigationBar
+          currentDocIndex={currentDocIndex}
+          totalInGroup={totalInGroup}
+          isGrouped={isGrouped}
+          onNavigateNext={onNavigateNext}
+          onNavigatePrevious={onNavigatePrevious}
+          canNavigateNext={canNavigateNext}
+          canNavigatePrevious={canNavigatePrevious}
+          searchTerm={searchTerm}
+          searchMatchField={searchMatchField}
+          searchFieldValue={searchFieldValue}
+          lang={lang}
+          t={t}
+        />
 
         <div className="p-6">
           {isLoading && (

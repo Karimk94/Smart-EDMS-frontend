@@ -3,6 +3,29 @@ import { UploadableFile } from "./UploadableFile";
 import { PersonOption } from "../models/PersonOption";
 import { TagObject } from "./TagObject";
 
+/**
+ * Enhanced modal props for document modals in profile search context
+ * Supports grouping/collage and search term highlighting
+ */
+export interface EnhancedModalProps {
+    // Navigation between collaged/grouped documents
+    onNavigateNext?: () => void;
+    onNavigatePrevious?: () => void;
+    canNavigateNext?: boolean;
+    canNavigatePrevious?: boolean;
+    
+    // Group/collage information
+    currentDocIndex?: number; // 0-based index in group
+    totalInGroup?: number;   // Total documents in group
+    isGrouped?: boolean;     // Whether this doc is part of a group
+    
+    // Search context for highlighting
+    searchTerm?: string;
+    searchMatchType?: 'like' | 'exact' | 'startsWith';
+    searchMatchField?: string; // Which field was matched (e.g., 'document_content', 'title')
+    searchFieldValue?: string; // The matched value/snippet returned by profile search
+}
+
 export interface UploadModalProps {
     onClose: () => void;
     apiURL: string;
@@ -57,7 +80,7 @@ export interface ReadOnlyEventDisplayProps {
     t: Function;
 }
 
-export interface PdfModalProps {
+export interface PdfModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -69,7 +92,7 @@ export interface PdfModalProps {
     theme: 'light' | 'dark';
 }
 
-export interface ImageModalProps {
+export interface ImageModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -81,7 +104,7 @@ export interface ImageModalProps {
     theme: 'light' | 'dark';
 }
 
-export interface VideoModalProps {
+export interface VideoModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -130,7 +153,7 @@ export interface ReadOnlyTagDisplayProps {
 
 
 
-export interface TxtModalProps {
+export interface TxtModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -142,7 +165,7 @@ export interface TxtModalProps {
     theme: 'light' | 'dark';
 }
 
-export interface FileModalProps {
+export interface FileModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -161,7 +184,7 @@ export interface GalleryModalProps {
     onClose: () => void;
 }
 
-export interface ExcelModalProps {
+export interface ExcelModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -173,7 +196,7 @@ export interface ExcelModalProps {
     theme: 'light' | 'dark';
 }
 
-export interface WordModalProps {
+export interface WordModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -185,7 +208,7 @@ export interface WordModalProps {
     theme: 'light' | 'dark';
 }
 
-export interface PowerPointModalProps {
+export interface PowerPointModalProps extends EnhancedModalProps {
     doc: Document;
     onClose: () => void;
     apiURL: string;
@@ -282,6 +305,8 @@ export interface DocumentListProps {
     onTagSelect: (tag: string) => void;
     isLoading: boolean;
     processingDocs: number[];
+    enableCollage?: boolean;
+    showFavoriteButton?: boolean;
 
     lang: 'en' | 'ar';
     t: Function;
@@ -295,6 +320,7 @@ export interface DocumentItemProps {
     isProcessing: boolean;
     itemTags?: TagObject[];
     isTagsLoading?: boolean;
+    showFavoriteButton?: boolean;
 
     lang: 'en' | 'ar';
     t: Function;

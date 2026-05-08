@@ -3,8 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from '../hooks/useTranslations';
 import type { TFunction } from '../hooks/useTranslations';
+import { useUser } from '../context/UserContext';
+import { PageSpinner } from './Spinner';
+import { useAdmin } from '../../hooks/useAdmin';
+import { useEmsAdminAuth } from '../../hooks/useEmsAdminAuth';
 
 interface SystemCard {
     id: string;
@@ -12,9 +17,16 @@ interface SystemCard {
     description: string;
     icon: React.ReactNode | string;
     href: string;
+    tabKey?: 'recent' | 'favorites' | 'folders' | 'profilesearch';
+    accessKey?: 'admin' | 'ems-admin';
     isExternal?: boolean;
     color: string;
 }
+
+const translateWithFallback = (t: TFunction, key: Parameters<TFunction>[0], fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+};
 
 const getSystems = (t: TFunction): SystemCard[] => [
     {
@@ -23,6 +35,7 @@ const getSystems = (t: TFunction): SystemCard[] => [
         description: t('smartEdmsDesc'),
         icon: '/smart-edms.svg',
         href: '/dashboard',
+        tabKey: 'recent',
         color: 'from-blue-600 to-blue-800',
     },
     {
@@ -31,6 +44,7 @@ const getSystems = (t: TFunction): SystemCard[] => [
         description: t('foldersDesc') || 'Browse all your files and folders',
         icon: '/folders-icon.svg',
         href: '/folders',
+        tabKey: 'folders',
         color: 'from-blue-600 to-blue-800',
     },
     {
@@ -39,39 +53,62 @@ const getSystems = (t: TFunction): SystemCard[] => [
         description: t('profilesearchDesc') || 'Search document profiles across all forms',
         icon: '/search-icon.svg',
         href: '/profilesearch',
-        color: 'from-indigo-600 to-indigo-800',
+        tabKey: 'profilesearch',
+        color: 'from-blue-600 to-blue-800',
     },
     {
-        id: 'pta-edms',
-        title: t('ptaEdmsTitle'),
-        description: t('ptaEdmsDesc'),
-        icon: '/pta-edms.svg',
-        href: '/PTAEDMS',
-        isExternal: true,
-        color: 'from-blue-500 to-blue-700',
+        id: 'admin',
+        title: translateWithFallback(t, 'admin', 'Admin'),
+        description: translateWithFallback(t, 'adminDesc', 'Manage EDMS users, tab permissions, quotas, and processing queues.'),
+        icon: '/admin-icon.svg',
+        href: '/admin',
+        accessKey: 'admin',
+        color: 'from-blue-600 to-blue-800',
+    },
+    {
+        id: 'ems-admin',
+        title: t('emsAdmin'),
+        description: t('emsAdminDescription'),
+        icon: '/ems-admin-icon.svg',
+        href: '/ems-admin',
+        accessKey: 'ems-admin',
+        color: 'from-blue-600 to-blue-800',
     },
 ];
 
 export function PortalLanding() {
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [lang, setLang] = useState<'en' | 'ar'>('en');
+    const router = useRouter();
+    const { isLoading, isAuthenticated, currentLang, currentTheme, allowedSections } = useUser();
+    const { useCheckAccess: useCheckAdminAccess } = useAdmin();
+    const { useCheckAccess: useCheckEmsAdminAccess } = useEmsAdminAuth();
+    const { data: adminAccessData, isLoading: isCheckingAdminAccess } = useCheckAdminAccess();
+    const { data: emsAdminAccessData, isLoading: isCheckingEmsAdminAccess } = useCheckEmsAdminAccess();
+
+    const [theme, setTheme] = useState<'light' | 'dark'>(currentTheme);
+    const [lang, setLang] = useState<'en' | 'ar'>(currentLang);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
-        const storedTheme = (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
-        const storedLang = (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
-        
-        setTheme(storedTheme);
-        setLang(storedLang);
-
-        if (storedTheme === 'dark') document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
-
-        document.documentElement.lang = storedLang;
-        document.documentElement.dir = 'ltr'; // Consider updating this based on RTL languages if necessary
     }, []);
+
+    useEffect(() => {
+        setLang(currentLang);
+        setTheme(currentTheme);
+    }, [currentLang, currentTheme]);
+
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            const params = new URLSearchParams({ redirect: '/' });
+            if (lang) params.set('lang', lang);
+            if (theme) params.set('theme', theme);
+            router.push(`/login?${params.toString()}`);
+        }
+    }, [isAuthenticated, isLoading, lang, theme, router]);
+
     const t = useTranslations(lang);
+    const hasAdminAccess = adminAccessData?.has_access === true;
+    const hasEmsAdminAccess = emsAdminAccessData?.has_access === true;
 
     const toggleTheme = () => {
         setTheme(prev => {
@@ -93,7 +130,33 @@ export function PortalLanding() {
         });
     };
 
-    const systems = getSystems(t);
+    const systems = getSystems(t).filter(system => {
+        if (system.tabKey) {
+            return allowedSections.includes(system.tabKey);
+        }
+
+        if (system.accessKey === 'admin') {
+            return hasAdminAccess;
+        }
+
+        if (system.accessKey === 'ems-admin') {
+            return hasEmsAdminAccess;
+        }
+
+        return true;
+    });
+
+    if (
+        isLoading ||
+        (!mounted && !isAuthenticated) ||
+        (isAuthenticated && (isCheckingAdminAccess || isCheckingEmsAdminAccess))
+    ) {
+        return <PageSpinner label={t('loading') || 'Loading...'} />;
+    }
+
+    if (!isAuthenticated) {
+        return <PageSpinner label="Redirecting to login..." />;
+    }
 
     return (
         <>
@@ -156,7 +219,11 @@ export function PortalLanding() {
 
                     {/* System List - Vertical Layout */}
                     <div className="space-y-4">
-                        {systems.map((system) => (
+                        {systems.length === 0 ? (
+                            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-8 text-center text-slate-700 dark:text-slate-200">
+                                You do not have access to any portal sections. Contact your administrator.
+                            </div>
+                        ) : systems.map((system) => (
                             <Link
                                 key={system.id}
                                 href={`${system.href}?lang=${lang}&theme=${theme}`}

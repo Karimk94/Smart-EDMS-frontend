@@ -6,6 +6,7 @@ import { useDownload } from '../../hooks/useDownload';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { CollapsibleSection } from './CollapsibleSection';
 import { LoadingButton } from './LoadingButton';
+import { ModalNavigationBar } from './ModalNavigationBar';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { Spinner } from './Spinner';
 import { TagEditor } from './TagEditor';
@@ -48,7 +49,11 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
+export const TxtModal: React.FC<TxtModalProps> = ({
+  doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme,
+  currentDocIndex, totalInGroup, isGrouped, onNavigateNext, onNavigatePrevious,
+  canNavigateNext, canNavigatePrevious, searchTerm, searchMatchField, searchFieldValue,
+}) => {
   const focusTrapRef = useFocusTrap(onClose);
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
   const [textContent, setTextContent] = useState<string | null>(null);
@@ -249,6 +254,21 @@ export const TxtModal: React.FC<TxtModalProps> = ({ doc, onClose, apiURL, onUpda
             </button>
           </div>
         </div>
+
+        <ModalNavigationBar
+          currentDocIndex={currentDocIndex}
+          totalInGroup={totalInGroup}
+          isGrouped={isGrouped}
+          onNavigateNext={onNavigateNext}
+          onNavigatePrevious={onNavigatePrevious}
+          canNavigateNext={canNavigateNext}
+          canNavigatePrevious={canNavigatePrevious}
+          searchTerm={searchTerm}
+          searchMatchField={searchMatchField}
+          searchFieldValue={searchFieldValue}
+          lang={lang}
+          t={t}
+        />
 
         {/* Content Area */}
         <div className={`flex-grow p-4 grid ${isDetailsVisible ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'} gap-4 min-h-0 transition-all duration-300`}>

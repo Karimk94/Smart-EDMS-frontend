@@ -7,6 +7,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { VideoModalProps } from '../../interfaces/PropsInterfaces';
 import { CollapsibleSection } from './CollapsibleSection';
 import { LoadingButton } from './LoadingButton';
+import { ModalNavigationBar } from './ModalNavigationBar';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
 
@@ -58,7 +59,11 @@ const formatToApiDate = (date: Date | null): string | null => {
   return `${year} -${month} -${day} ${hours}:${minutes}:${seconds} `;
 };
 
-export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme }) => {
+export const VideoModal: React.FC<VideoModalProps> = ({
+  doc, onClose, apiURL, onUpdateAbstractSuccess, isEditor, t, lang, theme,
+  currentDocIndex, totalInGroup, isGrouped, onNavigateNext, onNavigatePrevious,
+  canNavigateNext, canNavigatePrevious, searchTerm, searchMatchField, searchFieldValue,
+}) => {
   const focusTrapRef = useFocusTrap(onClose);
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [documentDate, setDocumentDate] = useState<Date | null>(safeParseDate(doc.date));
@@ -243,6 +248,21 @@ export const VideoModal: React.FC<VideoModalProps> = ({ doc, onClose, apiURL, on
             </button>
           </div>
         </div>
+
+        <ModalNavigationBar
+          currentDocIndex={currentDocIndex}
+          totalInGroup={totalInGroup}
+          isGrouped={isGrouped}
+          onNavigateNext={onNavigateNext}
+          onNavigatePrevious={onNavigatePrevious}
+          canNavigateNext={canNavigateNext}
+          canNavigatePrevious={canNavigatePrevious}
+          searchTerm={searchTerm}
+          searchMatchField={searchMatchField}
+          searchFieldValue={searchFieldValue}
+          lang={lang}
+          t={t}
+        />
 
         <div className="p-6">
           <div className={`relative ${isFullScreen ? 'fixed inset-0 z-[60] bg-black flex items-center justify-center' : ''} `}>

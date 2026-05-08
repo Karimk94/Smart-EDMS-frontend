@@ -307,6 +307,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     onTagSelect={handleTagSelect}
                     isLoading={false}
                     processingDocs={processingDocs}
+                    enableCollage={false}
                     lang={lang}
                     t={t}
                 />

@@ -43,3 +43,5 @@ yarn-error.log*
 next-env.d.ts
 deploy.zip
 files to install.zip
+.next-dev.err.log
+.next-dev.log

@@ -6,6 +6,7 @@ import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
 import { InfiniteSelect } from '../../components/InfiniteSelect';
+import * as XLSX from 'xlsx';
 
 interface EdmsPerson {
     system_id: number;
@@ -93,6 +94,70 @@ export default function EdmsUsersTab() {
     // Details/Edit Modal
     const [showEditModal, setShowEditModal] = useState(false);
     const [editPerson, setEditPerson] = useState<EdmsPerson | null>(null);
+
+    // Export State
+    const [isExporting, setIsExporting] = useState(false);
+
+    // Export to Excel function (using optimized backend endpoint)
+    const handleExportToExcel = async () => {
+        setIsExporting(true);
+        try {
+            showToast('Preparing export...', 'info');
+
+            // Build params - include search if active
+            const params = new URLSearchParams();
+            if (searchQuery.length >= 3) {
+                params.append('search', searchQuery);
+            }
+
+            // Fetch all export data from optimized endpoint
+            const response = await fetch(`/api/edms-people/export?${params}`, { credentials: 'include' });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to fetch export data');
+            }
+            
+            const exportData = await response.json();
+
+            if (exportData.length === 0) {
+                showToast('No users found to export', 'error');
+                setIsExporting(false);
+                return;
+            }
+
+            // Create Excel workbook
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'EDMS Users');
+
+            // Set column widths
+            const colWidths = [
+                { wch: 20 }, // Username
+                { wch: 30 }, // Full Name
+                { wch: 35 }, // Email
+                { wch: 40 }, // Groups
+                { wch: 15 }, // Allow Login
+                { wch: 15 }, // Disabled
+                { wch: 40 }  // Agency - Department - Section
+            ];
+            worksheet['!cols'] = colWidths;
+
+            // Generate filename with date
+            const today = new Date();
+            const dateStr = today.toISOString().split('T')[0];
+            const filename = `edms-users-export-${dateStr}.xlsx`;
+
+            // Trigger download
+            XLSX.writeFile(workbook, filename);
+
+            showToast(`Successfully exported ${exportData.length} users to ${filename}`, 'success');
+        } catch (err: any) {
+            console.error('Export error:', err);
+            showToast(err.message || 'Failed to export users', 'error');
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     // Fetch EDMS Users
     const { data: usersData, isLoading: isLoadingUsers } = useQuery({
@@ -452,6 +517,25 @@ export default function EdmsUsersTab() {
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                     >
                         Refresh
+                    </button>
+                    <button
+                        onClick={handleExportToExcel}
+                        disabled={isExporting}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {isExporting ? (
+                            <>
+                                <Spinner size="sm" />
+                                <span>Exporting...</span>
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span>Export to Excel</span>
+                            </>
+                        )}
                     </button>
                 </div>
 

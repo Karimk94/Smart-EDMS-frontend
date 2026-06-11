@@ -127,7 +127,7 @@ export default function CompaniesPage() {
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    secid: editCompany.SECID,
+                    system_id: editCompany.SYSTEM_ID,
                     name: editName,
                     translation: editTranslation,
                     disabled: editDisabled,

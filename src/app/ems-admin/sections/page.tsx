@@ -195,7 +195,7 @@ export default function EmsSectionsPage() {
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    secid: editSection.SECID,
+                    system_id: editSection.SYSTEM_ID,
                     name: editName,
                     translation: editTranslation,
                     disabled: editDisabled,

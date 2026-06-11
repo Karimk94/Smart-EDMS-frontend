@@ -165,7 +165,7 @@ export default function DepartmentsPage() {
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    deptid: editDepartment.DEPTID,
+                    system_id: editDepartment.SYSTEM_ID,
                     name: editName,
                     translation: editTranslation,
                 }),

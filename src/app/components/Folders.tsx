@@ -1155,12 +1155,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
 
-      {isSelectionMode && isEditor && (
-        <div className="mx-6 mt-4 mb-0 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 flex items-center justify-between gap-3">
-          <div className="text-sm font-medium text-blue-900 dark:text-blue-200">
-            {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
-          </div>
-          <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
+        {isSelectionMode && isEditor && (
+          <div className="flex items-center gap-2 mr-4">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/50 px-3 py-1 rounded-md">
+              {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
+            </span>
             <button
               onClick={() => openMoveModal(Array.from(selectedFileIds))}
               disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
@@ -1192,10 +1192,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
               {t('doneSelecting') || 'Done'}
             </button>
           </div>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
+        )}
         <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
           {breadcrumbs.map((crumb, index) => (
             <div key={index} className="flex items-center whitespace-nowrap">

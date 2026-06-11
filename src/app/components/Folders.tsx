@@ -133,8 +133,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     currentY: number;
     additive: boolean;
     baseSelection: Set<string>;
+    containerOffsetX: number;
+    containerOffsetY: number;
   } | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const gridAreaRef = useRef<HTMLDivElement>(null);
   const fileTileRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const suppressItemClickRef = useRef(false);
@@ -593,6 +596,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     if (!isSelectionMode && ctrlHeld) {
       setIsSelectionMode(true);
     }
+
+    // Capture the container's viewport offset so we can render the marquee
+    // with absolute positioning relative to the container.
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    const offsetX = containerRect?.left ?? 0;
+    const offsetY = containerRect?.top ?? 0;
+
     setMarqueeSelection({
       startX: e.clientX,
       startY: e.clientY,
@@ -600,6 +610,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       currentY: e.clientY,
       additive,
       baseSelection: new Set(selectedFileIds),
+      containerOffsetX: offsetX,
+      containerOffsetY: offsetY,
     });
     suppressItemClickRef.current = false;
     e.preventDefault();
@@ -1153,122 +1165,126 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     });
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
+    <div ref={containerRef} className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
 
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
-        {isSelectionMode && isEditor && (
-          <div className="flex items-center gap-2 mr-4">
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/50 px-3 py-1 rounded-md">
-              {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
-            </span>
-            <button
-              onClick={() => openMoveModal(Array.from(selectedFileIds))}
-              disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
-              className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-            >
-              {isBatchMoving ? (t('moving')) : (t('move') || 'Move')}
-            </button>
-            <LoadingButton
-              onClick={handleBatchDelete}
-              isLoading={isBatchDeleting}
-              loadingText={t('deleting') || 'Deleting...'}
-              disabled={isBatchMoving || selectedFileCount === 0}
-              className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
-            >
-              {t('delete') || 'Delete'}
-            </LoadingButton>
-            <button
-              onClick={clearSelection}
-              disabled={isBatchMoving || isBatchDeleting}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
-            >
-              {t('clear') || 'Clear'}
-            </button>
-            <button
-              onClick={toggleSelectionMode}
-              disabled={isBatchMoving || isBatchDeleting}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
-            >
-              {t('doneSelecting') || 'Done'}
-            </button>
-          </div>
-        )}
-        <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
-          {breadcrumbs.map((crumb, index) => (
-            <div key={index} className="flex items-center whitespace-nowrap">
-              {index > 0 && <span className="mx-2 text-gray-400">/</span>}
-              {/* Use Link or clickable element for breadcrumbs (could use Link for optimisation, but button with router.push acts similar for now) */}
-              <button
-                onClick={() => handleBreadcrumbClick(index)}
-                className={`hover:text-blue-500 hover:underline transition-colors ${index === breadcrumbs.length - 1 ? 'font-bold text-gray-900 dark:text-white' : ''
-                  }`}
-              >
-                {crumb.name}
-              </button>
+      <div className="relative border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
+        <div className="flex items-center justify-between px-6 py-4">
+          <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
+            {breadcrumbs.map((crumb, index) => (
+              <div key={index} className="flex items-center whitespace-nowrap">
+                {index > 0 && <span className="mx-2 text-gray-400">/</span>}
+                <button
+                  onClick={() => handleBreadcrumbClick(index)}
+                  className={`hover:text-blue-500 hover:underline transition-colors ${index === breadcrumbs.length - 1 ? 'font-bold text-gray-900 dark:text-white' : ''
+                    }`}
+                >
+                  {crumb.name}
+                </button>
+              </div>
+            ))}
+          </nav>
+
+          <div className="flex items-center space-x-3 ml-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={t('search') || "Search in folder..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-48 transition-all focus:w-64"
+              />
+              <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-60 dark:invert" />
+              {searchTerm && (
+                <button
+                  onClick={() => { setSearchTerm(''); setDebouncedSearchTerm(''); }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                  aria-label="Clear search"
+                >
+                  <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
+                </button>
+              )}
             </div>
-          ))}
-        </nav>
 
-        <div className="flex items-center space-x-3 ml-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={t('search') || "Search in folder..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-48 transition-all focus:w-64"
-            />
-            <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-60 dark:invert" />
-            {searchTerm && (
+            <button
+              onClick={() => refreshCurrentView()}
+              disabled={isRefreshing || isFetching}
+              className={`p-2 transition ${
+                isRefreshing || isFetching
+                  ? 'text-blue-500 dark:text-blue-400 cursor-not-allowed opacity-70'
+                  : 'text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400'
+              }`}
+              title={t('refresh')}
+            >
+              <Image src="/icons/refresh.svg" alt="" width={20} height={20} className={`${isRefreshing || isFetching ? 'animate-spin' : ''} dark:invert`} />
+            </button>
+
+            {isEditor && (
               <button
-                onClick={() => { setSearchTerm(''); setDebouncedSearchTerm(''); }}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                aria-label="Clear search"
+                onClick={toggleSelectionMode}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm text-sm font-medium ${isSelectionMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'}`}
               >
-                <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
+                <Image src="/icons/select.svg" alt="" width={20} height={20} className="dark:invert" />
+                {isSelectionMode ? (t('doneSelecting') || 'Done') : (t('select') || 'Select')}
+              </button>
+            )}
+
+            {isEditor && (<button
+              onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
+            >
+              <Image src="/upload.svg" alt="" width={20} height={20} className="dark:invert" />
+              {t('upload')}
+            </button>
+            )}
+
+            {isEditor && (
+              <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
+                <Image src="/icons/plus.svg" alt="" width={20} height={20} className="dark:invert" />
+                {t('createFolder')}
               </button>
             )}
           </div>
-
-          <button
-            onClick={() => refreshCurrentView()}
-            disabled={isRefreshing || isFetching}
-            className={`p-2 transition ${
-              isRefreshing || isFetching
-                ? 'text-blue-500 dark:text-blue-400 cursor-not-allowed opacity-70'
-                : 'text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400'
-            }`}
-            title={t('refresh')}
-          >
-            <Image src="/icons/refresh.svg" alt="" width={20} height={20} className={`${isRefreshing || isFetching ? 'animate-spin' : ''} dark:invert`} />
-          </button>
-
-          {isEditor && (
-            <button
-              onClick={toggleSelectionMode}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm text-sm font-medium ${isSelectionMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'}`}
-            >
-              <Image src="/icons/select.svg" alt="" width={20} height={20} className="dark:invert" />
-              {isSelectionMode ? (t('doneSelecting') || 'Done') : (t('select') || 'Select')}
-            </button>
-          )}
-
-          {isEditor && (<button
-            onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
-          >
-            <Image src="/upload.svg" alt="" width={20} height={20} className="dark:invert" />
-            {t('upload')}
-          </button>
-          )}
-
-          {isEditor && (
-            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
-              <Image src="/icons/plus.svg" alt="" width={20} height={20} className="dark:invert" />
-              {t('createFolder')}
-            </button>
-          )}
         </div>
+
+        {isSelectionMode && isEditor && (
+          <div className="absolute inset-0 z-10 flex items-center justify-between px-6 bg-blue-50 dark:bg-blue-950/90 border-b border-blue-200 dark:border-blue-800">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
+              {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openMoveModal(Array.from(selectedFileIds))}
+                disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
+                className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {isBatchMoving ? (t('moving')) : (t('move') || 'Move')}
+              </button>
+              <LoadingButton
+                onClick={handleBatchDelete}
+                isLoading={isBatchDeleting}
+                loadingText={t('deleting') || 'Deleting...'}
+                disabled={isBatchMoving || selectedFileCount === 0}
+                className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {t('delete') || 'Delete'}
+              </LoadingButton>
+              <button
+                onClick={clearSelection}
+                disabled={isBatchMoving || isBatchDeleting}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+              >
+                {t('clear') || 'Clear'}
+              </button>
+              <button
+                onClick={toggleSelectionMode}
+                disabled={isBatchMoving || isBatchDeleting}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+              >
+                {t('doneSelecting') || 'Done'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div
@@ -1443,10 +1459,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
       {marqueeSelection && (
         <div
-          className="fixed z-[250] border border-blue-500 bg-blue-400/15 pointer-events-none"
+          className="absolute z-[250] border border-blue-500 bg-blue-400/15 pointer-events-none"
           style={{
-            left: Math.min(marqueeSelection.startX, marqueeSelection.currentX),
-            top: Math.min(marqueeSelection.startY, marqueeSelection.currentY),
+            left: Math.min(marqueeSelection.startX, marqueeSelection.currentX) - marqueeSelection.containerOffsetX,
+            top: Math.min(marqueeSelection.startY, marqueeSelection.currentY) - marqueeSelection.containerOffsetY,
             width: Math.abs(marqueeSelection.currentX - marqueeSelection.startX),
             height: Math.abs(marqueeSelection.currentY - marqueeSelection.startY),
           }}

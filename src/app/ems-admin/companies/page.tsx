@@ -100,11 +100,19 @@ export default function CompaniesPage() {
                     translation: addTranslation,
                 }),
             });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to add company');
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                throw new Error('Invalid server response');
             }
-            return response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || data?.detail || 'Failed to add company');
+            }
+            if (data?.success === false) {
+                throw new Error(data?.error || data?.message || 'Failed to add company');
+            }
+            return data;
         },
         onSuccess: (data) => {
             showToast(t('companyAddedSuccess'), 'success');
@@ -133,11 +141,19 @@ export default function CompaniesPage() {
                     disabled: editDisabled,
                 }),
             });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to update company');
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                throw new Error('Invalid server response');
             }
-            return response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || data?.detail || 'Failed to update company');
+            }
+            if (data?.success === false) {
+                throw new Error(data?.error || data?.message || 'Failed to update company');
+            }
+            return data;
         },
         onSuccess: () => {
             showToast(t('companyUpdatedSuccess'), 'success');
@@ -333,7 +349,7 @@ export default function CompaniesPage() {
                                     </thead>
                                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                         {companiesData?.sections.map((company) => (
-                                            <tr key={company.SECID} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <tr key={company.SECID} onDoubleClick={() => handleEditClick(company)} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
                                                 <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                                                     <span className="inline-flex items-center gap-1.5">
                                                         {company.SECID}

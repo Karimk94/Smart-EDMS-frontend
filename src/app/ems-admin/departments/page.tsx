@@ -136,11 +136,19 @@ export default function DepartmentsPage() {
                     agency_system_id: addAgencyId,
                 }),
             });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to add department');
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                throw new Error('Invalid server response');
             }
-            return response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || data?.detail || 'Failed to add department');
+            }
+            if (data?.success === false) {
+                throw new Error(data?.error || data?.message || 'Failed to add department');
+            }
+            return data;
         },
         onSuccess: (data) => {
             showToast(t('departmentAddedSuccess'), 'success');
@@ -170,11 +178,19 @@ export default function DepartmentsPage() {
                     translation: editTranslation,
                 }),
             });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to update department');
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                throw new Error('Invalid server response');
             }
-            return response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || data?.detail || 'Failed to update department');
+            }
+            if (data?.success === false) {
+                throw new Error(data?.error || data?.message || 'Failed to update department');
+            }
+            return data;
         },
         onSuccess: () => {
             showToast(t('departmentUpdatedSuccess'), 'success');
@@ -427,7 +443,7 @@ export default function DepartmentsPage() {
                                     </thead>
                                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                         {departmentsData?.departments.map((dept) => (
-                                            <tr key={dept.DEPTID} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <tr key={dept.DEPTID} onDoubleClick={() => handleEditClick(dept)} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
                                                 <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                                                     <span className="inline-flex items-center gap-1.5">
                                                         {dept.DEPTID}

@@ -13,6 +13,8 @@ import { Spinner } from './Spinner';
 import { CreateFolderModal } from './CreateFolderModal';
 import SecurityModal from './SecurityModal';
 import ShareModal from './ShareModal';
+import { HistoryModal } from './HistoryModal';
+import { useAdmin } from '../../hooks/useAdmin';
 import Image from 'next/image';
 
 
@@ -37,6 +39,13 @@ interface ContextMenuState {
 export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId, externalRefreshTrigger }) => {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  const { useCheckAccess } = useAdmin();
+  const { data: adminAccessData } = useCheckAccess();
+  const hasAdminAccess = adminAccessData?.has_access === true;
+
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<FolderItem | null>(null);
 
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialFolderId || null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
@@ -84,6 +93,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     let actions = 4; // share, rename, permissions, delete
     if (item.type === 'folder') actions += 2; // create subfolder + download as zip
     if (item.type !== 'folder') actions += 1; // download
+    if (hasAdminAccess) actions += 1; // history
 
     return header + actions * row + 8;
   };
@@ -940,6 +950,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
       setConfirmMessage(`${t('confirmDelete') || "Are you sure you want to delete"} "${targetItem.name}"?`);
       setConfirmModalOpen(true);
     }
+    else if (action === 'history') {
+      setSelectedHistoryItem(targetItem);
+      setIsHistoryModalOpen(true);
+    }
     else if (action === 'security') {
       setSelectedSecurityItem(targetItem);
       setIsSecurityModalOpen(true);
@@ -1618,9 +1632,29 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 <Image src="/icons/trash.svg" width={16} height={16} className="dark:invert" alt="" />
                 {t('delete') || 'Delete'}
               </button>
+
+              {hasAdminAccess && (
+                <button
+                  onClick={() => handleContextMenuAction('history')}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                >
+                  <Image src="/admin-icon.svg" width={16} height={16} className="dark:invert opacity-70" alt="" />
+                  {t('history') || 'History'}
+                </button>
+              )}
             </>
           )}
         </div>
+      )}
+
+      {isHistoryModalOpen && selectedHistoryItem && (
+        <HistoryModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => setIsHistoryModalOpen(false)}
+          docId={selectedHistoryItem.id}
+          itemName={selectedHistoryItem.name}
+          t={t}
+        />
       )}
 
       {showCreateModal && (

@@ -79,6 +79,16 @@ export interface TabPermission {
     disabled?: boolean;
 }
 
+export interface HistoryEntry {
+    activity_description: string;
+    docnumber: number;
+    typist: string;
+    docname: string;
+    author: string;
+    start_date: string;
+    form_name: string;
+}
+
 interface AddUserParams {
     user_system_id: number;
     security_level_id: number;
@@ -280,6 +290,16 @@ export function useAdmin() {
         },
     });
 
+    const useDocumentHistory = (docnumber: number | null, enabled: boolean = true) => useQuery({
+        queryKey: ['documentHistory', docnumber],
+        queryFn: async (): Promise<HistoryEntry[]> => {
+            if (!docnumber) return [];
+            const data = await apiClient.get(`/api/admin/history/${docnumber}`);
+            return data.history;
+        },
+        enabled: enabled && !!docnumber,
+    });
+
     return {
         useCheckAccess,
         useUsers,
@@ -287,6 +307,7 @@ export function useAdmin() {
         useSearchPeople,
         useProcessingQueueStatus,
         useTabPermissions,
+        useDocumentHistory,
         retryFailedQueue: retryFailedQueueMutation.mutateAsync,
         isRetryingFailedQueue: retryFailedQueueMutation.isPending,
         retrySelectedQueue: retrySelectedQueueMutation.mutateAsync,

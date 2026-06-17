@@ -167,11 +167,19 @@ export default function EmsSectionsPage() {
                     dept_system_id: selectedDeptId,
                 }),
             });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to add EMS section');
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                throw new Error('Invalid server response');
             }
-            return response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || data?.detail || 'Failed to add EMS section');
+            }
+            if (data?.success === false) {
+                throw new Error(data?.error || data?.message || 'Failed to add EMS section');
+            }
+            return data;
         },
         onSuccess: (data) => {
             showToast(t('emsSectionAddedSuccess'), 'success');
@@ -202,11 +210,19 @@ export default function EmsSectionsPage() {
                     parent_dept_system_id: editSection.PARENT_DEPT_SYSTEM_ID,
                 }),
             });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to update EMS section');
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                throw new Error('Invalid server response');
             }
-            return response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || data?.detail || 'Failed to update EMS section');
+            }
+            if (data?.success === false) {
+                throw new Error(data?.error || data?.message || 'Failed to update EMS section');
+            }
+            return data;
         },
         onSuccess: () => {
             showToast(t('emsSectionUpdatedSuccess'), 'success');
@@ -493,7 +509,7 @@ export default function EmsSectionsPage() {
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                             {sectionsData?.sections.map((section) => (
-                                                <tr key={section.SECID} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                <tr key={section.SECID} onDoubleClick={() => handleEditClick(section)} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
                                                     <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                                                         <span className="inline-flex items-center gap-1.5">
                                                             {section.SECID}

@@ -42,6 +42,8 @@ export interface FolderUploadModalProps {
     parentName: string;
     onUploadComplete: () => void;
     t: Function;
+    /** Pre-seeded files from an OS drag-and-drop onto the folder grid */
+    initialFiles?: File[];
 }
 
 export interface UploadFileItemProps {
@@ -253,6 +255,8 @@ export interface FolderUploadModalProps {
     parentName: string;
     onUploadComplete: () => void;
     t: Function;
+    /** Pre-seeded files from an OS drag-and-drop onto the folder grid */
+    initialFiles?: File[];
 }
 
 export interface TagEditorProps {

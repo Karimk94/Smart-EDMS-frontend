@@ -21,6 +21,24 @@ export interface SecurityLevel {
     name: string;
 }
 
+export interface AdminProfile {
+    system_id: number;
+    form_name: string;
+    form_title: string;
+}
+
+export interface AdminGroup {
+    group_id: string;
+    group_name: string;
+    system_id: number;
+}
+
+export interface AdminGroupUser {
+    user_id: string;
+    full_name: string;
+    system_id: number;
+}
+
 export interface PersonResult {
     system_id: number;
     user_id: string;
@@ -300,6 +318,35 @@ export function useAdmin() {
         enabled: enabled && !!docnumber,
     });
 
+    const useAdminProfiles = (enabled: boolean = true) => useQuery({
+        queryKey: ['adminProfiles'],
+        queryFn: async (): Promise<AdminProfile[]> => {
+            const data = await apiClient.get('/api/admin/profiles');
+            return data.profiles;
+        },
+        enabled,
+    });
+
+    const useProfileGroups = (profileId: number | null, enabled: boolean = true) => useQuery({
+        queryKey: ['profileGroups', profileId],
+        queryFn: async (): Promise<AdminGroup[]> => {
+            if (!profileId) return [];
+            const data = await apiClient.get(`/api/admin/profiles/${profileId}/groups`);
+            return data.groups;
+        },
+        enabled: enabled && !!profileId,
+    });
+
+    const useGroupUsers = (groupId: number | null, enabled: boolean = true) => useQuery({
+        queryKey: ['groupUsers', groupId],
+        queryFn: async (): Promise<AdminGroupUser[]> => {
+            if (!groupId) return [];
+            const data = await apiClient.get(`/api/admin/groups/${groupId}/users`);
+            return data.users;
+        },
+        enabled: enabled && !!groupId,
+    });
+
     return {
         useCheckAccess,
         useUsers,
@@ -308,6 +355,9 @@ export function useAdmin() {
         useProcessingQueueStatus,
         useTabPermissions,
         useDocumentHistory,
+        useAdminProfiles,
+        useProfileGroups,
+        useGroupUsers,
         retryFailedQueue: retryFailedQueueMutation.mutateAsync,
         isRetryingFailedQueue: retryFailedQueueMutation.isPending,
         retrySelectedQueue: retrySelectedQueueMutation.mutateAsync,

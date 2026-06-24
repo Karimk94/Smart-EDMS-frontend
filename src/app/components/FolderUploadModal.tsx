@@ -63,7 +63,7 @@ const removeExtension = (filename: string) => {
 import { FolderUploadModalProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
 
-export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete, t }) => {
+export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, apiURL, theme, parentId, parentName, onUploadComplete, t, initialFiles }) => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [files, setFiles] = useState<UploadableFile[]>([]);
@@ -83,6 +83,17 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, hasUploaded, onUploadComplete]);
 
+  // Pre-seed files dropped directly from the OS onto the folder grid
+  useEffect(() => {
+    if (!initialFiles || initialFiles.length === 0) return;
+    processFilesIntoUploadable(initialFiles).then(uploads => {
+      setFiles(uploads);
+    });
+    // Only run once on mount — intentionally omitting processFilesIntoUploadable
+    // from deps to avoid stale-closure issues with the counter ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const extractExifDate = async (file: File): Promise<Date | null> => {
     try {
       const tags = await ExifReader.load(file);
@@ -101,11 +112,8 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
     return null;
   };
 
-  const handleFiles = async (selectedFiles: FileList | null) => {
-    if (!selectedFiles) return;
-
-    const newUploadPromises = Array.from(selectedFiles).map(async (file) => {
-
+  const processFilesIntoUploadable = async (fileArray: File[]): Promise<UploadableFile[]> => {
+    const newUploadPromises = fileArray.map(async (file) => {
       let finalDate: Date | null = null;
       let dateSource: UploadableFile['dateSource'] = undefined;
 
@@ -125,6 +133,9 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
         }
       }
 
+      // Preserve relative path for folder uploads (e.g. "subfolder/file.pdf")
+      const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+
       return {
         id: `file-${fileIdCounter.current++}`,
         file,
@@ -132,12 +143,29 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
         progress: 0,
         editedFileName: removeExtension(file.name),
         editedDateTaken: finalDate,
-        dateSource: dateSource
+        dateSource: dateSource,
+        relativePath,
       } as UploadableFile;
     });
 
-    const newUploads = await Promise.all(newUploadPromises);
+    return Promise.all(newUploadPromises);
+  };
+
+  const handleFiles = async (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
+    const newUploads = await processFilesIntoUploadable(Array.from(selectedFiles));
     setFiles(prev => [...prev, ...newUploads]);
+  };
+
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles) return;
+    // webkitdirectory gives us all files recursively — filter out any empty entries
+    const fileArray = Array.from(selectedFiles).filter(f => f.size > 0 || f.name !== '');
+    const newUploads = await processFilesIntoUploadable(fileArray);
+    setFiles(prev => [...prev, ...newUploads]);
+    // Reset input so same folder can be re-selected if needed
+    e.target.value = '';
   };
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -290,10 +318,32 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2 invert" />
             <p className="mt-2 text-lg text-gray-300">Drag & Drop files here</p>
             <p className="text-sm text-gray-500">or</p>
+
+            {/* Browse individual files */}
             <label htmlFor="folder-file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
               Browse Files
             </label>
             <input id="folder-file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
+
+            {/* Browse an entire folder (all children + sub-children) */}
+            <label
+              htmlFor="folder-directory-upload"
+              className="mt-2 cursor-pointer px-4 py-2 bg-indigo-700 text-white text-sm font-medium rounded-md hover:bg-indigo-800 transition flex items-center gap-2"
+              title="Select a folder — all files inside (including subfolders) will be added"
+            >
+              <Image src="/folder.svg" alt="" width={16} height={16} className="brightness-0 invert" />
+              Select Folder
+            </label>
+            <input
+              id="folder-directory-upload"
+              type="file"
+              className="hidden"
+              // @ts-ignore — webkitdirectory is non-standard but widely supported
+              webkitdirectory=""
+              multiple
+              onChange={handleFolderSelect}
+            />
+            <p className="mt-2 text-xs text-gray-500">Selects all files inside the folder recursively</p>
           </div>
         </div>
 

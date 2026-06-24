@@ -1,1889 +1,2184 @@
 import { useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
-import { FolderItem, useFolderContents } from '../../hooks/useFolderContents';
-import { useMoveModalFolders } from '../../hooks/useMoveModalFolders';
-import { useDeleteFolder, useRenameFolder, useMoveItemsMutation } from '../../hooks/useFolderMutations';
+import { useAdmin } from '../../hooks/useAdmin';
 import { useDownload } from '../../hooks/useDownload';
-import { apiClient } from '../../lib/apiClient';
+import { FolderItem, useFolderContents } from '../../hooks/useFolderContents';
+import { useDeleteFolder, useMoveItemsMutation, useRenameFolder } from '../../hooks/useFolderMutations';
+import { useMoveModalFolders } from '../../hooks/useMoveModalFolders';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
-import { LoadingButton } from './LoadingButton';
-import { Spinner } from './Spinner';
 import { CreateFolderModal } from './CreateFolderModal';
+import { HistoryModal } from './HistoryModal';
+import { LoadingButton } from './LoadingButton';
 import SecurityModal from './SecurityModal';
 import ShareModal from './ShareModal';
-import { HistoryModal } from './HistoryModal';
-import { useAdmin } from '../../hooks/useAdmin';
-import Image from 'next/image';
+import { Spinner } from './Spinner';
 
 
 interface FoldersProps {
-  onFolderClick: (folderId: 'images' | 'videos' | 'files') => void;
-  onDocumentClick?: (doc: Document) => void;
-  onUploadClick: (parentId: string | null, parentName: string) => void;
-  t: Function;
-  apiURL: string;
-  isEditor: boolean;
-  initialFolderId?: string | null;
-  externalRefreshTrigger?: number;
+    onFolderClick: (folderId: 'images' | 'videos' | 'files') => void;
+    onDocumentClick?: (doc: Document) => void;
+    onUploadClick: (parentId: string | null, parentName: string, files?: File[]) => void;
+    t: Function;
+    apiURL: string;
+    isEditor: boolean;
+    initialFolderId?: string | null;
+    externalRefreshTrigger?: number;
 }
 
 interface ContextMenuState {
-  visible: boolean;
-  x: number;
-  y: number;
-  item: FolderItem | null;
+    visible: boolean;
+    x: number;
+    y: number;
+    item: FolderItem | null;
 }
 
 export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId, externalRefreshTrigger }) => {
-  const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
+    const searchParams = useSearchParams();
+    const queryClient = useQueryClient();
 
-  const { useCheckAccess } = useAdmin();
-  const { data: adminAccessData } = useCheckAccess();
-  const hasAdminAccess = adminAccessData?.has_access === true;
+    const { useCheckAccess } = useAdmin();
+    const { data: adminAccessData } = useCheckAccess();
+    const hasAdminAccess = adminAccessData?.has_access === true;
 
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  const [selectedHistoryItem, setSelectedHistoryItem] = useState<FolderItem | null>(null);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [selectedHistoryItem, setSelectedHistoryItem] = useState<FolderItem | null>(null);
 
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialFolderId || null);
-  const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
-    { id: null, name: t('home') || 'Home' }
-  ]);
+    const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialFolderId || null);
+    const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
+        { id: null, name: t('home') || 'Home' }
+    ]);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  const { data, isLoading: isInitialLoading, isFetching } = useFolderContents({
-    parentId: currentFolderId,
-    searchTerm: debouncedSearchTerm,
-    apiURL
-  });
+    const { data, isLoading: isInitialLoading, isFetching } = useFolderContents({
+        parentId: currentFolderId,
+        searchTerm: debouncedSearchTerm,
+        apiURL
+    });
 
-  const [hiddenItemIds, setHiddenItemIds] = useState<Set<string>>(new Set());
-  const items = (data?.contents || []).filter((item) => !hiddenItemIds.has(item.id));
-  const [isOperationLoading, setIsOperationLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const isLoading = isInitialLoading || isOperationLoading;
+    const [hiddenItemIds, setHiddenItemIds] = useState<Set<string>>(new Set());
+    const items = (data?.contents || []).filter((item) => !hiddenItemIds.has(item.id));
+    const [isOperationLoading, setIsOperationLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const isLoading = isInitialLoading || isOperationLoading;
 
-  // Auto-clear operation loading & refreshing when fetch settles
-  const prevIsFetchingRef = useRef(false);
-  useEffect(() => {
-    if (prevIsFetchingRef.current && !isFetching) {
-      setIsOperationLoading(false);
-      setIsRefreshing(false);
-    }
-    prevIsFetchingRef.current = isFetching;
-  }, [isFetching]);
-
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null });
-  const contextMenuRef = useRef<HTMLDivElement>(null);
-
-  const estimateContextMenuHeight = (item: FolderItem | null) => {
-    const header = 40;
-    const row = 36;
-
-    if (!item) {
-      return header + row * 2 + 8;
-    }
-
-    let actions = 4; // share, rename, permissions, delete
-    if (item.type === 'folder') actions += 2; // create subfolder + download as zip
-    if (item.type !== 'folder') actions += 1; // download
-    if (hasAdminAccess) actions += 1; // history
-
-    return header + actions * row + 8;
-  };
-
-  const getSafeContextMenuPosition = (rawX: number, rawY: number, item: FolderItem | null) => {
-    const viewportPadding = 8;
-    const menuWidth = 192; // matches w-48
-    const menuHeight = estimateContextMenuHeight(item);
-
-    const maxX = window.innerWidth - menuWidth - viewportPadding;
-    const maxY = window.innerHeight - menuHeight - viewportPadding;
-
-    return {
-      x: Math.max(viewportPadding, Math.min(rawX, maxX)),
-      y: Math.max(viewportPadding, Math.min(rawY, maxY)),
-    };
-  };
-
-  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
-  const [selectedSecurityItem, setSelectedSecurityItem] = useState<FolderItem | null>(null);
-
-  // Share Modal State
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [itemToShare, setItemToShare] = useState<FolderItem | null>(null);
-
-  const deleteFolderMutation = useDeleteFolder();
-  const renameFolderMutation = useRenameFolder();
-  const moveItemsMutation = useMoveItemsMutation();
-  const { download } = useDownload();
-
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<FolderItem | null>(null);
-  const [confirmMessage, setConfirmMessage] = useState('');
-  const [deleteMode, setDeleteMode] = useState<'standard' | 'force'>('standard');
-
-  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
-  const [itemToRename, setItemToRename] = useState<FolderItem | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [isRenaming, setIsRenaming] = useState(false);
-
-  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [marqueeSelection, setMarqueeSelection] = useState<{
-    startX: number;
-    startY: number;
-    currentX: number;
-    currentY: number;
-    additive: boolean;
-    baseSelection: Set<string>;
-    containerOffsetX: number;
-    containerOffsetY: number;
-  } | null>(null);
-  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const gridAreaRef = useRef<HTMLDivElement>(null);
-  const fileTileRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const suppressItemClickRef = useRef(false);
-
-  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
-  const [moveCurrentFolderId, setMoveCurrentFolderId] = useState<string | null>(null);
-  const [moveBreadcrumbs, setMoveBreadcrumbs] = useState<{ id: string | null; name: string }[]>([{ id: null, name: t('home') || 'Home' }]);
-  const [targetMoveFolderId, setTargetMoveFolderId] = useState<string | null>(null);
-  const [moveItemIds, setMoveItemIds] = useState<string[]>([]);
-  const [isBatchMoving, setIsBatchMoving] = useState(false);
-  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
-  
-  // Use react-query hook for move modal folders with caching
-  const { data: moveFolderItems = [], isLoading: isMoveFoldersLoading, isFetching: isMoveFoldersFetching } = useMoveModalFolders({
-    parentId: moveCurrentFolderId,
-    apiURL,
-    isEnabled: isMoveModalOpen
-  });
-  const isMoveFoldersInitialLoading = isMoveFoldersLoading && moveFolderItems.length === 0;
-  const isMoveFoldersRefreshing = isMoveFoldersFetching && moveFolderItems.length > 0;
-
-  const { showToast, removeToast } = useToast();
-
-  const selectedFiles = items.filter((item) => selectedFileIds.has(item.id) && item.type === 'file');
-  const selectedFileCount = selectedFiles.length;
-
-  // Debounce search term
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [searchTerm]);
-
-  // Sync breadcrumbs from backend data if available
-  useEffect(() => {
-    if (data?.breadcrumbs && Array.isArray(data.breadcrumbs)) {
-      setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, ...data.breadcrumbs]);
-    }
-  }, [data, t]);
-
-  useEffect(() => {
-    // Sync breadcrumbs from URL if present
-    if (!searchParams) return;
-    const breadcrumbsParam = searchParams.get('breadcrumbs');
-    if (breadcrumbsParam) {
-      try {
-        const parsed = JSON.parse(breadcrumbsParam);
-        if (Array.isArray(parsed)) {
-          setBreadcrumbs(parsed);
+    // Auto-clear operation loading & refreshing when fetch settles
+    const prevIsFetchingRef = useRef(false);
+    useEffect(() => {
+        if (prevIsFetchingRef.current && !isFetching) {
+            setIsOperationLoading(false);
+            setIsRefreshing(false);
         }
-      } catch (e) { console.error("Error parsing breadcrumbs", e); }
-    }
-  }, [searchParams]);
+        prevIsFetchingRef.current = isFetching;
+    }, [isFetching]);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      // Close Context Menu
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-        setContextMenu({ ...contextMenu, visible: false });
-      }
-    };
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, [contextMenu]);
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (confirmModalOpen) {
-          setConfirmModalOpen(false);
-          setItemToDelete(null);
+    const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null });
+    const contextMenuRef = useRef<HTMLDivElement>(null);
+
+    const estimateContextMenuHeight = (item: FolderItem | null) => {
+        const header = 40;
+        const row = 36;
+
+        if (!item) {
+            return header + row * 2 + 8;
         }
-        if (isRenameModalOpen) {
-          setIsRenameModalOpen(false);
-        }
-        if (isShareModalOpen) {
-          setIsShareModalOpen(false);
-        }
-      }
+
+        let actions = 4; // share, rename, permissions, delete
+        if (item.type === 'folder') actions += 2; // create subfolder + download as zip
+        if (item.type !== 'folder') actions += 1; // download
+        if (hasAdminAccess) actions += 1; // history
+
+        return header + actions * row + 8;
     };
 
-    if (confirmModalOpen || isRenameModalOpen || isShareModalOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-    }
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [confirmModalOpen, isRenameModalOpen, isShareModalOpen]);
+    const getSafeContextMenuPosition = (rawX: number, rawY: number, item: FolderItem | null) => {
+        const viewportPadding = 8;
+        const menuWidth = 192; // matches w-48
+        const menuHeight = estimateContextMenuHeight(item);
 
-  useEffect(() => {
-    if (initialFolderId !== undefined) {
-      setCurrentFolderId(initialFolderId);
-    }
-  }, [initialFolderId]);
+        const maxX = window.innerWidth - menuWidth - viewportPadding;
+        const maxY = window.innerHeight - menuHeight - viewportPadding;
 
-  useEffect(() => {
-    setSelectedFileIds(new Set());
-    setIsSelectionMode(false);
-  }, [currentFolderId, debouncedSearchTerm]);
+        return {
+            x: Math.max(viewportPadding, Math.min(rawX, maxX)),
+            y: Math.max(viewportPadding, Math.min(rawY, maxY)),
+        };
+    };
 
-  useEffect(() => {
-    setHiddenItemIds(new Set());
-  }, [currentFolderId, debouncedSearchTerm]);
+    const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+    const [selectedSecurityItem, setSelectedSecurityItem] = useState<FolderItem | null>(null);
 
-  // React to external refresh trigger (e.g. upload-complete from parent)
-  const prevTriggerRef = useRef(externalRefreshTrigger);
-  useEffect(() => {
-    if (externalRefreshTrigger !== undefined && prevTriggerRef.current !== externalRefreshTrigger && prevTriggerRef.current !== undefined) {
-      setIsOperationLoading(true);
-    }
-    prevTriggerRef.current = externalRefreshTrigger;
-  }, [externalRefreshTrigger]);
+    // Share Modal State
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [itemToShare, setItemToShare] = useState<FolderItem | null>(null);
 
-  // Handle browser back/forward navigation
-  useEffect(() => {
-    const handlePopState = () => {
-      const path = window.location.pathname;
-      const searchParamsObj = new URLSearchParams(window.location.search);
+    const deleteFolderMutation = useDeleteFolder();
+    const renameFolderMutation = useRenameFolder();
+    const moveItemsMutation = useMoveItemsMutation();
+    const { download } = useDownload();
 
-      if (path === '/folders') {
-        // Root folders view
-        setCurrentFolderId(null);
-        setBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
-      } else if (path.startsWith('/folder/')) {
-        // Extract folder ID from path
-        const folderId = path.split('/folder/')[1]?.split('?')[0];
-        if (folderId) {
-          setCurrentFolderId(folderId);
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<FolderItem | null>(null);
+    const [confirmMessage, setConfirmMessage] = useState('');
+    const [deleteMode, setDeleteMode] = useState<'standard' | 'force'>('standard');
 
-          // Try to restore breadcrumbs from URL
-          const breadcrumbsParam = searchParamsObj.get('breadcrumbs');
-          if (breadcrumbsParam) {
+    // Pending drag-and-drop move confirmation
+    const [pendingMoveConfirm, setPendingMoveConfirm] = useState<{
+        fileIds: string[];
+        destination: FolderItem;
+    } | null>(null);
+
+    // Batch delete confirmation modal (replaces window.confirm)
+    const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
+
+    const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+    const [itemToRename, setItemToRename] = useState<FolderItem | null>(null);
+    const [renameValue, setRenameValue] = useState('');
+    const [isRenaming, setIsRenaming] = useState(false);
+
+    const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [marqueeSelection, setMarqueeSelection] = useState<{
+        startX: number;
+        startY: number;
+        currentX: number;
+        currentY: number;
+        additive: boolean;
+        baseSelection: Set<string>;
+        containerOffsetX: number;
+        containerOffsetY: number;
+        zoomFactor: number;
+    } | null>(null);
+    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const gridAreaRef = useRef<HTMLDivElement>(null);
+    const fileTileRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const suppressItemClickRef = useRef(false);
+
+    // Track OS-level (external) drag-over to show upload overlay
+    const [isExternalDragOver, setIsExternalDragOver] = useState(false);
+    const externalDragCounterRef = useRef(0); // track nested dragenter/dragleave pairs
+
+    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+    const [moveCurrentFolderId, setMoveCurrentFolderId] = useState<string | null>(null);
+    const [moveBreadcrumbs, setMoveBreadcrumbs] = useState<{ id: string | null; name: string }[]>([{ id: null, name: t('home') || 'Home' }]);
+    const [targetMoveFolderId, setTargetMoveFolderId] = useState<string | null>(null);
+    const [moveItemIds, setMoveItemIds] = useState<string[]>([]);
+    const [isBatchMoving, setIsBatchMoving] = useState(false);
+    const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+
+    // Use react-query hook for move modal folders with caching
+    const { data: moveFolderItems = [], isLoading: isMoveFoldersLoading, isFetching: isMoveFoldersFetching } = useMoveModalFolders({
+        parentId: moveCurrentFolderId,
+        apiURL,
+        isEnabled: isMoveModalOpen
+    });
+    const isMoveFoldersInitialLoading = isMoveFoldersLoading && moveFolderItems.length === 0;
+    const isMoveFoldersRefreshing = isMoveFoldersFetching && moveFolderItems.length > 0;
+
+    const { showToast, removeToast } = useToast();
+
+    const selectedFiles = items.filter((item) => selectedFileIds.has(item.id) && item.type === 'file');
+    const selectedFileCount = selectedFiles.length;
+
+    // Debounce search term
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
+    // Sync breadcrumbs from backend data if available
+    useEffect(() => {
+        if (data?.breadcrumbs && Array.isArray(data.breadcrumbs)) {
+            setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, ...data.breadcrumbs]);
+        }
+    }, [data, t]);
+
+    useEffect(() => {
+        // Sync breadcrumbs from URL if present
+        if (!searchParams) return;
+        const breadcrumbsParam = searchParams.get('breadcrumbs');
+        if (breadcrumbsParam) {
             try {
-              const parsed = JSON.parse(breadcrumbsParam);
-              if (Array.isArray(parsed)) {
-                setBreadcrumbs(parsed);
-              }
-            } catch (e) {
-              // Fallback breadcrumbs
-              const folderName = searchParamsObj.get('name') || folderId;
-              setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: folderName }]);
-            }
-          } else {
-            // Standard folder or no breadcrumbs in URL
-            if (['images', 'videos', 'files'].includes(folderId)) {
-              setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: t(folderId) || folderId }]);
-            } else {
-              const folderName = searchParamsObj.get('name') || folderId;
-              setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: folderName }]);
-            }
-          }
+                const parsed = JSON.parse(breadcrumbsParam);
+                if (Array.isArray(parsed)) {
+                    setBreadcrumbs(parsed);
+                }
+            } catch (e) { console.error("Error parsing breadcrumbs", e); }
         }
-      }
-    };
+    }, [searchParams]);
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [t]);
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            // Close Context Menu
+            if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+                setContextMenu({ ...contextMenu, visible: false });
+            }
+        };
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+    }, [contextMenu]);
 
-  // Error handling for 404 is now easier if we want to redirect, 
-  // but React Query handles errors via 'error' object or onError callbacks.
-  // For now, we rely on the component rendering empty or error state if needed,
-  // roughly mirroring the specialized 404 redirect if absolutely necessary.
-  /*
-    The previous fetchContents had a specific 404 redirect. 
-    If we want to maintain exactly that, we can use the 'error' from the hook.
-    But usually, simple error UI is better than redirect.
-  */
-
-  const getFolderHref = (item: FolderItem) => {
-    if (item.is_standard) {
-      return `/folder/${item.id}`;
-    }
-    const newBreadcrumbs = [...breadcrumbs, { id: item.id, name: item.name }];
-    const json = JSON.stringify(newBreadcrumbs);
-    // Include name param as backup
-    return `/folder/${item.id}?breadcrumbs=${encodeURIComponent(json)}&name=${encodeURIComponent(item.name)}`;
-  };
-
-  const renderIcon = (item: FolderItem, isStandard = false) => {
-    let iconSrc = '/folder-icon.svg';
-    let altText = 'Folder';
-    let size = 56; // Maps to h-14 w-14
-    let invertClass = "";
-
-    let type: string = 'folder';
-    if (isStandard) {
-      if (item.id === 'images') type = 'image';
-      else if (item.id === 'videos') type = 'video';
-      else type = 'file';
-    } else {
-      if (item.type === 'file') {
-        const mType = getMediaType(item);
-        type = mType;
-      }
-    }
-
-    if (isStandard) {
-      size = 24; // Maps to h-6 w-6
-      invertClass = "";
-
-      if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
-      else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
-      else { iconSrc = '/file-document.svg'; altText = 'Files'; }
-    } else {
-      const iconMap: Record<string, { src: string; alt: string }> = {
-        'image': { src: '/file-image.svg', alt: 'Image' },
-        'video': { src: '/file-video.svg', alt: 'Video' },
-        'excel': { src: '/file-excel.svg', alt: 'Excel' },
-        'pdf': { src: '/file-pdf.svg', alt: 'PDF' },
-        'powerpoint': { src: '/file-powerpoint.svg', alt: 'PowerPoint' },
-        'word': { src: '/file-word.svg', alt: 'Word' },
-        'zip': { src: '/file-zip.svg', alt: 'Zip' },
-        'audio': { src: '/file-audio.svg', alt: 'Audio' },
-        'cad': { src: '/file-cad.svg', alt: 'CAD' },
-        'code': { src: '/file-code.svg', alt: 'Code' },
-        'email': { src: '/file-email.svg', alt: 'Email' },
-        'font': { src: '/file-font.svg', alt: 'Font' },
-        'database': { src: '/file-database.svg', alt: 'Database' },
-        'vector': { src: '/file-vector.svg', alt: 'Vector' },
-        'archive': { src: '/file-archive.svg', alt: 'Archive' },
-        'executable': { src: '/file-executable.svg', alt: 'Executable' },
-        'disc': { src: '/file-disc.svg', alt: 'Disc Image' },
-        'visio': { src: '/file-visio.svg', alt: 'Visio' },
-        'onenote': { src: '/file-onenote.svg', alt: 'OneNote' },
-        'text': { src: '/file-document.svg', alt: 'File' },
-        'file': { src: '/file-document.svg', alt: 'File' },
-      };
-
-      const mapped = iconMap[type];
-      if (mapped) {
-        iconSrc = mapped.src;
-        altText = mapped.alt;
-      } else {
-        iconSrc = '/folder-icon.svg';
-        altText = 'Folder';
-      }
-      invertClass = "";
-    }
-
-    return <Image src={iconSrc} alt={altText} width={size} height={size} className={invertClass} />;
-  };
-
-  const getMediaType = (item: FolderItem) => {
-    // If backend already resolved it to a specific type, rely on it
-    if (item.media_type && item.media_type !== 'folder' && item.media_type !== 'file') {
-      // Normalize docx to word if needed
-      if (item.media_type === 'docx' as any) return 'word';
-      return item.media_type;
-    }
-
-    const ext = item.name.split('.').pop()?.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '')) return 'image';
-    if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '')) return 'video';
-    if (['pdf'].includes(ext || '')) return 'pdf';
-    if (['doc', 'docx'].includes(ext || '')) return 'word';
-    if (['zip'].includes(ext || '')) return 'zip';
-    if (['rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext || '')) return 'archive';
-    if (['txt', 'csv', 'log', 'md'].includes(ext || '')) return 'text';
-    if (['xls', 'xlsx', 'ods', 'xlsm'].includes(ext || '')) return 'excel';
-    if (['ppt', 'pptx', 'odp', 'pps', 'ppsx'].includes(ext || '')) return 'powerpoint';
-    if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext || '')) return 'audio';
-    if (['dwg', 'dxf', 'step', 'stp', 'iges', 'igs', 'stl', 'obj', '3ds', 'fbx'].includes(ext || '')) return 'cad';
-    if (['py', 'js', 'ts', 'tsx', 'jsx', 'html', 'css', 'java', 'cpp', 'c', 'cs', 'go', 'rb', 'php', 'swift', 'rs', 'r', 'sql', 'sh', 'bat', 'ps1', 'cmd'].includes(ext || '')) return 'code';
-    if (['eml', 'msg', 'mbox'].includes(ext || '')) return 'email';
-    if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(ext || '')) return 'font';
-    if (['db', 'sqlite', 'mdb', 'accdb'].includes(ext || '')) return 'database';
-    if (['ai', 'eps'].includes(ext || '')) return 'vector';
-    if (['exe', 'msi'].includes(ext || '')) return 'executable';
-    if (['iso', 'img', 'dmg', 'vhd'].includes(ext || '')) return 'disc';
-    if (['vsd', 'vsdx'].includes(ext || '')) return 'visio';
-    if (['one', 'onetoc2'].includes(ext || '')) return 'onenote';
-    if (['json', 'xml', 'yml', 'yaml', 'ini', 'conf'].includes(ext || '')) return 'code';
-    return 'file';
-  };
-
-  // Helper function to update URL without full page reload (shallow routing)
-  const updateUrlShallow = (folderId: string | null, newBreadcrumbs: { id: string | null; name: string }[]) => {
-    if (folderId === null) {
-      window.history.pushState(null, '', '/folders');
-    } else if (['images', 'videos', 'files'].includes(folderId)) {
-      window.history.pushState(null, '', `/folder/${folderId}`);
-    } else {
-      const breadcrumbsJson = JSON.stringify(newBreadcrumbs);
-      const folderName = newBreadcrumbs.length > 0 ? newBreadcrumbs[newBreadcrumbs.length - 1].name : '';
-      window.history.pushState(null, '', `/folder/${folderId}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}&name=${encodeURIComponent(folderName)}`);
-    }
-  };
-
-  const handleNavigate = (folder: FolderItem) => {
-    if (folder.name.toLowerCase().endsWith('.zip') || folder.media_type === 'file') {
-      showToast(t('contentCannotBeDisplayed') || "Content cannot be displayed", 'info');
-      return;
-    }
-
-    // Clear search when navigating into a folder so its contents are shown
-    if (folder.type === 'folder' || folder.is_standard || folder.node_type === 'N' || folder.node_type === 'F') {
-      setSearchTerm('');
-      setDebouncedSearchTerm('');
-    }
-
-    if (folder.is_standard) {
-      // For standard folders (images, videos, files), use internal state update
-      setCurrentFolderId(folder.id);
-      setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
-      updateUrlShallow(folder.id, [{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
-      return;
-    }
-
-    if (folder.type === 'file' || (folder.type !== 'folder' && folder.node_type !== 'N' && folder.node_type !== 'F')) {
-      if (onDocumentClick) {
-        let mediaType: any = 'file';
-        const detectedType = getMediaType(folder);
-
-        if (detectedType === 'image') mediaType = 'image';
-        else if (detectedType === 'video') mediaType = 'video';
-        else if (detectedType === 'pdf') mediaType = 'pdf';
-        else if (detectedType === 'text') mediaType = 'text';
-        else if (detectedType === 'excel') mediaType = 'excel';
-        else if (detectedType === 'powerpoint') mediaType = 'powerpoint';
-        else if (detectedType === 'word') mediaType = 'word';
-        else if (detectedType === 'zip') mediaType = 'zip';
-        else mediaType = 'file';
-
-        const doc = new Document({
-          doc_id: parseInt(folder.id),
-          docname: folder.name,
-          title: folder.name,
-          media_type: mediaType,
-          date: new Date().toISOString(),
-          thumbnail_url: folder.thumbnail_url || `cache/${folder.id}.jpg`
-        });
-        onDocumentClick(doc);
-      }
-      return;
-    }
-
-    // Internal state navigation for dynamic folders (no full page reload)
-    const newBreadcrumbs = [...breadcrumbs, { id: folder.id, name: folder.name }];
-    setCurrentFolderId(folder.id);
-    setBreadcrumbs(newBreadcrumbs);
-    updateUrlShallow(folder.id, newBreadcrumbs);
-  };
-
-  const handleBreadcrumbClick = (index: number) => {
-    const target = breadcrumbs[index];
-    if (target.id === null) {
-      // Navigate back to root folders
-      setCurrentFolderId(null);
-      setBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
-      updateUrlShallow(null, [{ id: null, name: t('home') || 'Home' }]);
-    } else {
-      // Navigate back to a specific folder in the breadcrumb trail
-      const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
-      setCurrentFolderId(target.id);
-      setBreadcrumbs(newBreadcrumbs);
-      updateUrlShallow(target.id, newBreadcrumbs);
-    }
-  };
-
-  const refreshCurrentView = (showOverlay = false) => {
-    if (showOverlay) {
-      setIsOperationLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
-    // Force refetch from server, bypassing stale time cache
-    queryClient.refetchQueries({ queryKey: ['folders', currentFolderId, debouncedSearchTerm] });
-    queryClient.invalidateQueries({ queryKey: ['documents'] });
-  };
-
-  const updateItemsInCurrentView = (updater: (item: FolderItem) => FolderItem) => {
-    queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
-      if (!previous?.contents) return previous;
-
-      return {
-        ...previous,
-        contents: previous.contents.map((item: FolderItem) => updater(item)),
-      };
-    });
-  };
-
-  const hideItemsFromCurrentView = (itemIds: string[]) => {
-    if (itemIds.length === 0) return;
-
-    const idsToHide = new Set(itemIds);
-    setHiddenItemIds((prev) => {
-      const next = new Set(prev);
-      itemIds.forEach((id) => next.add(id));
-      return next;
-    });
-
-    queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
-      if (!previous?.contents) return previous;
-
-      return {
-        ...previous,
-        contents: previous.contents.filter((item: FolderItem) => !idsToHide.has(item.id)),
-      };
-    });
-  };
-
-  const clearSelection = () => {
-    setSelectedFileIds(new Set());
-  };
-
-  useEffect(() => {
-    const handleEscapeClearSelection = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (selectedFileIds.size === 0) return;
-      clearSelection();
-    };
-
-    document.addEventListener('keydown', handleEscapeClearSelection);
-    return () => document.removeEventListener('keydown', handleEscapeClearSelection);
-  }, [selectedFileIds]);
-
-  const toggleSelectionMode = () => {
-    setIsSelectionMode((prev) => {
-      if (prev) {
-        setSelectedFileIds(new Set());
-      }
-      return !prev;
-    });
-  };
-
-  const toggleFileSelection = (fileId: string, checked?: boolean) => {
-    setSelectedFileIds(prev => {
-      const next = new Set(prev);
-      const isChecked = checked !== undefined ? checked : !next.has(fileId);
-
-      if (isChecked) next.add(fileId);
-      else next.delete(fileId);
-
-      return next;
-    });
-  };
-
-  const selectOnlyFile = (fileId: string) => {
-    setSelectedFileIds(new Set([fileId]));
-  };
-
-  const isRectIntersecting = (a: DOMRect, b: { left: number; right: number; top: number; bottom: number }) => {
-    return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
-  };
-
-  const startMarqueeSelection = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isEditor || e.button !== 0) return;
-
-    const ctrlHeld = e.ctrlKey || e.metaKey;
-    if (!isSelectionMode && !ctrlHeld) return;
-
-    const target = e.target as HTMLElement;
-    if (target.closest('button,input,textarea,label,a,[data-no-marquee="true"]')) return;
-
-    const additive = ctrlHeld;
-    if (!isSelectionMode && ctrlHeld) {
-      setIsSelectionMode(true);
-    }
-
-    // Capture the container's viewport offset so we can render the marquee
-    // with absolute positioning relative to the container.
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    const offsetX = containerRect?.left ?? 0;
-    const offsetY = containerRect?.top ?? 0;
-
-    setMarqueeSelection({
-      startX: e.clientX,
-      startY: e.clientY,
-      currentX: e.clientX,
-      currentY: e.clientY,
-      additive,
-      baseSelection: new Set(selectedFileIds),
-      containerOffsetX: offsetX,
-      containerOffsetY: offsetY,
-    });
-    suppressItemClickRef.current = false;
-    e.preventDefault();
-  };
-
-  useEffect(() => {
-    if (!marqueeSelection) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setMarqueeSelection(prev => {
-        if (!prev) return prev;
-
-        const next = {
-          ...prev,
-          currentX: e.clientX,
-          currentY: e.clientY,
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (confirmModalOpen) {
+                    setConfirmModalOpen(false);
+                    setItemToDelete(null);
+                }
+                if (isRenameModalOpen) {
+                    setIsRenameModalOpen(false);
+                }
+                if (isShareModalOpen) {
+                    setIsShareModalOpen(false);
+                }
+            }
         };
 
-        const left = Math.min(next.startX, next.currentX);
-        const right = Math.max(next.startX, next.currentX);
-        const top = Math.min(next.startY, next.currentY);
-        const bottom = Math.max(next.startY, next.currentY);
-
-        if (Math.abs(next.currentX - next.startX) > 3 || Math.abs(next.currentY - next.startY) > 3) {
-          suppressItemClickRef.current = true;
+        if (confirmModalOpen || isRenameModalOpen || isShareModalOpen) {
+            document.addEventListener('keydown', handleKeyDown);
         }
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [confirmModalOpen, isRenameModalOpen, isShareModalOpen]);
 
-        const intersected = new Set<string>();
-        items.forEach((item) => {
-          if (item.type !== 'file') return;
-          const node = fileTileRefs.current[item.id];
-          if (!node) return;
-          const rect = node.getBoundingClientRect();
-          if (isRectIntersecting(rect, { left, right, top, bottom })) {
-            intersected.add(item.id);
-          }
-        });
-
-        setSelectedFileIds(() => {
-          if (next.additive) {
-            const merged = new Set(next.baseSelection);
-            intersected.forEach((id) => merged.add(id));
-            return merged;
-          }
-          return intersected;
-        });
-
-        return next;
-      });
-    };
-
-    const handleMouseUp = () => {
-      setMarqueeSelection(prev => {
-        if (!prev) return null;
-
-        const wasClick = Math.abs(prev.currentX - prev.startX) <= 3 && Math.abs(prev.currentY - prev.startY) <= 3;
-        if (wasClick && !prev.additive) {
-          clearSelection();
+    useEffect(() => {
+        if (initialFolderId !== undefined) {
+            setCurrentFolderId(initialFolderId);
         }
+    }, [initialFolderId]);
 
-        return null;
-      });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [marqueeSelection, items]);
-
-  const moveFilesToFolder = async (fileIds: string[], destinationFolderId: string | null) => {
-    if (fileIds.length === 0) return;
-
-    if (destinationFolderId === currentFolderId) {
-      showToast(t('alreadyInThisFolder') || 'Selected files are already in this folder.', 'info');
-      return;
-    }
-
-    setIsOperationLoading(true);
-    setIsBatchMoving(true);
-    let didTriggerRefresh = false;
-
-    try {
-      const itemNames = Object.fromEntries(
-        fileIds
-          .map((id) => {
-            const matched = items.find((item) => item.id === id);
-            return matched ? [id, matched.name] : null;
-          })
-          .filter((entry): entry is [string, string] => Array.isArray(entry))
-      );
-
-      const result = await moveItemsMutation.mutateAsync({
-        item_ids: fileIds,
-        destination_parent_id: destinationFolderId,
-        item_names: itemNames,
-        apiURL
-      });
-
-      const moved = Number(result?.moved_count || 0);
-      const failed = Number(result?.failed_count || 0);
-
-      if (moved > 0) {
-        showToast(t('successMoving') || `Moved ${moved} file(s) successfully.`, 'success');
-      }
-      if (failed > 0) {
-        showToast(t('errorMoving') || `${failed} file(s) could not be moved.`, 'error');
-      }
-
-      if (moved > 0 && failed === 0) {
-        hideItemsFromCurrentView(fileIds);
-      }
-
-      clearSelection();
-      if (moved > 0 && failed === 0) {
+    useEffect(() => {
+        setSelectedFileIds(new Set());
         setIsSelectionMode(false);
-      }
-      didTriggerRefresh = true;
-      refreshCurrentView(true);
-    } catch (error: any) {
-      setIsOperationLoading(false);
-      showToast(t('errorMoving') || `Error moving files: ${error.message || 'Unknown error'}`, 'error');
-    } finally {
-      setIsBatchMoving(false);
-      if (!didTriggerRefresh) {
-        setIsOperationLoading(false);
-      }
-    }
-  };
+    }, [currentFolderId, debouncedSearchTerm]);
 
-  const fetchMoveFolderItems = async (parentId: string | null) => {
-    // No longer needed - useMoveModalFolders hook handles fetching with caching
-    // This function is kept as a no-op for backward compatibility
-  };
+    useEffect(() => {
+        setHiddenItemIds(new Set());
+    }, [currentFolderId, debouncedSearchTerm]);
 
-  const closeMoveModal = () => {
-    setIsMoveModalOpen(false);
-    setMoveItemIds([]);
-  };
-
-  const openMoveModal = async (fileIds: string[]) => {
-    if (fileIds.length === 0) return;
-
-    setMoveItemIds(fileIds);
-    setIsMoveModalOpen(true);
-    setMoveCurrentFolderId(null);
-    setMoveBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
-    setTargetMoveFolderId(currentFolderId);
-    // No need to manually fetch - hook will load data automatically
-  };
-
-  const handleMoveModalNavigate = async (folder: FolderItem) => {
-    const nextBreadcrumbs = [...moveBreadcrumbs, { id: folder.id, name: folder.name }];
-    setMoveCurrentFolderId(folder.id);
-    setMoveBreadcrumbs(nextBreadcrumbs);
-    setTargetMoveFolderId(folder.id);
-    // Hook automatically fetches data based on moveCurrentFolderId change
-  };
-
-  const handleMoveBreadcrumbClick = async (index: number) => {
-    const target = moveBreadcrumbs[index];
-    const nextBreadcrumbs = moveBreadcrumbs.slice(0, index + 1);
-    setMoveBreadcrumbs(nextBreadcrumbs);
-    setMoveCurrentFolderId(target.id);
-    setTargetMoveFolderId(target.id);
-    // Hook automatically fetches data based on moveCurrentFolderId change
-  };
-
-  const handleBatchDelete = async () => {
-    if (selectedFileCount === 0) return;
-
-    const confirmed = window.confirm(
-      t('confirmDeleteMultiple') || `Are you sure you want to delete ${selectedFileCount} selected file(s)?`
-    );
-
-    if (!confirmed) return;
-
-    setIsOperationLoading(true);
-    setIsBatchDeleting(true);
-
-    let deleted = 0;
-    let failed = 0;
-    const deletedIds: string[] = [];
-    let didTriggerRefresh = false;
-
-    try {
-      await Promise.all(Array.from(selectedFileIds).map(async (id) => {
-        try {
-          await deleteFolderMutation.mutateAsync({ id, force: false, apiURL });
-          deleted += 1;
-          deletedIds.push(id);
-        } catch {
-          failed += 1;
+    // React to external refresh trigger (e.g. upload-complete from parent)
+    const prevTriggerRef = useRef(externalRefreshTrigger);
+    useEffect(() => {
+        if (externalRefreshTrigger !== undefined && prevTriggerRef.current !== externalRefreshTrigger && prevTriggerRef.current !== undefined) {
+            setIsOperationLoading(true);
         }
-      }));
+        prevTriggerRef.current = externalRefreshTrigger;
+    }, [externalRefreshTrigger]);
 
-      if (deleted > 0) {
-        showToast(t('successDeleting') || `Deleted ${deleted} file(s) successfully.`, 'success');
-      }
-      if (failed > 0) {
-        showToast(t('errorDeleting') || `${failed} file(s) could not be deleted.`, 'error');
-      }
+    // Handle browser back/forward navigation
+    useEffect(() => {
+        const handlePopState = () => {
+            const path = window.location.pathname;
+            const searchParamsObj = new URLSearchParams(window.location.search);
 
-      hideItemsFromCurrentView(deletedIds);
+            if (path === '/folders') {
+                // Root folders view
+                setCurrentFolderId(null);
+                setBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
+            } else if (path.startsWith('/folder/')) {
+                // Extract folder ID from path
+                const folderId = path.split('/folder/')[1]?.split('?')[0];
+                if (folderId) {
+                    setCurrentFolderId(folderId);
 
-      clearSelection();
-      didTriggerRefresh = true;
-      refreshCurrentView(true);
-    } finally {
-      setIsBatchDeleting(false);
-      if (!didTriggerRefresh) {
-        setIsOperationLoading(false);
-      }
-    }
-  };
-
-  const handleRightClick = (e: React.MouseEvent, item: FolderItem) => {
-    e.preventDefault();
-    if (!isEditor) return;
-    if (item.is_standard) return;
-
-    const position = getSafeContextMenuPosition(e.clientX, e.clientY, item);
-
-    setContextMenu({
-      visible: true,
-      x: position.x,
-      y: position.y,
-      item: item
-    });
-  };
-
-  const handleBackgroundContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!isEditor) return;
-    if (e.target !== e.currentTarget) return;
-
-    const position = getSafeContextMenuPosition(e.clientX, e.clientY, null);
-
-    setContextMenu({
-      visible: true,
-      x: position.x,
-      y: position.y,
-      item: null
-    });
-  };
-
-  useEffect(() => {
-    if (!contextMenu.visible || !contextMenuRef.current) return;
-
-    const rect = contextMenuRef.current.getBoundingClientRect();
-    const viewportPadding = 8;
-
-    const adjustedX = Math.max(
-      viewportPadding,
-      Math.min(contextMenu.x, window.innerWidth - rect.width - viewportPadding)
-    );
-    const adjustedY = Math.max(
-      viewportPadding,
-      Math.min(contextMenu.y, window.innerHeight - rect.height - viewportPadding)
-    );
-
-    if (adjustedX !== contextMenu.x || adjustedY !== contextMenu.y) {
-      setContextMenu(prev => ({ ...prev, x: adjustedX, y: adjustedY }));
-    }
-  }, [contextMenu.visible, contextMenu.x, contextMenu.y]);
-
-  const getCurrentFolderName = () => {
-    if (breadcrumbs.length > 0) {
-      return breadcrumbs[breadcrumbs.length - 1].name;
-    }
-    return t('home') || 'Home';
-  };
-
-  const handleContextMenuAction = async (action: string) => {
-    if (action === 'upload' && !contextMenu.item) {
-      setContextMenu({ ...contextMenu, visible: false });
-      onUploadClick(currentFolderId, getCurrentFolderName());
-      return;
-    }
-
-    if (action === 'createFolder' && !contextMenu.item) {
-      setContextMenu({ ...contextMenu, visible: false });
-      setShowCreateModal(true);
-      return;
-    }
-
-    if (!contextMenu.item) return;
-    const targetItem = contextMenu.item;
-
-    setContextMenu({ ...contextMenu, visible: false });
-
-    if (action === 'select' && targetItem.type === 'file') {
-      setIsSelectionMode(true);
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        next.add(targetItem.id);
-        return next;
-      });
-      return;
-    }
-
-    if (action === 'deselect' && targetItem.type === 'file') {
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        next.delete(targetItem.id);
-        return next;
-      });
-      return;
-    }
-
-    if (action === 'createChild' && targetItem.type === 'folder') {
-      handleNavigate(targetItem);
-      setShowCreateModal(true);
-    }
-    else if (action === 'rename') {
-      setItemToRename(targetItem);
-      setRenameValue(targetItem.name);
-      setIsRenameModalOpen(true);
-    }
-    else if (action === 'delete') {
-      setItemToDelete(targetItem);
-      setDeleteMode('standard');
-      setConfirmMessage(`${t('confirmDelete') || "Are you sure you want to delete"} "${targetItem.name}"?`);
-      setConfirmModalOpen(true);
-    }
-    else if (action === 'history') {
-      setSelectedHistoryItem(targetItem);
-      setIsHistoryModalOpen(true);
-    }
-    else if (action === 'security') {
-      setSelectedSecurityItem(targetItem);
-      setIsSecurityModalOpen(true);
-    }
-    else if (action === 'share') {
-      setItemToShare(targetItem);
-      setIsShareModalOpen(true);
-    }
-    else if (action === 'download') {
-      handleDownload(targetItem);
-    }
-    else if (action === 'downloadZip') {
-      handleDownloadFolderZip(targetItem);
-    }
-    else if (action === 'moveFile' && targetItem.type === 'file') {
-      openMoveModal([targetItem.id]);
-    }
-    else if (action === 'moveSelected') {
-      openMoveModal(Array.from(selectedFileIds));
-    }
-    else if (action === 'deleteSelected') {
-      handleBatchDelete();
-    }
-  };
-
-  const handleDownload = (item: FolderItem) => {
-    const toastId = showToast(t('downloading') || "Downloading...", 'info', 'subtle', 0);
-    const mediaType = getMediaType(item);
-    download(
-      { docId: item.id, docname: item.name, apiURL, mediaType },
-      {
-        onSuccess: () => {
-          removeToast(toastId);
-        },
-        onError: () => {
-          removeToast(toastId);
-          showToast(t('errorDownloading'), 'error');
-        }
-      }
-    );
-  };
-
-  const handleDownloadFolderZip = async (item: FolderItem) => {
-    showToast(t('zipSkipsFoldersNotice') || "Note: only files in this folder will be downloaded. Subfolders are skipped.", 'info');
-    const toastId = showToast(t('downloadingZip') || "Preparing ZIP download...", 'info', 'subtle', 0);
-    try {
-      const response = await fetch(`${apiURL}/folders/${item.id}/download-zip`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (response.status === 413) {
-        removeToast(toastId);
-        showToast(t('folderTooLarge') || "Unable to download: folder size exceeds the 300 MB limit. Please download individual files instead.", 'error');
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${item.name}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      removeToast(toastId);
-    } catch (err) {
-      removeToast(toastId);
-      showToast(t('zipDownloadError') || "Failed to download folder as ZIP", 'error');
-    }
-  };
-
-  const handleRenameSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!itemToRename || !renameValue || renameValue === itemToRename.name) {
-      setIsRenameModalOpen(false);
-      return;
-    }
-
-    setIsRenaming(true);
-    setIsOperationLoading(true);
-    let didTriggerRefresh = false;
-    try {
-      const nextName = renameValue;
-
-      await renameFolderMutation.mutateAsync({
-        id: itemToRename.id,
-        name: nextName,
-        system_id: itemToRename.system_id,
-        apiURL
-      });
-
-      updateItemsInCurrentView((item) => (
-        item.id === itemToRename.id ? { ...item, name: nextName } : item
-      ));
-
-      showToast(t('successRenaming'), 'success');
-      setIsRenameModalOpen(false);
-      setItemToRename(null);
-      didTriggerRefresh = true;
-      refreshCurrentView(true);
-    } catch (e: any) {
-      console.error("Rename error:", e);
-      setIsOperationLoading(false);
-      showToast(t('errorRenaming') || `Error: ${e.message}`, 'error');
-    } finally {
-      setIsRenaming(false);
-      if (!didTriggerRefresh) {
-        setIsOperationLoading(false);
-      }
-    }
-  };
-
-  const processDelete = async () => {
-    if (!itemToDelete) return;
-
-    setIsOperationLoading(true);
-    let didTriggerRefresh = false;
-
-    if (deleteMode === 'standard') {
-      setConfirmModalOpen(false);
-    }
-
-    try {
-      await deleteFolderMutation.mutateAsync({
-        id: itemToDelete.id,
-        force: deleteMode === 'force',
-        apiURL
-      });
-
-      hideItemsFromCurrentView([itemToDelete.id]);
-
-      setItemToDelete(null);
-      setConfirmModalOpen(false);
-      showToast(t('successDeleting'), 'success');
-      didTriggerRefresh = true;
-      refreshCurrentView(true);
-
-    } catch (e: any) {
-      let errMsg = "";
-      let errDetail = "";
-
-      if (e.data) {
-        errMsg = (e.data.detail || e.data.error || "").toLowerCase();
-        errDetail = e.data.detail || e.data.error;
-      } else {
-        errMsg = e.message.toLowerCase();
-        errDetail = e.message;
-      }
-
-      const hasSubfolders = errMsg.includes("contains subfolders");
-
-      if (hasSubfolders) {
-        setDeleteMode('standard');
-        setItemToDelete(null);
-        setConfirmModalOpen(false);
-        showToast(t('folderContainsSubfolders') || errDetail || 'This folder cannot be deleted because it contains subfolders.', 'warning');
-      } else if (deleteMode === 'standard' && (e.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate"))) {
-        setDeleteMode('force');
-        setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records or is not empty.");
-        setConfirmModalOpen(true);
-      } else {
-        showToast(t('errorDeleting') || `Error: ${errDetail || 'Unknown error'}`, 'error');
-        if (deleteMode === 'force') {
-          setConfirmModalOpen(false);
-        }
-      }
-    } finally {
-      if (!didTriggerRefresh) {
-        setIsOperationLoading(false);
-      }
-    }
-  };
-
-  const getStandardFolderColor = (id: string) => {
-    return 'bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700';
-  };
-
-  const getFileColorClass = (item: FolderItem) => {
-    const type = getMediaType(item);
-    const colorMap: Record<string, string> = {
-      'image': 'text-blue-500 dark:text-blue-400',
-      'video': 'text-red-500 dark:text-red-400',
-      'excel': 'text-green-500 dark:text-green-400',
-      'powerpoint': 'text-orange-500 dark:text-orange-400',
-      'word': 'text-blue-700 dark:text-blue-500',
-      'zip': 'text-purple-500 dark:text-purple-400',
-      'audio': 'text-teal-500 dark:text-teal-400',
-      'cad': 'text-blue-800 dark:text-blue-500',
-      'code': 'text-cyan-600 dark:text-cyan-400',
-      'email': 'text-slate-500 dark:text-slate-400',
-      'font': 'text-gray-600 dark:text-gray-400',
-      'database': 'text-indigo-500 dark:text-indigo-400',
-      'vector': 'text-pink-600 dark:text-pink-400',
-      'archive': 'text-amber-700 dark:text-amber-500',
-      'executable': 'text-slate-600 dark:text-slate-400',
-      'disc': 'text-gray-500 dark:text-gray-400',
-      'visio': 'text-blue-600 dark:text-blue-400',
-      'onenote': 'text-purple-700 dark:text-purple-400',
-    };
-    return colorMap[type] || 'text-yellow-500 dark:text-yellow-400';
-  };
-
-  const isInsideStandardFolder = ['images', 'videos', 'files'].includes(currentFolderId || '');
-
-  const standardItems = items.filter(item => item.is_standard && !isInsideStandardFolder);
-
-  const userItems = items
-    .filter(item => !item.is_standard)
-    .sort((a, b) => {
-      const aIsFolder = a.type === 'folder';
-      const bIsFolder = b.type === 'folder';
-
-      if (aIsFolder && !bIsFolder) return -1;
-      if (!aIsFolder && bIsFolder) return 1;
-
-      return a.name.localeCompare(b.name);
-    });
-
-  return (
-    <div ref={containerRef} className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
-
-      <div className="relative border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
-        <div className="flex items-center justify-between px-6 py-4">
-          <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
-            {breadcrumbs.map((crumb, index) => (
-              <div key={index} className="flex items-center whitespace-nowrap">
-                {index > 0 && <span className="mx-2 text-gray-400">/</span>}
-                <button
-                  onClick={() => handleBreadcrumbClick(index)}
-                  className={`hover:text-blue-500 hover:underline transition-colors ${index === breadcrumbs.length - 1 ? 'font-bold text-gray-900 dark:text-white' : ''
-                    }`}
-                >
-                  {crumb.name}
-                </button>
-              </div>
-            ))}
-          </nav>
-
-          <div className="flex items-center space-x-3 ml-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder={t('search') || "Search in folder..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-48 transition-all focus:w-64"
-              />
-              <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-60 dark:invert" />
-              {searchTerm && (
-                <button
-                  onClick={() => { setSearchTerm(''); setDebouncedSearchTerm(''); }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                  aria-label="Clear search"
-                >
-                  <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
-                </button>
-              )}
-            </div>
-
-            <button
-              onClick={() => refreshCurrentView()}
-              disabled={isRefreshing || isFetching}
-              className={`p-2 transition ${
-                isRefreshing || isFetching
-                  ? 'text-blue-500 dark:text-blue-400 cursor-not-allowed opacity-70'
-                  : 'text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400'
-              }`}
-              title={t('refresh')}
-            >
-              <Image src="/icons/refresh.svg" alt="" width={20} height={20} className={`${isRefreshing || isFetching ? 'animate-spin' : ''} dark:invert`} />
-            </button>
-
-            {isEditor && (
-              <button
-                onClick={toggleSelectionMode}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm text-sm font-medium ${isSelectionMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'}`}
-              >
-                <Image src="/icons/select.svg" alt="" width={20} height={20} className="dark:invert" />
-                {isSelectionMode ? (t('doneSelecting') || 'Done') : (t('select') || 'Select')}
-              </button>
-            )}
-
-            {isEditor && (<button
-              onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
-            >
-              <Image src="/upload.svg" alt="" width={20} height={20} className="dark:invert" />
-              {t('upload')}
-            </button>
-            )}
-
-            {isEditor && (
-              <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
-                <Image src="/icons/plus.svg" alt="" width={20} height={20} className="dark:invert" />
-                {t('createFolder')}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {isSelectionMode && isEditor && (
-          <div className="absolute inset-0 z-10 flex items-center justify-between px-6 bg-blue-50 dark:bg-blue-950/90 border-b border-blue-200 dark:border-blue-800">
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
-              {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => openMoveModal(Array.from(selectedFileIds))}
-                disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
-                className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-              >
-                {isBatchMoving ? (t('moving')) : (t('move') || 'Move')}
-              </button>
-              <LoadingButton
-                onClick={handleBatchDelete}
-                isLoading={isBatchDeleting}
-                loadingText={t('deleting') || 'Deleting...'}
-                disabled={isBatchMoving || selectedFileCount === 0}
-                className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {t('delete') || 'Delete'}
-              </LoadingButton>
-              <button
-                onClick={clearSelection}
-                disabled={isBatchMoving || isBatchDeleting}
-                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
-              >
-                {t('clear') || 'Clear'}
-              </button>
-              <button
-                onClick={toggleSelectionMode}
-                disabled={isBatchMoving || isBatchDeleting}
-                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
-              >
-                {t('doneSelecting') || 'Done'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div
-        ref={gridAreaRef}
-        className="flex-1 overflow-y-auto p-6"
-        onContextMenu={handleBackgroundContextMenu}
-        onMouseDown={startMarqueeSelection}
-      >
-        {isLoading ? (
-          <div className="py-8">
-            <Spinner size="lg" center label={t('loading') || 'Loading...'} />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-8">
-
-            {standardItems.length > 0 && !searchTerm && (
-              <div className="animate-fade-in">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">
-                  {t('libraries') || 'Quick Access'}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {standardItems.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => handleNavigate(item)}
-                      className={`group flex items-center p-4 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${getStandardFolderColor(item.id)}`}
-                    >
-                      <div className="flex-shrink-0 p-2 bg-white dark:bg-[#333] rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                        {renderIcon(item, true)}
-                      </div>
-                      <div className="ml-4 flex-1 min-w-0">
-                        <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{t(item.id)}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} ${t('items')}` : ''}</p>
-                      </div>
-                      <div className="text-gray-300 dark:text-gray-600">
-                        <Image src="/icons/chevron-right.svg" alt="" width={20} height={20} className="dark:invert" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1">
-              {(standardItems.length > 0 && userItems.length > 0 && !searchTerm) && (
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
-              )}
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {userItems.map((item) => {
-                  const isFile = item.type === 'file';
-                  const isSelected = selectedFileIds.has(item.id);
-                  const isDragOverTarget = dragOverFolderId === item.id;
-
-                  if (!isFile && item.type === 'folder') {
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => handleNavigate(item)}
-                        onContextMenu={(e) => handleRightClick(e, item)}
-                        onDragOver={(e) => {
-                          if (!isEditor) return;
-                          e.preventDefault();
-                          setDragOverFolderId(item.id);
-                        }}
-                        onDragLeave={() => {
-                          if (dragOverFolderId === item.id) {
-                            setDragOverFolderId(null);
-                          }
-                        }}
-                        onDrop={async (e) => {
-                          if (!isEditor) return;
-                          e.preventDefault();
-                          setDragOverFolderId(null);
-
-                          let draggedIds: string[] = [];
-                          try {
-                            const raw = e.dataTransfer.getData('application/json');
-                            if (raw) {
-                              const parsed = JSON.parse(raw);
-                              if (Array.isArray(parsed?.fileIds)) {
-                                draggedIds = parsed.fileIds;
-                              }
+                    // Try to restore breadcrumbs from URL
+                    const breadcrumbsParam = searchParamsObj.get('breadcrumbs');
+                    if (breadcrumbsParam) {
+                        try {
+                            const parsed = JSON.parse(breadcrumbsParam);
+                            if (Array.isArray(parsed)) {
+                                setBreadcrumbs(parsed);
                             }
-                          } catch {
-                            draggedIds = [];
-                          }
+                        } catch (e) {
+                            // Fallback breadcrumbs
+                            const folderName = searchParamsObj.get('name') || folderId;
+                            setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: folderName }]);
+                        }
+                    } else {
+                        // Standard folder or no breadcrumbs in URL
+                        if (['images', 'videos', 'files'].includes(folderId)) {
+                            setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: t(folderId) || folderId }]);
+                        } else {
+                            const folderName = searchParamsObj.get('name') || folderId;
+                            setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folderId, name: folderName }]);
+                        }
+                    }
+                }
+            }
+        };
 
-                          const idsToMove = draggedIds.length > 0 ? draggedIds : Array.from(selectedFileIds);
-                          await moveFilesToFolder(idsToMove, item.id);
-                        }}
-                        className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:shadow-sm dark:hover:bg-[#2c2c2c] ${isDragOverTarget ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-500' : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'}`}
-                      >
-                        <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200 text-gray-400 group-hover:text-blue-500">
-                          {renderIcon(item, false)}
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [t]);
+
+    // Error handling for 404 is now easier if we want to redirect, 
+    // but React Query handles errors via 'error' object or onError callbacks.
+    // For now, we rely on the component rendering empty or error state if needed,
+    // roughly mirroring the specialized 404 redirect if absolutely necessary.
+    /*
+      The previous fetchContents had a specific 404 redirect. 
+      If we want to maintain exactly that, we can use the 'error' from the hook.
+      But usually, simple error UI is better than redirect.
+    */
+
+    const getFolderHref = (item: FolderItem) => {
+        if (item.is_standard) {
+            return `/folder/${item.id}`;
+        }
+        const newBreadcrumbs = [...breadcrumbs, { id: item.id, name: item.name }];
+        const json = JSON.stringify(newBreadcrumbs);
+        // Include name param as backup
+        return `/folder/${item.id}?breadcrumbs=${encodeURIComponent(json)}&name=${encodeURIComponent(item.name)}`;
+    };
+
+    const renderIcon = (item: FolderItem, isStandard = false) => {
+        let iconSrc = '/folder-icon.svg';
+        let altText = 'Folder';
+        let size = 56; // Maps to h-14 w-14
+        let invertClass = "";
+
+        let type: string = 'folder';
+        if (isStandard) {
+            if (item.id === 'images') type = 'image';
+            else if (item.id === 'videos') type = 'video';
+            else type = 'file';
+        } else {
+            if (item.type === 'file') {
+                const mType = getMediaType(item);
+                type = mType;
+            }
+        }
+
+        if (isStandard) {
+            size = 24; // Maps to h-6 w-6
+            invertClass = "";
+
+            if (type === 'image') { iconSrc = '/file-image.svg'; altText = 'Images'; }
+            else if (type === 'video') { iconSrc = '/file-video.svg'; altText = 'Videos'; }
+            else { iconSrc = '/file-document.svg'; altText = 'Files'; }
+        } else {
+            const iconMap: Record<string, { src: string; alt: string }> = {
+                'image': { src: '/file-image.svg', alt: 'Image' },
+                'video': { src: '/file-video.svg', alt: 'Video' },
+                'excel': { src: '/file-excel.svg', alt: 'Excel' },
+                'pdf': { src: '/file-pdf.svg', alt: 'PDF' },
+                'powerpoint': { src: '/file-powerpoint.svg', alt: 'PowerPoint' },
+                'word': { src: '/file-word.svg', alt: 'Word' },
+                'zip': { src: '/file-zip.svg', alt: 'Zip' },
+                'audio': { src: '/file-audio.svg', alt: 'Audio' },
+                'cad': { src: '/file-cad.svg', alt: 'CAD' },
+                'code': { src: '/file-code.svg', alt: 'Code' },
+                'email': { src: '/file-email.svg', alt: 'Email' },
+                'font': { src: '/file-font.svg', alt: 'Font' },
+                'database': { src: '/file-database.svg', alt: 'Database' },
+                'vector': { src: '/file-vector.svg', alt: 'Vector' },
+                'archive': { src: '/file-archive.svg', alt: 'Archive' },
+                'executable': { src: '/file-executable.svg', alt: 'Executable' },
+                'disc': { src: '/file-disc.svg', alt: 'Disc Image' },
+                'visio': { src: '/file-visio.svg', alt: 'Visio' },
+                'onenote': { src: '/file-onenote.svg', alt: 'OneNote' },
+                'text': { src: '/file-document.svg', alt: 'File' },
+                'file': { src: '/file-document.svg', alt: 'File' },
+            };
+
+            const mapped = iconMap[type];
+            if (mapped) {
+                iconSrc = mapped.src;
+                altText = mapped.alt;
+            } else {
+                iconSrc = '/folder-icon.svg';
+                altText = 'Folder';
+            }
+            invertClass = "";
+        }
+
+        return <Image src={iconSrc} alt={altText} width={size} height={size} className={invertClass} />;
+    };
+
+    const getMediaType = (item: FolderItem) => {
+        // If backend already resolved it to a specific type, rely on it
+        if (item.media_type && item.media_type !== 'folder' && item.media_type !== 'file') {
+            // Normalize docx to word if needed
+            if (item.media_type === 'docx' as any) return 'word';
+            return item.media_type;
+        }
+
+        const ext = item.name.split('.').pop()?.toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '')) return 'image';
+        if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '')) return 'video';
+        if (['pdf'].includes(ext || '')) return 'pdf';
+        if (['doc', 'docx'].includes(ext || '')) return 'word';
+        if (['zip'].includes(ext || '')) return 'zip';
+        if (['rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext || '')) return 'archive';
+        if (['txt', 'csv', 'log', 'md'].includes(ext || '')) return 'text';
+        if (['xls', 'xlsx', 'ods', 'xlsm'].includes(ext || '')) return 'excel';
+        if (['ppt', 'pptx', 'odp', 'pps', 'ppsx'].includes(ext || '')) return 'powerpoint';
+        if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a'].includes(ext || '')) return 'audio';
+        if (['dwg', 'dxf', 'step', 'stp', 'iges', 'igs', 'stl', 'obj', '3ds', 'fbx'].includes(ext || '')) return 'cad';
+        if (['py', 'js', 'ts', 'tsx', 'jsx', 'html', 'css', 'java', 'cpp', 'c', 'cs', 'go', 'rb', 'php', 'swift', 'rs', 'r', 'sql', 'sh', 'bat', 'ps1', 'cmd'].includes(ext || '')) return 'code';
+        if (['eml', 'msg', 'mbox'].includes(ext || '')) return 'email';
+        if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(ext || '')) return 'font';
+        if (['db', 'sqlite', 'mdb', 'accdb'].includes(ext || '')) return 'database';
+        if (['ai', 'eps'].includes(ext || '')) return 'vector';
+        if (['exe', 'msi'].includes(ext || '')) return 'executable';
+        if (['iso', 'img', 'dmg', 'vhd'].includes(ext || '')) return 'disc';
+        if (['vsd', 'vsdx'].includes(ext || '')) return 'visio';
+        if (['one', 'onetoc2'].includes(ext || '')) return 'onenote';
+        if (['json', 'xml', 'yml', 'yaml', 'ini', 'conf'].includes(ext || '')) return 'code';
+        return 'file';
+    };
+
+    // Helper function to update URL without full page reload (shallow routing)
+    const updateUrlShallow = (folderId: string | null, newBreadcrumbs: { id: string | null; name: string }[]) => {
+        if (folderId === null) {
+            window.history.pushState(null, '', '/folders');
+        } else if (['images', 'videos', 'files'].includes(folderId)) {
+            window.history.pushState(null, '', `/folder/${folderId}`);
+        } else {
+            const breadcrumbsJson = JSON.stringify(newBreadcrumbs);
+            const folderName = newBreadcrumbs.length > 0 ? newBreadcrumbs[newBreadcrumbs.length - 1].name : '';
+            window.history.pushState(null, '', `/folder/${folderId}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}&name=${encodeURIComponent(folderName)}`);
+        }
+    };
+
+    const handleNavigate = (folder: FolderItem) => {
+        if (folder.name.toLowerCase().endsWith('.zip') || folder.media_type === 'file') {
+            showToast(t('contentCannotBeDisplayed') || "Content cannot be displayed", 'info');
+            return;
+        }
+
+        // Clear search when navigating into a folder so its contents are shown
+        if (folder.type === 'folder' || folder.is_standard || folder.node_type === 'N' || folder.node_type === 'F') {
+            setSearchTerm('');
+            setDebouncedSearchTerm('');
+        }
+
+        if (folder.is_standard) {
+            // For standard folders (images, videos, files), use internal state update
+            setCurrentFolderId(folder.id);
+            setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
+            updateUrlShallow(folder.id, [{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
+            return;
+        }
+
+        if (folder.type === 'file' || (folder.type !== 'folder' && folder.node_type !== 'N' && folder.node_type !== 'F')) {
+            if (onDocumentClick) {
+                let mediaType: any = 'file';
+                const detectedType = getMediaType(folder);
+
+                if (detectedType === 'image') mediaType = 'image';
+                else if (detectedType === 'video') mediaType = 'video';
+                else if (detectedType === 'pdf') mediaType = 'pdf';
+                else if (detectedType === 'text') mediaType = 'text';
+                else if (detectedType === 'excel') mediaType = 'excel';
+                else if (detectedType === 'powerpoint') mediaType = 'powerpoint';
+                else if (detectedType === 'word') mediaType = 'word';
+                else if (detectedType === 'zip') mediaType = 'zip';
+                else mediaType = 'file';
+
+                const doc = new Document({
+                    doc_id: parseInt(folder.id),
+                    docname: folder.name,
+                    title: folder.name,
+                    media_type: mediaType,
+                    date: new Date().toISOString(),
+                    thumbnail_url: folder.thumbnail_url || `cache/${folder.id}.jpg`
+                });
+                onDocumentClick(doc);
+            }
+            return;
+        }
+
+        // Internal state navigation for dynamic folders (no full page reload)
+        const newBreadcrumbs = [...breadcrumbs, { id: folder.id, name: folder.name }];
+        setCurrentFolderId(folder.id);
+        setBreadcrumbs(newBreadcrumbs);
+        updateUrlShallow(folder.id, newBreadcrumbs);
+    };
+
+    const handleBreadcrumbClick = (index: number) => {
+        const target = breadcrumbs[index];
+        if (target.id === null) {
+            // Navigate back to root folders
+            setCurrentFolderId(null);
+            setBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
+            updateUrlShallow(null, [{ id: null, name: t('home') || 'Home' }]);
+        } else {
+            // Navigate back to a specific folder in the breadcrumb trail
+            const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
+            setCurrentFolderId(target.id);
+            setBreadcrumbs(newBreadcrumbs);
+            updateUrlShallow(target.id, newBreadcrumbs);
+        }
+    };
+
+    const refreshCurrentView = (showOverlay = false) => {
+        if (showOverlay) {
+            setIsOperationLoading(true);
+        } else {
+            setIsRefreshing(true);
+        }
+        // Force refetch from server, bypassing stale time cache
+        queryClient.refetchQueries({ queryKey: ['folders', currentFolderId, debouncedSearchTerm] });
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
+    };
+
+    const updateItemsInCurrentView = (updater: (item: FolderItem) => FolderItem) => {
+        queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
+            if (!previous?.contents) return previous;
+
+            return {
+                ...previous,
+                contents: previous.contents.map((item: FolderItem) => updater(item)),
+            };
+        });
+    };
+
+    const hideItemsFromCurrentView = (itemIds: string[]) => {
+        if (itemIds.length === 0) return;
+
+        const idsToHide = new Set(itemIds);
+        setHiddenItemIds((prev) => {
+            const next = new Set(prev);
+            itemIds.forEach((id) => next.add(id));
+            return next;
+        });
+
+        queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
+            if (!previous?.contents) return previous;
+
+            return {
+                ...previous,
+                contents: previous.contents.filter((item: FolderItem) => !idsToHide.has(item.id)),
+            };
+        });
+    };
+
+    const clearSelection = () => {
+        setSelectedFileIds(new Set());
+    };
+
+    useEffect(() => {
+        const handleEscapeClearSelection = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            if (selectedFileIds.size === 0) return;
+            clearSelection();
+        };
+
+        document.addEventListener('keydown', handleEscapeClearSelection);
+        return () => document.removeEventListener('keydown', handleEscapeClearSelection);
+    }, [selectedFileIds]);
+
+    const toggleSelectionMode = () => {
+        setIsSelectionMode((prev) => {
+            if (prev) {
+                setSelectedFileIds(new Set());
+            }
+            return !prev;
+        });
+    };
+
+    const toggleFileSelection = (fileId: string, checked?: boolean) => {
+        setSelectedFileIds(prev => {
+            const next = new Set(prev);
+            const isChecked = checked !== undefined ? checked : !next.has(fileId);
+
+            if (isChecked) next.add(fileId);
+            else next.delete(fileId);
+
+            return next;
+        });
+    };
+
+    const selectOnlyFile = (fileId: string) => {
+        setSelectedFileIds(new Set([fileId]));
+    };
+
+    const isRectIntersecting = (a: DOMRect, b: { left: number; right: number; top: number; bottom: number }) => {
+        return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+    };
+
+    const startMarqueeSelection = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isEditor || e.button !== 0) return;
+
+        const ctrlHeld = e.ctrlKey || e.metaKey;
+        if (!isSelectionMode && !ctrlHeld) return;
+
+        const target = e.target as HTMLElement;
+        if (target.closest('button,input,textarea,label,a,[data-no-marquee="true"]')) return;
+
+        const additive = ctrlHeld;
+        if (!isSelectionMode && ctrlHeld) {
+            setIsSelectionMode(true);
+        }
+
+        let zoomFactor = 1;
+        if (typeof window !== 'undefined') {
+            const htmlZoom = window.getComputedStyle(document.documentElement).zoom;
+            if (htmlZoom && htmlZoom !== '1') {
+                zoomFactor = htmlZoom.includes('%') ? parseFloat(htmlZoom) / 100 : parseFloat(htmlZoom);
+            }
+            if (isNaN(zoomFactor) || zoomFactor <= 0) zoomFactor = 1;
+        }
+
+        setMarqueeSelection({
+            startX: e.clientX,
+            startY: e.clientY,
+            currentX: e.clientX,
+            currentY: e.clientY,
+            additive,
+            baseSelection: new Set(selectedFileIds),
+            containerOffsetX: 0,
+            containerOffsetY: 0,
+            zoomFactor,
+        });
+        suppressItemClickRef.current = false;
+        e.preventDefault();
+    };
+
+    // --- OS drag-and-drop helpers ---
+
+    /** Returns true only when the drag originates from outside the browser (real files from the OS). */
+    const isOsDrag = (e: React.DragEvent<any>) => {
+        const types = Array.from(e.dataTransfer.types);
+        // 'Files' type is set by the OS; internal drags use 'application/json'
+        return types.includes('Files') && !types.includes('application/json');
+    };
+
+    /**
+     * Recursively reads all files from a DataTransferItem (handles folder drops
+     * via the FileSystem API when available, falls back to .getAsFile()).
+     */
+    const readFilesFromEntry = (entry: FileSystemEntry): Promise<File[]> => {
+        return new Promise((resolve) => {
+            if (entry.isFile) {
+                (entry as FileSystemFileEntry).file(
+                    (file) => resolve([file]),
+                    () => resolve([]),
+                );
+            } else if (entry.isDirectory) {
+                const reader = (entry as FileSystemDirectoryEntry).createReader();
+                const allFiles: File[] = [];
+                const readBatch = () => {
+                    reader.readEntries(async (entries) => {
+                        if (entries.length === 0) {
+                            resolve(allFiles);
+                            return;
+                        }
+                        const nested = await Promise.all(entries.map(readFilesFromEntry));
+                        nested.forEach((f) => allFiles.push(...f));
+                        readBatch(); // keep reading until entries is empty
+                    }, () => resolve(allFiles));
+                };
+                readBatch();
+            } else {
+                resolve([]);
+            }
+        });
+    };
+
+    const handleGridDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+        if (!isEditor || !isOsDrag(e)) return;
+        e.preventDefault();
+        externalDragCounterRef.current += 1;
+        if (externalDragCounterRef.current === 1) setIsExternalDragOver(true);
+    };
+
+    const handleGridDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        if (!isEditor || !isOsDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleGridDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        if (!isEditor) return;
+        externalDragCounterRef.current -= 1;
+        if (externalDragCounterRef.current <= 0) {
+            externalDragCounterRef.current = 0;
+            setIsExternalDragOver(false);
+        }
+    };
+
+    const handleGridDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        if (!isEditor || !isOsDrag(e)) return;
+        e.preventDefault();
+        externalDragCounterRef.current = 0;
+        setIsExternalDragOver(false);
+
+        let collectedFiles: File[] = [];
+
+        // Use DataTransferItemList + FileSystem API for recursive folder support
+        const items = Array.from(e.dataTransfer.items);
+        if (items.length > 0 && typeof items[0].webkitGetAsEntry === 'function') {
+            const entries = items
+                .map((item) => item.webkitGetAsEntry())
+                .filter((entry): entry is FileSystemEntry => entry !== null);
+            const nested = await Promise.all(entries.map(readFilesFromEntry));
+            nested.forEach((f) => collectedFiles.push(...f));
+        } else {
+            // Fallback: plain FileList (no folder recursion possible)
+            collectedFiles = Array.from(e.dataTransfer.files);
+        }
+
+        if (collectedFiles.length === 0) return;
+        onUploadClick(currentFolderId, getCurrentFolderName(), collectedFiles);
+    };
+
+
+    useEffect(() => {
+        if (!marqueeSelection) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            setMarqueeSelection(prev => {
+                if (!prev) return prev;
+
+                const next = {
+                    ...prev,
+                    currentX: e.clientX,
+                    currentY: e.clientY,
+                };
+
+                const left = Math.min(next.startX, next.currentX);
+                const right = Math.max(next.startX, next.currentX);
+                const top = Math.min(next.startY, next.currentY);
+                const bottom = Math.max(next.startY, next.currentY);
+
+                if (Math.abs(next.currentX - next.startX) > 3 || Math.abs(next.currentY - next.startY) > 3) {
+                    suppressItemClickRef.current = true;
+                }
+
+                const intersected = new Set<string>();
+                items.forEach((item) => {
+                    if (item.type !== 'file') return;
+                    const node = fileTileRefs.current[item.id];
+                    if (!node) return;
+                    const rect = node.getBoundingClientRect();
+                    if (isRectIntersecting(rect, { left, right, top, bottom })) {
+                        intersected.add(item.id);
+                    }
+                });
+
+                setSelectedFileIds(() => {
+                    if (next.additive) {
+                        const merged = new Set(next.baseSelection);
+                        intersected.forEach((id) => merged.add(id));
+                        return merged;
+                    }
+                    return intersected;
+                });
+
+                return next;
+            });
+        };
+
+        const handleMouseUp = () => {
+            setMarqueeSelection(prev => {
+                if (!prev) return null;
+
+                const wasClick = Math.abs(prev.currentX - prev.startX) <= 3 && Math.abs(prev.currentY - prev.startY) <= 3;
+                if (wasClick && !prev.additive) {
+                    clearSelection();
+                }
+
+                return null;
+            });
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [marqueeSelection, items]);
+
+    const moveFilesToFolder = async (fileIds: string[], destinationFolderId: string | null) => {
+        if (fileIds.length === 0) return;
+
+        if (destinationFolderId === currentFolderId) {
+            showToast(t('alreadyInThisFolder') || 'Selected files are already in this folder.', 'info');
+            return;
+        }
+
+        setIsOperationLoading(true);
+        setIsBatchMoving(true);
+        let didTriggerRefresh = false;
+
+        try {
+            const itemNames = Object.fromEntries(
+                fileIds
+                    .map((id) => {
+                        const matched = items.find((item) => item.id === id);
+                        return matched ? [id, matched.name] : null;
+                    })
+                    .filter((entry): entry is [string, string] => Array.isArray(entry))
+            );
+
+            const result = await moveItemsMutation.mutateAsync({
+                item_ids: fileIds,
+                destination_parent_id: destinationFolderId,
+                item_names: itemNames,
+                apiURL
+            });
+
+            const moved = Number(result?.moved_count || 0);
+            const failed = Number(result?.failed_count || 0);
+
+            if (moved > 0) {
+                showToast(t('successMoving') || `Moved ${moved} file(s) successfully.`, 'success');
+            }
+            if (failed > 0) {
+                showToast(t('errorMoving') || `${failed} file(s) could not be moved.`, 'error');
+            }
+
+            if (moved > 0 && failed === 0) {
+                hideItemsFromCurrentView(fileIds);
+            }
+
+            clearSelection();
+            if (moved > 0 && failed === 0) {
+                setIsSelectionMode(false);
+            }
+            didTriggerRefresh = true;
+            refreshCurrentView(true);
+        } catch (error: any) {
+            setIsOperationLoading(false);
+            showToast(t('errorMoving') || `Error moving files: ${error.message || 'Unknown error'}`, 'error');
+        } finally {
+            setIsBatchMoving(false);
+            if (!didTriggerRefresh) {
+                setIsOperationLoading(false);
+            }
+        }
+    };
+
+    const fetchMoveFolderItems = async (parentId: string | null) => {
+        // No longer needed - useMoveModalFolders hook handles fetching with caching
+        // This function is kept as a no-op for backward compatibility
+    };
+
+    const closeMoveModal = () => {
+        setIsMoveModalOpen(false);
+        setMoveItemIds([]);
+    };
+
+    const openMoveModal = async (fileIds: string[]) => {
+        if (fileIds.length === 0) return;
+
+        setMoveItemIds(fileIds);
+        setIsMoveModalOpen(true);
+        setMoveCurrentFolderId(null);
+        setMoveBreadcrumbs([{ id: null, name: t('home') || 'Home' }]);
+        setTargetMoveFolderId(currentFolderId);
+        // No need to manually fetch - hook will load data automatically
+    };
+
+    const handleMoveModalNavigate = async (folder: FolderItem) => {
+        const nextBreadcrumbs = [...moveBreadcrumbs, { id: folder.id, name: folder.name }];
+        setMoveCurrentFolderId(folder.id);
+        setMoveBreadcrumbs(nextBreadcrumbs);
+        setTargetMoveFolderId(folder.id);
+        // Hook automatically fetches data based on moveCurrentFolderId change
+    };
+
+    const handleMoveBreadcrumbClick = async (index: number) => {
+        const target = moveBreadcrumbs[index];
+        const nextBreadcrumbs = moveBreadcrumbs.slice(0, index + 1);
+        setMoveBreadcrumbs(nextBreadcrumbs);
+        setMoveCurrentFolderId(target.id);
+        setTargetMoveFolderId(target.id);
+        // Hook automatically fetches data based on moveCurrentFolderId change
+    };
+
+    const handleBatchDelete = () => {
+        if (selectedFileCount === 0) return;
+        setBatchDeleteConfirmOpen(true);
+    };
+
+    const executeBatchDelete = async () => {
+        setBatchDeleteConfirmOpen(false);
+        if (selectedFileCount === 0) return;
+
+        setIsOperationLoading(true);
+        setIsBatchDeleting(true);
+
+        let deleted = 0;
+        let failed = 0;
+        const deletedIds: string[] = [];
+        let didTriggerRefresh = false;
+
+        try {
+            await Promise.all(Array.from(selectedFileIds).map(async (id) => {
+                try {
+                    await deleteFolderMutation.mutateAsync({ id, force: false, apiURL });
+                    deleted += 1;
+                    deletedIds.push(id);
+                } catch {
+                    failed += 1;
+                }
+            }));
+
+            if (deleted > 0) {
+                showToast(t('successDeleting') || `Deleted ${deleted} file(s) successfully.`, 'success');
+            }
+            if (failed > 0) {
+                showToast(t('errorDeleting') || `${failed} file(s) could not be deleted.`, 'error');
+            }
+
+            hideItemsFromCurrentView(deletedIds);
+
+            clearSelection();
+            didTriggerRefresh = true;
+            refreshCurrentView(true);
+        } finally {
+            setIsBatchDeleting(false);
+            if (!didTriggerRefresh) {
+                setIsOperationLoading(false);
+            }
+        }
+    };
+
+    const handleRightClick = (e: React.MouseEvent, item: FolderItem) => {
+        e.preventDefault();
+        if (!isEditor) return;
+        if (item.is_standard) return;
+
+        const position = getSafeContextMenuPosition(e.clientX, e.clientY, item);
+
+        setContextMenu({
+            visible: true,
+            x: position.x,
+            y: position.y,
+            item: item
+        });
+    };
+
+    const handleBackgroundContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!isEditor) return;
+        if (e.target !== e.currentTarget) return;
+
+        const position = getSafeContextMenuPosition(e.clientX, e.clientY, null);
+
+        setContextMenu({
+            visible: true,
+            x: position.x,
+            y: position.y,
+            item: null
+        });
+    };
+
+    useEffect(() => {
+        if (!contextMenu.visible || !contextMenuRef.current) return;
+
+        const rect = contextMenuRef.current.getBoundingClientRect();
+        const viewportPadding = 8;
+
+        const adjustedX = Math.max(
+            viewportPadding,
+            Math.min(contextMenu.x, window.innerWidth - rect.width - viewportPadding)
+        );
+        const adjustedY = Math.max(
+            viewportPadding,
+            Math.min(contextMenu.y, window.innerHeight - rect.height - viewportPadding)
+        );
+
+        if (adjustedX !== contextMenu.x || adjustedY !== contextMenu.y) {
+            setContextMenu(prev => ({ ...prev, x: adjustedX, y: adjustedY }));
+        }
+    }, [contextMenu.visible, contextMenu.x, contextMenu.y]);
+
+    const getCurrentFolderName = () => {
+        if (breadcrumbs.length > 0) {
+            return breadcrumbs[breadcrumbs.length - 1].name;
+        }
+        return t('home') || 'Home';
+    };
+
+    const handleContextMenuAction = async (action: string) => {
+        if (action === 'upload' && !contextMenu.item) {
+            setContextMenu({ ...contextMenu, visible: false });
+            onUploadClick(currentFolderId, getCurrentFolderName());
+            return;
+        }
+
+        if (action === 'createFolder' && !contextMenu.item) {
+            setContextMenu({ ...contextMenu, visible: false });
+            setShowCreateModal(true);
+            return;
+        }
+
+        if (!contextMenu.item) return;
+        const targetItem = contextMenu.item;
+
+        setContextMenu({ ...contextMenu, visible: false });
+
+        if (action === 'select' && targetItem.type === 'file') {
+            setIsSelectionMode(true);
+            setSelectedFileIds((prev) => {
+                const next = new Set(prev);
+                next.add(targetItem.id);
+                return next;
+            });
+            return;
+        }
+
+        if (action === 'deselect' && targetItem.type === 'file') {
+            setSelectedFileIds((prev) => {
+                const next = new Set(prev);
+                next.delete(targetItem.id);
+                return next;
+            });
+            return;
+        }
+
+        if (action === 'createChild' && targetItem.type === 'folder') {
+            handleNavigate(targetItem);
+            setShowCreateModal(true);
+        }
+        else if (action === 'rename') {
+            setItemToRename(targetItem);
+            setRenameValue(targetItem.name);
+            setIsRenameModalOpen(true);
+        }
+        else if (action === 'delete') {
+            setItemToDelete(targetItem);
+            setDeleteMode('standard');
+            setConfirmMessage(`${t('confirmDelete') || "Are you sure you want to delete"} "${targetItem.name}"?`);
+            setConfirmModalOpen(true);
+        }
+        else if (action === 'history') {
+            setSelectedHistoryItem(targetItem);
+            setIsHistoryModalOpen(true);
+        }
+        else if (action === 'security') {
+            setSelectedSecurityItem(targetItem);
+            setIsSecurityModalOpen(true);
+        }
+        else if (action === 'share') {
+            setItemToShare(targetItem);
+            setIsShareModalOpen(true);
+        }
+        else if (action === 'download') {
+            handleDownload(targetItem);
+        }
+        else if (action === 'downloadZip') {
+            handleDownloadFolderZip(targetItem);
+        }
+        else if (action === 'moveFile' && targetItem.type === 'file') {
+            openMoveModal([targetItem.id]);
+        }
+        else if (action === 'moveSelected') {
+            openMoveModal(Array.from(selectedFileIds));
+        }
+        else if (action === 'deleteSelected') {
+            handleBatchDelete();
+        }
+    };
+
+    const handleDownload = (item: FolderItem) => {
+        const toastId = showToast(t('downloading') || "Downloading...", 'info', 'subtle', 0);
+        const mediaType = getMediaType(item);
+        download(
+            { docId: item.id, docname: item.name, apiURL, mediaType },
+            {
+                onSuccess: () => {
+                    removeToast(toastId);
+                },
+                onError: () => {
+                    removeToast(toastId);
+                    showToast(t('errorDownloading'), 'error');
+                }
+            }
+        );
+    };
+
+    const handleDownloadFolderZip = async (item: FolderItem) => {
+        showToast(t('zipSkipsFoldersNotice') || "Note: only files in this folder will be downloaded. Subfolders are skipped.", 'info');
+        const toastId = showToast(t('downloadingZip') || "Preparing ZIP download...", 'info', 'subtle', 0);
+        try {
+            const response = await fetch(`${apiURL}/folders/${item.id}/download-zip`, {
+                method: 'GET',
+                credentials: 'include',
+            });
+
+            if (response.status === 413) {
+                removeToast(toastId);
+                showToast(t('folderTooLarge') || "Unable to download: folder size exceeds the 300 MB limit. Please download individual files instead.", 'error');
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${item.name}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            removeToast(toastId);
+        } catch (err) {
+            removeToast(toastId);
+            showToast(t('zipDownloadError') || "Failed to download folder as ZIP", 'error');
+        }
+    };
+
+    const handleRenameSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!itemToRename || !renameValue || renameValue === itemToRename.name) {
+            setIsRenameModalOpen(false);
+            return;
+        }
+
+        setIsRenaming(true);
+        setIsOperationLoading(true);
+        let didTriggerRefresh = false;
+        try {
+            const nextName = renameValue;
+
+            await renameFolderMutation.mutateAsync({
+                id: itemToRename.id,
+                name: nextName,
+                system_id: itemToRename.system_id,
+                apiURL
+            });
+
+            updateItemsInCurrentView((item) => (
+                item.id === itemToRename.id ? { ...item, name: nextName } : item
+            ));
+
+            showToast(t('successRenaming'), 'success');
+            setIsRenameModalOpen(false);
+            setItemToRename(null);
+            didTriggerRefresh = true;
+            refreshCurrentView(true);
+        } catch (e: any) {
+            console.error("Rename error:", e);
+            setIsOperationLoading(false);
+            showToast(t('errorRenaming') || `Error: ${e.message}`, 'error');
+        } finally {
+            setIsRenaming(false);
+            if (!didTriggerRefresh) {
+                setIsOperationLoading(false);
+            }
+        }
+    };
+
+    const processDelete = async () => {
+        if (!itemToDelete) return;
+
+        setIsOperationLoading(true);
+        let didTriggerRefresh = false;
+
+        if (deleteMode === 'standard') {
+            setConfirmModalOpen(false);
+        }
+
+        try {
+            await deleteFolderMutation.mutateAsync({
+                id: itemToDelete.id,
+                force: deleteMode === 'force',
+                apiURL
+            });
+
+            hideItemsFromCurrentView([itemToDelete.id]);
+
+            setItemToDelete(null);
+            setConfirmModalOpen(false);
+            showToast(t('successDeleting'), 'success');
+            didTriggerRefresh = true;
+            refreshCurrentView(true);
+
+        } catch (e: any) {
+            let errMsg = "";
+            let errDetail = "";
+
+            if (e.data) {
+                errMsg = (e.data.detail || e.data.error || "").toLowerCase();
+                errDetail = e.data.detail || e.data.error;
+            } else {
+                errMsg = e.message.toLowerCase();
+                errDetail = e.message;
+            }
+
+            const hasSubfolders = errMsg.includes("contains subfolders");
+
+            if (hasSubfolders) {
+                setDeleteMode('standard');
+                setItemToDelete(null);
+                setConfirmModalOpen(false);
+                showToast(t('folderContainsSubfolders') || errDetail || 'This folder cannot be deleted because it contains subfolders.', 'warning');
+            } else if (deleteMode === 'standard' && (e.status === 409 || errMsg.includes("referenced") || errMsg.includes("folder") || errMsg.includes("unable to locate"))) {
+                setDeleteMode('force');
+                setConfirmMessage(t('referencedItemError') || "This item is currently referenced by other records or is not empty.");
+                setConfirmModalOpen(true);
+            } else {
+                showToast(t('errorDeleting') || `Error: ${errDetail || 'Unknown error'}`, 'error');
+                if (deleteMode === 'force') {
+                    setConfirmModalOpen(false);
+                }
+            }
+        } finally {
+            if (!didTriggerRefresh) {
+                setIsOperationLoading(false);
+            }
+        }
+    };
+
+    const getStandardFolderColor = (id: string) => {
+        return 'bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700';
+    };
+
+    const getFileColorClass = (item: FolderItem) => {
+        const type = getMediaType(item);
+        const colorMap: Record<string, string> = {
+            'image': 'text-blue-500 dark:text-blue-400',
+            'video': 'text-red-500 dark:text-red-400',
+            'excel': 'text-green-500 dark:text-green-400',
+            'powerpoint': 'text-orange-500 dark:text-orange-400',
+            'word': 'text-blue-700 dark:text-blue-500',
+            'zip': 'text-purple-500 dark:text-purple-400',
+            'audio': 'text-teal-500 dark:text-teal-400',
+            'cad': 'text-blue-800 dark:text-blue-500',
+            'code': 'text-cyan-600 dark:text-cyan-400',
+            'email': 'text-slate-500 dark:text-slate-400',
+            'font': 'text-gray-600 dark:text-gray-400',
+            'database': 'text-indigo-500 dark:text-indigo-400',
+            'vector': 'text-pink-600 dark:text-pink-400',
+            'archive': 'text-amber-700 dark:text-amber-500',
+            'executable': 'text-slate-600 dark:text-slate-400',
+            'disc': 'text-gray-500 dark:text-gray-400',
+            'visio': 'text-blue-600 dark:text-blue-400',
+            'onenote': 'text-purple-700 dark:text-purple-400',
+        };
+        return colorMap[type] || 'text-yellow-500 dark:text-yellow-400';
+    };
+
+    const isInsideStandardFolder = ['images', 'videos', 'files'].includes(currentFolderId || '');
+
+    const standardItems = items.filter(item => item.is_standard && !isInsideStandardFolder);
+
+    const userItems = items
+        .filter(item => !item.is_standard)
+        .sort((a, b) => {
+            const aIsFolder = a.type === 'folder';
+            const bIsFolder = b.type === 'folder';
+
+            if (aIsFolder && !bIsFolder) return -1;
+            if (!aIsFolder && bIsFolder) return 1;
+
+            return a.name.localeCompare(b.name);
+        });
+
+    return (
+        <div ref={containerRef} className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
+
+            <div className="relative border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
+                <div className="flex items-center justify-between px-6 py-4">
+                    <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
+                        {breadcrumbs.map((crumb, index) => (
+                            <div key={index} className="flex items-center whitespace-nowrap">
+                                {index > 0 && <span className="mx-2 text-gray-400">/</span>}
+                                <button
+                                    onClick={() => handleBreadcrumbClick(index)}
+                                    className={`hover:text-blue-500 hover:underline transition-colors ${index === breadcrumbs.length - 1 ? 'font-bold text-gray-900 dark:text-white' : ''
+                                        }`}
+                                >
+                                    {crumb.name}
+                                </button>
+                            </div>
+                        ))}
+                    </nav>
+
+                    <div className="flex items-center space-x-3 ml-4">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder={t('search') || "Search in folder..."}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-48 transition-all focus:w-64"
+                            />
+                            <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-60 dark:invert" />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => { setSearchTerm(''); setDebouncedSearchTerm(''); }}
+                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                    aria-label="Clear search"
+                                >
+                                    <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
+                                </button>
+                            )}
                         </div>
-                        <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
-                          {item.name}
+
+                        <button
+                            onClick={() => refreshCurrentView()}
+                            disabled={isRefreshing || isFetching}
+                            className={`p-2 transition ${isRefreshing || isFetching
+                                ? 'text-blue-500 dark:text-blue-400 cursor-not-allowed opacity-70'
+                                : 'text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400'
+                                }`}
+                            title={t('refresh')}
+                        >
+                            <Image src="/icons/refresh.svg" alt="" width={20} height={20} className={`${isRefreshing || isFetching ? 'animate-spin' : ''} dark:invert`} />
+                        </button>
+
+                        {isEditor && (
+                            <button
+                                onClick={toggleSelectionMode}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm text-sm font-medium ${isSelectionMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                            >
+                                <Image src="/icons/select.svg" alt="" width={20} height={20} className="dark:invert" />
+                                {isSelectionMode ? (t('doneSelecting') || 'Done') : (t('select') || 'Select')}
+                            </button>
+                        )}
+
+                        {isEditor && (<button
+                            onClick={() => onUploadClick(currentFolderId, getCurrentFolderName())}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition shadow-sm text-sm font-medium"
+                        >
+                            <Image src="/upload.svg" alt="" width={20} height={20} className="invert dark:invert-0" />
+                            {t('upload')}
+                        </button>
+                        )}
+
+                        {isEditor && (
+                            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium">
+                                <Image src="/icons/plus.svg" alt="" width={20} height={20} className="dark:invert" />
+                                {t('createFolder')}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {isSelectionMode && isEditor && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-between px-6 bg-blue-50 dark:bg-blue-950/90 border-b border-blue-200 dark:border-blue-800">
+                        <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                            {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
                         </span>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      ref={(el) => {
-                        fileTileRefs.current[item.id] = el;
-                      }}
-                      data-select-item="true"
-                      key={item.id}
-                      onClick={(e) => {
-                        if (suppressItemClickRef.current) {
-                          suppressItemClickRef.current = false;
-                          return;
-                        }
-
-                        if ((e.ctrlKey || e.metaKey) && isEditor) {
-                          e.preventDefault();
-                          if (!isSelectionMode) setIsSelectionMode(true);
-                          toggleFileSelection(item.id);
-                          return;
-                        }
-                        handleNavigate(item);
-                      }}
-                      onContextMenu={(e) => handleRightClick(e, item)}
-                      draggable={isEditor}
-                      onDragStart={(e) => {
-                        const payloadIds = isSelectionMode && isSelected && selectedFileCount > 1
-                          ? selectedFiles.map((file) => file.id)
-                          : [item.id];
-                        e.dataTransfer.setData('application/json', JSON.stringify({ fileIds: payloadIds }));
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      onDragEnd={() => setDragOverFolderId(null)}
-                      className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700 ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent'}`}
-                    >
-                      {isEditor && isSelectionMode && (
-                        <label className="absolute top-2 left-2 z-10 flex items-center justify-center w-5 h-5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f1f1f] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleFileSelection(item.id, e.target.checked);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-3.5 w-3.5"
-                          />
-                        </label>
-                      )}
-                      <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
-                        {renderIcon(item, false)}
-                      </div>
-                      <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
-                        {item.name}
-                      </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => openMoveModal(Array.from(selectedFileIds))}
+                                disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
+                                className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                            >
+                                {isBatchMoving ? (t('moving')) : (t('move') || 'Move')}
+                            </button>
+                            <LoadingButton
+                                onClick={handleBatchDelete}
+                                isLoading={isBatchDeleting}
+                                loadingText={t('deleting') || 'Deleting...'}
+                                disabled={isBatchMoving || selectedFileCount === 0}
+                                className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                            >
+                                {t('delete') || 'Delete'}
+                            </LoadingButton>
+                            <button
+                                onClick={clearSelection}
+                                disabled={isBatchMoving || isBatchDeleting}
+                                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+                            >
+                                {t('clear') || 'Clear'}
+                            </button>
+                            <button
+                                onClick={toggleSelectionMode}
+                                disabled={isBatchMoving || isBatchDeleting}
+                                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+                            >
+                                {t('doneSelecting') || 'Done'}
+                            </button>
+                        </div>
                     </div>
-                  );
-                })}
-              </div>
-
-              {items.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                  <p>{searchTerm ? t('noDocumentsFound') : (t('emptyFolder') || "This folder is empty.")}</p>
-                </div>
-              )}
+                )}
             </div>
 
-          </div>
-        )}
-      </div>
-
-      {marqueeSelection && (
-        <div
-          className="absolute z-[250] border border-blue-500 bg-blue-400/15 pointer-events-none"
-          style={{
-            left: Math.min(marqueeSelection.startX, marqueeSelection.currentX) - marqueeSelection.containerOffsetX,
-            top: Math.min(marqueeSelection.startY, marqueeSelection.currentY) - marqueeSelection.containerOffsetY,
-            width: Math.abs(marqueeSelection.currentX - marqueeSelection.startX),
-            height: Math.abs(marqueeSelection.currentY - marqueeSelection.startY),
-          }}
-        />
-      )}
-
-      {contextMenu.visible && (
-        <div
-          ref={contextMenuRef}
-          className="absolute z-[220] bg-white dark:bg-[#333] border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl w-48 py-1"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px`, position: 'fixed' }}
-        >
-          {contextMenu.item ? (
-            <div 
-              className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider break-all"
-              title={contextMenu.item.name}
+            <div
+                ref={gridAreaRef}
+                className="flex-1 overflow-y-auto p-6 relative"
+                onContextMenu={handleBackgroundContextMenu}
+                onMouseDown={startMarqueeSelection}
+                onDragEnter={handleGridDragEnter}
+                onDragOver={handleGridDragOver}
+                onDragLeave={handleGridDragLeave}
+                onDrop={handleGridDrop}
             >
-              {contextMenu.item.name}
-            </div>
-          ) : (
-            <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              {t('folderActions') || 'Folder Actions'}
-            </div>
-          )}
-
-          {!contextMenu.item && (
-            <>
-              <button
-                onClick={() => handleContextMenuAction('upload')}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-              >
-                <Image src="/upload.svg" width={16} height={16} className="dark:invert" alt="" />
-                {t('upload')}
-              </button>
-              <button
-                onClick={() => handleContextMenuAction('createFolder')}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-              >
-                <Image src="/icons/plus.svg" width={16} height={16} className="dark:invert" alt="" />
-                {t('createFolder')}
-              </button>
-            </>
-          )}
-
-          {contextMenu.item?.type === 'folder' && (
-            <button
-              onClick={() => handleContextMenuAction('createChild')}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-            >
-              <Image src="/icons/plus.svg" width={16} height={16} className="dark:invert" alt="" />
-              {t('createSubfolder') || 'Create Subfolder'}
-            </button>
-          )}
-
-          {contextMenu.item?.type === 'folder' && (
-            <button
-              onClick={() => handleContextMenuAction('downloadZip')}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-            >
-              <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
-              <span className="flex flex-col">
-                <span>{t('downloadAsZip') || 'Download as ZIP'}</span>
-              </span>
-            </button>
-          )}
-
-          {contextMenu.item && (
-            <>
-              {contextMenu.item.type === 'file' && (
-                <button
-                  onClick={() => handleContextMenuAction(selectedFileIds.has(contextMenu.item!.id) ? 'deselect' : 'select')}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-                >
-                  <Image src="/icons/select.svg" width={16} height={16} className="dark:invert" alt="" />
-                  {selectedFileIds.has(contextMenu.item.id)
-                    ? (t('deselect') || 'Deselect')
-                    : (
-                      <span className="flex w-full items-center justify-between gap-3">
-                        <span>{t('select') || 'Select'}</span>
-                        <span className="text-gray-400 dark:text-gray-500">Ctrl + Click</span>
-                      </span>
-                    )}
-                </button>
-              )}
-
-              {isSelectionMode && contextMenu.item.type === 'file' && selectedFileCount > 0 && selectedFileIds.has(contextMenu.item.id) && (
-                <>
-                  <button
-                    onClick={() => handleContextMenuAction('moveSelected')}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-                  >
-                    <Image src="/icons/move-selected.svg" width={16} height={16} className="dark:invert" alt="" />
-                    {t('moveSelected') || 'Move selected'}
-                  </button>
-                  <button
-                    onClick={() => handleContextMenuAction('deleteSelected')}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
-                  >
-                    <Image src="/icons/trash.svg" width={16} height={16} className="dark:invert" alt="" />
-                    {t('deleteSelected') || 'Delete selected'}
-                  </button>
-                  <div className="mx-2 my-1 border-t border-gray-100 dark:border-gray-700" />
-                </>
-              )}
-
-              {contextMenu.item.type !== 'folder' && (
-                <>
-                  <button
-                    onClick={() => handleContextMenuAction('moveFile')}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-                  >
-                    <Image src="/icons/move-selected.svg" width={16} height={16} className="dark:invert" alt="" />
-                    {t('moveFile') || 'Move file'}
-                  </button>
-                  <button
-                    onClick={() => handleContextMenuAction('download')}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-                  >
-                    <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
-                    {t('download') || 'Download'}
-                  </button>
-                </>
-              )}
-
-              <button
-                onClick={() => handleContextMenuAction('share')}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-              >
-                <Image src="/icons/share.svg" width={16} height={16} className="dark:invert" alt="" />
-                {t('share') || 'Share'}
-              </button>
-
-              <button
-                onClick={() => handleContextMenuAction('rename')}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-              >
-                <Image src="/icons/rename.svg" width={16} height={16} className="dark:invert" alt="" />
-                {t('rename') || 'Rename'}
-              </button>
-
-              <button
-                onClick={() => handleContextMenuAction('security')}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-              >
-                <Image src="/icons/lock.svg" width={16} height={16} className="dark:invert" alt="" />
-                {t('permissions') || 'Permissions'}
-              </button>
-
-              <button
-                onClick={() => handleContextMenuAction('delete')}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
-              >
-                <Image src="/icons/trash.svg" width={16} height={16} className="dark:invert" alt="" />
-                {t('delete') || 'Delete'}
-              </button>
-
-              {hasAdminAccess && (
-                <button
-                  onClick={() => handleContextMenuAction('history')}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
-                >
-                  <Image src="/admin-icon.svg" width={16} height={16} className="dark:invert opacity-70" alt="" />
-                  {t('history') || 'History'}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {isHistoryModalOpen && selectedHistoryItem && (
-        <HistoryModal
-          isOpen={isHistoryModalOpen}
-          onClose={() => setIsHistoryModalOpen(false)}
-          docId={selectedHistoryItem.id}
-          itemName={selectedHistoryItem.name}
-          t={t}
-        />
-      )}
-
-      {showCreateModal && (
-        <CreateFolderModal
-          onClose={() => setShowCreateModal(false)}
-          apiURL={apiURL}
-          t={t}
-          initialParentId={currentFolderId || ''}
-          onFolderCreated={() => refreshCurrentView(true)}
-        />
-      )}
-
-      {isSecurityModalOpen && selectedSecurityItem && (
-        <SecurityModal
-          isOpen={isSecurityModalOpen}
-          onClose={() => setIsSecurityModalOpen(false)}
-          docId={selectedSecurityItem.id}
-          library="RTA_MAIN"
-          itemName={selectedSecurityItem.name}
-          t={t}
-        />
-      )}
-
-      {isShareModalOpen && itemToShare && (
-        <ShareModal
-          isOpen={isShareModalOpen}
-          onClose={() => {
-            setIsShareModalOpen(false);
-            setItemToShare(null);
-          }}
-          documentId={itemToShare.type !== 'folder' ? itemToShare.id : undefined}
-          folderId={itemToShare.type === 'folder' ? itemToShare.id : undefined}
-          documentName={itemToShare.name}
-          itemType={itemToShare.type === 'folder' ? 'folder' : 'file'}
-          t={t}
-        />
-      )}
-
-      {confirmModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setConfirmModalOpen(false);
-              setItemToDelete(null);
-            }
-          }}
-        >
-          <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-600">
-            <div className={`flex items-center gap-3 mb-4 ${deleteMode === 'force' ? 'text-amber-500' : 'text-red-500'}`}>
-              <Image src={deleteMode === 'force' ? '/icons/warning.svg' : '/icons/trash.svg'} alt="" width={32} height={32} className="dark:invert" />
-              <h3 className="text-lg font-bold dark:text-white">
-                {deleteMode === 'force' ? (t('warning') || 'Warning') : (t('delete') || 'Delete Item')}
-              </h3>
-            </div>
-
-            <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm whitespace-pre-wrap">
-              {confirmMessage}
-              {deleteMode === 'force' && (
-                <>
-                  <br /><br />
-                  {t('confirmForceDelete') || "Do you want to delete it anyway? This will remove all contents and references."}
-                </>
-              )}
-            </p>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setConfirmModalOpen(false);
-                  setItemToDelete(null);
-                }}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                {t('cancel') || 'Cancel'}
-              </button>
-              <LoadingButton
-                onClick={processDelete}
-                isLoading={isLoading}
-                className={`px-4 py-2 text-sm text-white rounded transition-colors shadow-sm ${deleteMode === 'force' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
-              >
-                {deleteMode === 'force' ? (t('yesDelete') || 'Yes, Delete') : (t('delete') || 'Delete')}
-              </LoadingButton>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isMoveModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4 animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              closeMoveModal();
-            }
-          }}
-        >
-          <div className="bg-white dark:bg-[#333] rounded-lg p-5 max-w-xl w-full shadow-xl border border-gray-200 dark:border-gray-600 max-h-[80vh] flex flex-col">
-            <h3 className="text-lg font-bold mb-3 dark:text-white">{t('moveToFolder') || 'Move to folder'}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              {t('doubleClickFolderHint')}
-            </p>
-
-            <div className="flex items-center flex-wrap gap-2 text-sm mb-3">
-              {moveBreadcrumbs.map((crumb, index) => (
-                <React.Fragment key={`${crumb.id || 'root'}-${index}`}>
-                  {index > 0 && <span className="text-gray-400">/</span>}
-                  <button
-                    onClick={() => handleMoveBreadcrumbClick(index)}
-                    className={`hover:underline ${index === moveBreadcrumbs.length - 1 ? 'font-semibold text-gray-900 dark:text-white' : 'text-blue-600 dark:text-blue-400'}`}
-                  >
-                    {crumb.name}
-                  </button>
-                </React.Fragment>
-              ))}
-              {isMoveFoldersRefreshing && (
-                <div className="ml-auto flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <Spinner size="sm" />
-                  <span>{t('loadingFolders') || 'Loading subfolders...'}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex-1 overflow-y-auto min-h-[220px]">
-              <button
-                onClick={() => setTargetMoveFolderId(moveCurrentFolderId)}
-                className={`w-full text-left px-3 py-2 rounded-md mb-2 border ${targetMoveFolderId === moveCurrentFolderId ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              >
-                <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                  {t('selectCurrentFolder') || 'Select this folder'}
-                </div>
-              </button>
-
-              {isMoveFoldersInitialLoading ? (
-                <div className="py-6 flex items-center justify-center">
-                  <Spinner size="md" label={t('loadingFolders') || 'Loading subfolders...'} />
-                </div>
-              ) : moveFolderItems.length === 0 ? (
-                <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">{t('noSubfolders') || 'No subfolders here'}</div>
-              ) : (
-                <div className="space-y-1">
-                  {moveFolderItems.map((folder) => (
-                    <div key={folder.id} className="flex items-center gap-2">
-                      <button
-                        onClick={() => setTargetMoveFolderId(folder.id)}
-                        onDoubleClick={() => handleMoveModalNavigate(folder)}
-                        className={`flex-1 text-left px-3 py-2 rounded-md border ${targetMoveFolderId === folder.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                      >
-                        <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{folder.name}</div>
-                      </button>
-                      <button
-                        onClick={() => handleMoveModalNavigate(folder)}
-                        className="px-2 py-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        title={t('openFolder') || 'Open folder'}
-                      >
-                        <Image src="/icons/chevron-right.svg" width={16} height={16} className="dark:invert" alt="" />
-                      </button>
+                {/* OS drag-and-drop overlay */}
+                {isExternalDragOver && isEditor && (
+                    <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center pointer-events-none rounded-xl border-4 border-dashed border-blue-500 bg-blue-500/10 backdrop-blur-[2px] transition-all">
+                        <div className="flex flex-col items-center gap-3 bg-white/90 dark:bg-[#1e1e1e]/90 rounded-2xl px-10 py-8 shadow-2xl border border-blue-200 dark:border-blue-800">
+                            <div className="text-blue-500 animate-bounce">
+                                <Image src="/upload.svg" alt="" width={48} height={48} className="invert dark:invert-0" />
+                            </div>
+                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">Drop to Upload</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                                Files &amp; folders will be added to<br />
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{getCurrentFolderName()}</span>
+                            </p>
+                        </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                )}
+                {isLoading ? (
+                    <div className="py-8">
+                        <Spinner size="lg" center label={t('loading') || 'Loading...'} />
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-8">
+
+                        {standardItems.length > 0 && !searchTerm && (
+                            <div className="animate-fade-in">
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">
+                                    {t('libraries') || 'Quick Access'}
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    {standardItems.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            onClick={() => handleNavigate(item)}
+                                            className={`group flex items-center p-4 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${getStandardFolderColor(item.id)}`}
+                                        >
+                                            <div className="flex-shrink-0 p-2 bg-white dark:bg-[#333] rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                                                {renderIcon(item, true)}
+                                            </div>
+                                            <div className="ml-4 flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{t(item.id)}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.count !== undefined ? `${item.count} ${t('items')}` : ''}</p>
+                                            </div>
+                                            <div className="text-gray-300 dark:text-gray-600">
+                                                <Image src="/icons/chevron-right.svg" alt="" width={20} height={20} className="dark:invert" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex-1">
+                            {(standardItems.length > 0 && userItems.length > 0 && !searchTerm) && (
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
+                            )}
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                {userItems.map((item) => {
+                                    const isFile = item.type === 'file';
+                                    const isSelected = selectedFileIds.has(item.id);
+                                    const isDragOverTarget = dragOverFolderId === item.id;
+
+                                    if (!isFile && item.type === 'folder') {
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                onClick={() => handleNavigate(item)}
+                                                onContextMenu={(e) => handleRightClick(e, item)}
+                                                onDragOver={(e) => {
+                                                    if (!isEditor) return;
+                                                    e.preventDefault();
+                                                    setDragOverFolderId(item.id);
+                                                }}
+                                                onDragLeave={() => {
+                                                    if (dragOverFolderId === item.id) {
+                                                        setDragOverFolderId(null);
+                                                    }
+                                                }}
+                                                onDrop={async (e) => {
+                                                    if (!isEditor) return;
+                                                    e.preventDefault();
+                                                    e.stopPropagation(); // prevent grid-level OS-drop handler firing
+                                                    setDragOverFolderId(null);
+
+                                                    // Only handle internal file drags (not OS files)
+                                                    let draggedIds: string[] = [];
+                                                    try {
+                                                        const raw = e.dataTransfer.getData('application/json');
+                                                        if (raw) {
+                                                            const parsed = JSON.parse(raw);
+                                                            if (Array.isArray(parsed?.fileIds)) {
+                                                                draggedIds = parsed.fileIds;
+                                                            }
+                                                        }
+                                                    } catch {
+                                                        draggedIds = [];
+                                                    }
+
+                                                    const idsToMove = draggedIds.length > 0 ? draggedIds : Array.from(selectedFileIds);
+                                                    if (idsToMove.length === 0) return;
+
+                                                    // Stage the move — show confirmation dialog instead of moving immediately
+                                                    setPendingMoveConfirm({ fileIds: idsToMove, destination: item });
+                                                }}
+                                                className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:shadow-sm dark:hover:bg-[#2c2c2c] ${isDragOverTarget ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-500' : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'}`}
+                                            >
+                                                <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200 text-gray-400 group-hover:text-blue-500">
+                                                    {renderIcon(item, false)}
+                                                </div>
+                                                <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
+                                                    {item.name}
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div
+                                            ref={(el) => {
+                                                fileTileRefs.current[item.id] = el;
+                                            }}
+                                            data-select-item="true"
+                                            key={item.id}
+                                            onClick={(e) => {
+                                                if (suppressItemClickRef.current) {
+                                                    suppressItemClickRef.current = false;
+                                                    return;
+                                                }
+
+                                                if ((e.ctrlKey || e.metaKey) && isEditor) {
+                                                    e.preventDefault();
+                                                    if (!isSelectionMode) setIsSelectionMode(true);
+                                                    toggleFileSelection(item.id);
+                                                    return;
+                                                }
+                                                handleNavigate(item);
+                                            }}
+                                            onContextMenu={(e) => handleRightClick(e, item)}
+                                            draggable={isEditor}
+                                            onDragStart={(e) => {
+                                                const payloadIds = isSelectionMode && isSelected && selectedFileCount > 1
+                                                    ? selectedFiles.map((file) => file.id)
+                                                    : [item.id];
+                                                e.dataTransfer.setData('application/json', JSON.stringify({ fileIds: payloadIds }));
+                                                e.dataTransfer.effectAllowed = 'move';
+                                            }}
+                                            onDragEnd={() => setDragOverFolderId(null)}
+                                            className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700 ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent'}`}
+                                        >
+                                            {isEditor && isSelectionMode && (
+                                                <label className="absolute top-2 left-2 z-10 flex items-center justify-center w-5 h-5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f1f1f] cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleFileSelection(item.id, e.target.checked);
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="h-3.5 w-3.5"
+                                                    />
+                                                </label>
+                                            )}
+                                            <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
+                                                {renderIcon(item, false)}
+                                            </div>
+                                            <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
+                                                {item.name}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {items.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                                    <p>{searchTerm ? t('noDocumentsFound') : (t('emptyFolder') || "This folder is empty.")}</p>
+                                </div>
+                            )}
+                        </div>
+
+                    </div>
+                )}
             </div>
 
-            <div className="mt-4 flex justify-end gap-3">
-              <button
-                onClick={closeMoveModal}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                {t('cancel') || 'Cancel'}
-              </button>
-              <LoadingButton
-                onClick={async () => {
-                  await moveFilesToFolder(moveItemIds, targetMoveFolderId);
-                  closeMoveModal();
-                }}
-                isLoading={isBatchMoving}
-                loadingText={t('moving') || 'Moving...'}
-                disabled={moveItemIds.length === 0}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
-              >
-                {t('moveHere') || 'Move here'}
-              </LoadingButton>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rename Modal */}
-      {isRenameModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsRenameModalOpen(false);
-          }}
-        >
-          <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-600">
-            <h3 className="text-lg font-bold dark:text-white mb-4">{t('rename') || 'Rename'}</h3>
-            <form onSubmit={handleRenameSubmit}>
-              <div className="mb-4">
-                <input
-                  type="text"
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
+            {marqueeSelection && (
+                <div
+                    className="fixed z-[250] border border-blue-500 bg-blue-400/15 pointer-events-none"
+                    style={{
+                        left: Math.min(marqueeSelection.startX, marqueeSelection.currentX) / marqueeSelection.zoomFactor,
+                        top: Math.min(marqueeSelection.startY, marqueeSelection.currentY) / marqueeSelection.zoomFactor,
+                        width: Math.abs(marqueeSelection.currentX - marqueeSelection.startX) / marqueeSelection.zoomFactor,
+                        height: Math.abs(marqueeSelection.currentY - marqueeSelection.startY) / marqueeSelection.zoomFactor,
+                    }}
                 />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsRenameModalOpen(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+            )}
+
+            {contextMenu.visible && (
+                <div
+                    ref={contextMenuRef}
+                    className="absolute z-[220] bg-white dark:bg-[#333] border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl w-48 py-1"
+                    style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px`, position: 'fixed' }}
                 >
-                  {t('cancel') || 'Cancel'}
-                </button>
-                <LoadingButton
-                  type="submit"
-                  isLoading={isRenaming}
-                  loadingText={t('saving')}
-                  disabled={!renameValue.trim()}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                    {contextMenu.item ? (
+                        <div
+                            className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider break-all"
+                            title={contextMenu.item.name}
+                        >
+                            {contextMenu.item.name}
+                        </div>
+                    ) : (
+                        <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            {t('folderActions') || 'Folder Actions'}
+                        </div>
+                    )}
+
+                    {!contextMenu.item && (
+                        <>
+                            <button
+                                onClick={() => handleContextMenuAction('upload')}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                            >
+                                <Image src="/upload.svg" width={16} height={16} className="invert dark:invert-0" alt="" />
+                                {t('upload')}
+                            </button>
+                            <button
+                                onClick={() => handleContextMenuAction('createFolder')}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                            >
+                                <Image src="/icons/plus.svg" width={16} height={16} className="dark:invert" alt="" />
+                                {t('createFolder')}
+                            </button>
+                        </>
+                    )}
+
+                    {contextMenu.item?.type === 'folder' && (
+                        <button
+                            onClick={() => handleContextMenuAction('createChild')}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                        >
+                            <Image src="/icons/plus.svg" width={16} height={16} className="dark:invert" alt="" />
+                            {t('createSubfolder') || 'Create Subfolder'}
+                        </button>
+                    )}
+
+                    {contextMenu.item?.type === 'folder' && (
+                        <button
+                            onClick={() => handleContextMenuAction('downloadZip')}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                        >
+                            <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
+                            <span className="flex flex-col">
+                                <span>{t('downloadAsZip') || 'Download as ZIP'}</span>
+                            </span>
+                        </button>
+                    )}
+
+                    {contextMenu.item && (
+                        <>
+                            {contextMenu.item.type === 'file' && (
+                                <button
+                                    onClick={() => handleContextMenuAction(selectedFileIds.has(contextMenu.item!.id) ? 'deselect' : 'select')}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                                >
+                                    <Image src="/icons/select.svg" width={16} height={16} className="dark:invert" alt="" />
+                                    {selectedFileIds.has(contextMenu.item.id)
+                                        ? (t('deselect') || 'Deselect')
+                                        : (
+                                            <span className="flex w-full items-center justify-between gap-3">
+                                                <span>{t('select') || 'Select'}</span>
+                                                <span className="text-gray-400 dark:text-gray-500">Ctrl + Click</span>
+                                            </span>
+                                        )}
+                                </button>
+                            )}
+
+                            {isSelectionMode && contextMenu.item.type === 'file' && selectedFileCount > 0 && selectedFileIds.has(contextMenu.item.id) && (
+                                <>
+                                    <button
+                                        onClick={() => handleContextMenuAction('moveSelected')}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                                    >
+                                        <Image src="/icons/move-selected.svg" width={16} height={16} className="dark:invert" alt="" />
+                                        {t('moveSelected') || 'Move selected'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleContextMenuAction('deleteSelected')}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
+                                    >
+                                        <Image src="/icons/trash.svg" width={16} height={16} className="dark:invert" alt="" />
+                                        {t('deleteSelected') || 'Delete selected'}
+                                    </button>
+                                    <div className="mx-2 my-1 border-t border-gray-100 dark:border-gray-700" />
+                                </>
+                            )}
+
+                            {contextMenu.item.type !== 'folder' && (
+                                <>
+                                    <button
+                                        onClick={() => handleContextMenuAction('moveFile')}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                                    >
+                                        <Image src="/icons/move-selected.svg" width={16} height={16} className="dark:invert" alt="" />
+                                        {t('moveFile') || 'Move file'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleContextMenuAction('download')}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                                    >
+                                        <Image src="/download.svg" width={16} height={16} className="dark:invert" alt="" />
+                                        {t('download') || 'Download'}
+                                    </button>
+                                </>
+                            )}
+
+                            <button
+                                onClick={() => handleContextMenuAction('share')}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                            >
+                                <Image src="/icons/share.svg" width={16} height={16} className="dark:invert" alt="" />
+                                {t('share') || 'Share'}
+                            </button>
+
+                            <button
+                                onClick={() => handleContextMenuAction('rename')}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                            >
+                                <Image src="/icons/rename.svg" width={16} height={16} className="dark:invert" alt="" />
+                                {t('rename') || 'Rename'}
+                            </button>
+
+                            <button
+                                onClick={() => handleContextMenuAction('security')}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                            >
+                                <Image src="/icons/lock.svg" width={16} height={16} className="dark:invert" alt="" />
+                                {t('permissions') || 'Permissions'}
+                            </button>
+
+                            <button
+                                onClick={() => handleContextMenuAction('delete')}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
+                            >
+                                <Image src="/icons/trash.svg" width={16} height={16} className="dark:invert" alt="" />
+                                {t('delete') || 'Delete'}
+                            </button>
+
+                            {hasAdminAccess && (
+                                <button
+                                    onClick={() => handleContextMenuAction('history')}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2"
+                                >
+                                    <Image src="/admin-icon.svg" width={16} height={16} className="dark:invert opacity-70" alt="" />
+                                    {t('history') || 'History'}
+                                </button>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            {isHistoryModalOpen && selectedHistoryItem && (
+                <HistoryModal
+                    isOpen={isHistoryModalOpen}
+                    onClose={() => setIsHistoryModalOpen(false)}
+                    docId={selectedHistoryItem.id}
+                    itemName={selectedHistoryItem.name}
+                    t={t}
+                />
+            )}
+
+            {showCreateModal && (
+                <CreateFolderModal
+                    onClose={() => setShowCreateModal(false)}
+                    apiURL={apiURL}
+                    t={t}
+                    initialParentId={currentFolderId || ''}
+                    onFolderCreated={() => refreshCurrentView(true)}
+                />
+            )}
+
+            {isSecurityModalOpen && selectedSecurityItem && (
+                <SecurityModal
+                    isOpen={isSecurityModalOpen}
+                    onClose={() => setIsSecurityModalOpen(false)}
+                    docId={selectedSecurityItem.id}
+                    library="RTA_MAIN"
+                    itemName={selectedSecurityItem.name}
+                    t={t}
+                />
+            )}
+
+            {isShareModalOpen && itemToShare && (
+                <ShareModal
+                    isOpen={isShareModalOpen}
+                    onClose={() => {
+                        setIsShareModalOpen(false);
+                        setItemToShare(null);
+                    }}
+                    documentId={itemToShare.type !== 'folder' ? itemToShare.id : undefined}
+                    folderId={itemToShare.type === 'folder' ? itemToShare.id : undefined}
+                    documentName={itemToShare.name}
+                    itemType={itemToShare.type === 'folder' ? 'folder' : 'file'}
+                    t={t}
+                />
+            )}
+
+            {confirmModalOpen && (
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setConfirmModalOpen(false);
+                            setItemToDelete(null);
+                        }
+                    }}
                 >
-                  {t('save') || 'Save'}
-                </LoadingButton>
-              </div>
-            </form>
-          </div>
+                    <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-600">
+                        <div className={`flex items-center gap-3 mb-4 ${deleteMode === 'force' ? 'text-amber-500' : 'text-red-500'}`}>
+                            <Image src={deleteMode === 'force' ? '/icons/warning.svg' : '/icons/trash.svg'} alt="" width={32} height={32} className="dark:invert" />
+                            <h3 className="text-lg font-bold dark:text-white">
+                                {deleteMode === 'force' ? (t('warning') || 'Warning') : (t('delete') || 'Delete Item')}
+                            </h3>
+                        </div>
+
+                        <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm whitespace-pre-wrap">
+                            {confirmMessage}
+                            {deleteMode === 'force' && (
+                                <>
+                                    <br /><br />
+                                    {t('confirmForceDelete') || "Do you want to delete it anyway? This will remove all contents and references."}
+                                </>
+                            )}
+                        </p>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => {
+                                    setConfirmModalOpen(false);
+                                    setItemToDelete(null);
+                                }}
+                                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                {t('cancel') || 'Cancel'}
+                            </button>
+                            <LoadingButton
+                                onClick={processDelete}
+                                isLoading={isLoading}
+                                className={`px-4 py-2 text-sm text-white rounded transition-colors shadow-sm ${deleteMode === 'force' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
+                            >
+                                {deleteMode === 'force' ? (t('yesDelete') || 'Yes, Delete') : (t('delete') || 'Delete')}
+                            </LoadingButton>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isMoveModalOpen && (
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4 animate-fade-in"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            closeMoveModal();
+                        }
+                    }}
+                >
+                    <div className="bg-white dark:bg-[#333] rounded-lg p-5 max-w-xl w-full shadow-xl border border-gray-200 dark:border-gray-600 max-h-[80vh] flex flex-col">
+                        <h3 className="text-lg font-bold mb-3 dark:text-white">{t('moveToFolder') || 'Move to folder'}</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                            {t('doubleClickFolderHint')}
+                        </p>
+
+                        <div className="flex items-center flex-wrap gap-2 text-sm mb-3">
+                            {moveBreadcrumbs.map((crumb, index) => (
+                                <React.Fragment key={`${crumb.id || 'root'}-${index}`}>
+                                    {index > 0 && <span className="text-gray-400">/</span>}
+                                    <button
+                                        onClick={() => handleMoveBreadcrumbClick(index)}
+                                        className={`hover:underline ${index === moveBreadcrumbs.length - 1 ? 'font-semibold text-gray-900 dark:text-white' : 'text-blue-600 dark:text-blue-400'}`}
+                                    >
+                                        {crumb.name}
+                                    </button>
+                                </React.Fragment>
+                            ))}
+                            {isMoveFoldersRefreshing && (
+                                <div className="ml-auto flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <Spinner size="sm" />
+                                    <span>{t('loadingFolders') || 'Loading subfolders...'}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex-1 overflow-y-auto min-h-[220px]">
+                            <button
+                                onClick={() => setTargetMoveFolderId(moveCurrentFolderId)}
+                                className={`w-full text-left px-3 py-2 rounded-md mb-2 border ${targetMoveFolderId === moveCurrentFolderId ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                            >
+                                <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                    {t('selectCurrentFolder') || 'Select this folder'}
+                                </div>
+                            </button>
+
+                            {isMoveFoldersInitialLoading ? (
+                                <div className="py-6 flex items-center justify-center">
+                                    <Spinner size="md" label={t('loadingFolders') || 'Loading subfolders...'} />
+                                </div>
+                            ) : moveFolderItems.length === 0 ? (
+                                <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">{t('noSubfolders') || 'No subfolders here'}</div>
+                            ) : (
+                                <div className="space-y-1">
+                                    {moveFolderItems.map((folder) => (
+                                        <div key={folder.id} className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setTargetMoveFolderId(folder.id)}
+                                                onDoubleClick={() => handleMoveModalNavigate(folder)}
+                                                className={`flex-1 text-left px-3 py-2 rounded-md border ${targetMoveFolderId === folder.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                            >
+                                                <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{folder.name}</div>
+                                            </button>
+                                            <button
+                                                onClick={() => handleMoveModalNavigate(folder)}
+                                                className="px-2 py-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                title={t('openFolder') || 'Open folder'}
+                                            >
+                                                <Image src="/icons/chevron-right.svg" width={16} height={16} className="dark:invert" alt="" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-4 flex justify-end gap-3">
+                            <button
+                                onClick={closeMoveModal}
+                                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                {t('cancel') || 'Cancel'}
+                            </button>
+                            <LoadingButton
+                                onClick={async () => {
+                                    await moveFilesToFolder(moveItemIds, targetMoveFolderId);
+                                    closeMoveModal();
+                                }}
+                                isLoading={isBatchMoving}
+                                loadingText={t('moving') || 'Moving...'}
+                                disabled={moveItemIds.length === 0}
+                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
+                            >
+                                {t('moveHere') || 'Move here'}
+                            </LoadingButton>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Drag-and-drop move confirmation dialog */}
+            {pendingMoveConfirm && (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center z-[90] p-4 animate-fade-in"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setPendingMoveConfirm(null);
+                    }}
+                >
+                    <div className="bg-white dark:bg-[#2a2a2a] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-md w-full overflow-hidden">
+                        {/* Header */}
+                        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-700 bg-blue-50 dark:bg-blue-950/40">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/60 flex items-center justify-center">
+                                <Image src="/folder.svg" alt="" width={22} height={22} className="dark:invert" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">{t('moveItemsTitle') || 'Move Items'}</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('confirmBeforeMoving') || 'Confirm before moving'}</p>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-6 py-5">
+                            {/* Count pill */}
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                    {pendingMoveConfirm.fileIds.length} {pendingMoveConfirm.fileIds.length === 1 ? (t('itemWord') || 'item') : (t('itemsWord') || 'items')}
+                                </span>
+                                <svg className="text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                    <polyline points="12 5 19 12 12 19" />
+                                </svg>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                                    <Image src="/folder.svg" alt="" width={12} height={12} className="opacity-70" />
+                                    {pendingMoveConfirm.destination.name}
+                                </span>
+                            </div>
+
+                            {/* Item name previews */}
+                            <div className="bg-gray-50 dark:bg-[#333] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
+                                <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('itemsToMove') || 'Items to move'}</p>
+                                </div>
+                                <div className="divide-y divide-gray-100 dark:divide-gray-700/60 max-h-44 overflow-y-auto">
+                                    {pendingMoveConfirm.fileIds.slice(0, 8).map((id) => {
+                                        const it = items.find((x) => x.id === id);
+                                        return it ? (
+                                            <div key={id} className="flex items-center gap-2.5 px-3 py-2">
+                                                <div className="flex-shrink-0 opacity-60">
+                                                    {renderIcon(it, false)}
+                                                </div>
+                                                <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{it.name}</span>
+                                            </div>
+                                        ) : null;
+                                    })}
+                                    {pendingMoveConfirm.fileIds.length > 8 && (
+                                        <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500 italic">
+                                            + {pendingMoveConfirm.fileIds.length - 8} {t('itemsWord') || 'more items'}…
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {t('confirmMoveItems')
+                                    ?.replace('{count}', String(pendingMoveConfirm.fileIds.length))
+                                    ?.replace('{itemWord}', pendingMoveConfirm.fileIds.length === 1 ? (t('itemWord') || 'item') : (t('itemsWord') || 'items'))
+                                    || `Are you sure you want to move ${pendingMoveConfirm.fileIds.length} ${pendingMoveConfirm.fileIds.length === 1 ? 'item' : 'items'} into`}
+                                {' '}
+                                <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                    &ldquo;{pendingMoveConfirm.destination.name}&rdquo;
+                                </span>?
+                            </p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/60 dark:bg-[#252525]/60">
+                            <button
+                                onClick={() => setPendingMoveConfirm(null)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-[#333] border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-[#3a3a3a] transition-colors"
+                            >
+                                {t('cancel') || 'Cancel'}
+                            </button>
+                            <LoadingButton
+                                onClick={async () => {
+                                    const { fileIds, destination } = pendingMoveConfirm;
+                                    setPendingMoveConfirm(null);
+                                    await moveFilesToFolder(fileIds, destination.id);
+                                }}
+                                isLoading={isBatchMoving}
+                                loadingText={t('moving') || 'Moving…'}
+                                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                    <polyline points="12 5 19 12 12 19" />
+                                </svg>
+                                {t('yesMove') || 'Yes, Move'}
+                            </LoadingButton>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Batch delete confirmation dialog */}
+            {batchDeleteConfirmOpen && (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center z-[90] p-4 animate-fade-in"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setBatchDeleteConfirmOpen(false);
+                    }}
+                >
+                    <div className="bg-white dark:bg-[#2a2a2a] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-md w-full overflow-hidden">
+                        {/* Header */}
+                        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-700 bg-red-50 dark:bg-red-950/40">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/60 flex items-center justify-center">
+                                <Image src="/icons/trash.svg" alt="" width={22} height={22} className="dark:invert" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">{t('deleteItems') || 'Delete Items'}</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('deleteItemsSubtitle') || 'This action cannot be undone'}</p>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-6 py-5">
+                            <div className="flex items-center gap-2 mb-5">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
+                                    <Image src="/icons/trash.svg" alt="" width={12} height={12} className="opacity-70 dark:invert" />
+                                    {selectedFileCount} {selectedFileCount === 1 ? (t('itemWord') || 'item') : (t('itemsWord') || 'items')}
+                                </span>
+                            </div>
+
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {t('confirmDeleteMultipleItems')
+                                    ?.replace('{count}', String(selectedFileCount))
+                                    ?.replace('{itemWord}', selectedFileCount === 1 ? (t('itemWord') || 'item') : (t('itemsWord') || 'items'))
+                                    || `Are you sure you want to delete ${selectedFileCount} selected ${selectedFileCount === 1 ? 'item' : 'items'}? This cannot be undone.`}
+                            </p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/60 dark:bg-[#252525]/60">
+                            <button
+                                onClick={() => setBatchDeleteConfirmOpen(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-[#333] border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-[#3a3a3a] transition-colors"
+                            >
+                                {t('cancel') || 'Cancel'}
+                            </button>
+                            <LoadingButton
+                                onClick={executeBatchDelete}
+                                isLoading={isBatchDeleting}
+                                loadingText={t('deleting') || 'Deleting…'}
+                                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                            >
+                                <Image src="/icons/trash.svg" alt="" width={14} height={14} className="dark:invert" />
+                                {t('yesDelete') || 'Yes, Delete'}
+                            </LoadingButton>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rename Modal */}
+            {isRenameModalOpen && (
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsRenameModalOpen(false);
+                    }}
+                >
+                    <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-600">
+                        <h3 className="text-lg font-bold dark:text-white mb-4">{t('rename') || 'Rename'}</h3>
+                        <form onSubmit={handleRenameSubmit}>
+                            <div className="mb-4">
+                                <input
+                                    type="text"
+                                    value={renameValue}
+                                    onChange={(e) => setRenameValue(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsRenameModalOpen(false)}
+                                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                >
+                                    {t('cancel') || 'Cancel'}
+                                </button>
+                                <LoadingButton
+                                    type="submit"
+                                    isLoading={isRenaming}
+                                    loadingText={t('saving')}
+                                    disabled={!renameValue.trim()}
+                                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                                >
+                                    {t('save') || 'Save'}
+                                </LoadingButton>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 };

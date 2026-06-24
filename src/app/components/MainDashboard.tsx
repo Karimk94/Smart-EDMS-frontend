@@ -125,6 +125,8 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     const [isFolderUploadModalOpen, setIsFolderUploadModalOpen] = useState(false);
     const [uploadParentId, setUploadParentId] = useState<string | null>(null);
     const [uploadParentName, setUploadParentName] = useState<string>('');
+    /** Files pre-seeded from an OS drag-and-drop onto the folder grid */
+    const [uploadInitialFiles, setUploadInitialFiles] = useState<File[] | undefined>(undefined);
     const [isClearCacheModalOpen, setIsClearCacheModalOpen] = useState(false);
     const [folderRefreshTrigger, setFolderRefreshTrigger] = useState(0);
 
@@ -174,12 +176,17 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
         }
     };
 
-    const handleFolderUploadClick = (parentId: string | null, parentName: string) => {
-        setUploadParentId(parentId); setUploadParentName(parentName); setIsFolderUploadModalOpen(true);
+    /** Opens the folder upload modal. Accepts optional OS-dropped files to pre-seed the queue. */
+    const handleFolderUploadClick = (parentId: string | null, parentName: string, files?: File[]) => {
+        setUploadParentId(parentId);
+        setUploadParentName(parentName);
+        setUploadInitialFiles(files);
+        setIsFolderUploadModalOpen(true);
     };
 
     const handleFolderUploadComplete = () => {
         setIsFolderUploadModalOpen(false);
+        setUploadInitialFiles(undefined);
         setFolderRefreshTrigger(prev => prev + 1);
         queryClient.invalidateQueries({ queryKey: ['folders'] });
     };
@@ -406,8 +413,14 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
                 {isFolderUploadModalOpen && isSectionWritable('folders') && (
                     <FolderUploadModal
-                        onClose={() => setIsFolderUploadModalOpen(false)} apiURL={API_PROXY_URL} theme={theme}
-                        parentId={uploadParentId} parentName={uploadParentName} onUploadComplete={handleFolderUploadComplete} t={t}
+                        onClose={() => { setIsFolderUploadModalOpen(false); setUploadInitialFiles(undefined); }}
+                        apiURL={API_PROXY_URL}
+                        theme={theme}
+                        parentId={uploadParentId}
+                        parentName={uploadParentName}
+                        onUploadComplete={handleFolderUploadComplete}
+                        t={t}
+                        initialFiles={uploadInitialFiles}
                     />
                 )}
 

@@ -8,6 +8,7 @@ import QuotaPieChart from "../components/QuotaPieChart";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { useToast } from "../context/ToastContext";
 import EdmsUsersTab from "./components/EdmsUsersTab";
+import ProfilesTab from "./components/ProfilesTab";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -138,7 +139,7 @@ export default function AdminPage() {
     const [retryingDocnumber, setRetryingDocnumber] = useState<number | null>(null);
     const [expandedErrorRows, setExpandedErrorRows] = useState<Record<number, boolean>>({});
     const [queueViewFilter, setQueueViewFilter] = useState<'failed' | 'in_progress' | 'queued'>('failed');
-    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users'>('users');
+    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles'>('users');
 
     const router = useRouter();
     const { showToast } = useToast();
@@ -414,7 +415,16 @@ export default function AdminPage() {
                     >
                         EDMS Users
                     </button>
+                    <button
+                        onClick={() => setActiveAdminTab('profiles')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'profiles' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        {t('adminProfiles')}
+                    </button>
                 </div>
+
+                {/* Profiles Tab */}
+                {activeAdminTab === 'profiles' && <ProfilesTab />}
 
                 {/* EDMS Users Management */}
                 {activeAdminTab === 'edms_users' && <EdmsUsersTab />}

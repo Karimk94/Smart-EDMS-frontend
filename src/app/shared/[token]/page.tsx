@@ -209,7 +209,7 @@ export default function SharedDocumentPage() {
     setMounted(true);
     const storedLang = (localStorage.getItem('lang') as 'en' | 'ar') || 'en';
     const storedTheme = (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
-    
+
     setLang(storedLang);
     setTheme(storedTheme);
 
@@ -283,7 +283,7 @@ export default function SharedDocumentPage() {
             {t('sharedFolder') || 'Shared Access Workspace'}
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Secure files and folders shared through Smart EDMS.
+            {t('secureFilesFoldersSharedThroughSmartEdms')}
           </p>
         </div>
       </div>
@@ -1585,139 +1585,139 @@ export default function SharedDocumentPage() {
             {renderSmartEdmsBrand()}
             <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
 
-            <div className="flex justify-center mb-6">
-              <Image
-                src="/logo.png"
-                alt="Smart EDMS"
-                width={80}
-                height={80}
-                className="h-20 w-auto object-contain"
-              />
-            </div>
-
-            <h2 className="text-2xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-              {shareInfo?.share_type === 'folder'
-                ? (t('SecureFolderAccess') || 'Secure Folder Access')
-                : t('SecureDocAccess')
-              }
-            </h2>
-
-            {/* Share Type Indicator */}
-            {shareInfo?.share_type === 'folder' && (
-              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
-                <div className="flex items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300">
-                  <Image src="/folder.svg" alt="" width={20} height={20} className="w-5 h-5" />
-                  <span className="font-medium text-sm">{t('sharedFolder') || 'Shared Folder'}</span>
-                </div>
+              <div className="flex justify-center mb-6">
+                <Image
+                  src="/logo.png"
+                  alt="Smart EDMS"
+                  width={80}
+                  height={80}
+                  className="h-20 w-auto object-contain"
+                />
               </div>
-            )}
 
-            {/* Restricted Access Notice */}
-            {shareInfo?.is_restricted && (
-              <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Image src="/icons/lock.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
-                  <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
-                    {t('restrictedLink') || 'Restricted Access'}
-                  </span>
+              <h2 className="text-2xl font-bold text-center mb-4 text-gray-900 dark:text-white">
+                {shareInfo?.share_type === 'folder'
+                  ? (t('SecureFolderAccess') || 'Secure Folder Access')
+                  : t('SecureDocAccess')
+                }
+              </h2>
+
+              {/* Share Type Indicator */}
+              {shareInfo?.share_type === 'folder' && (
+                <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
+                  <div className="flex items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300">
+                    <Image src="/folder.svg" alt="" width={20} height={20} className="w-5 h-5" />
+                    <span className="font-medium text-sm">{t('sharedFolder') || 'Shared Folder'}</span>
+                  </div>
                 </div>
-                <p className="text-sm text-orange-600 dark:text-orange-400">
-                  {t('restrictedLinkDesc') || 'This link can only be accessed by:'} <strong>{shareInfo.target_email_hint}</strong>
-                </p>
-              </div>
-            )}
-
-            <p className="text-center text-gray-600 dark:text-gray-300 mb-8">
-              {step === 'otp_input'
-                ? `${t('OtpSentMessage')} ${email}`
-                : t('VerifyIdentityMessage')}
-            </p>
-
-            <div className="space-y-4">
-
-              {/* Email Input Step */}
-              {step === 'email_input' && (
-                <form onSubmit={handleSendOtp} className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {t('OrgEmail')}
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="name@rta.ae"
-                    className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isAuthLoading}
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
-                  </p>
-                  <button
-                    type="submit"
-                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
-                    disabled={isAuthLoading}
-                  >
-                    {isAuthLoading ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    ) : (
-                      t('SendVerificationCode')
-                    )}
-                  </button>
-                </form>
               )}
 
-              {/* OTP Input Step */}
-              {step === 'otp_input' && (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {t('EnterOtp')}
+              {/* Restricted Access Notice */}
+              {shareInfo?.is_restricted && (
+                <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Image src="/icons/lock.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
+                    <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
+                      {t('restrictedLink') || 'Restricted Access'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-orange-600 dark:text-orange-400">
+                    {t('restrictedLinkDesc') || 'This link can only be accessed by:'} <strong>{shareInfo.target_email_hint}</strong>
+                  </p>
+                </div>
+              )}
+
+              <p className="text-center text-gray-600 dark:text-gray-300 mb-8">
+                {step === 'otp_input'
+                  ? `${t('OtpSentMessage')} ${email}`
+                  : t('VerifyIdentityMessage')}
+              </p>
+
+              <div className="space-y-4">
+
+                {/* Email Input Step */}
+                {step === 'email_input' && (
+                  <form onSubmit={handleSendOtp} className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {t('OrgEmail')}
                     </label>
                     <input
-                      type="text"
+                      type="email"
                       required
-                      placeholder="123456"
-                      maxLength={6}
-                      className="w-full px-4 py-3 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none tracking-[0.5em] text-center text-xl font-mono"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      placeholder="name@rta.ae"
+                      className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       disabled={isAuthLoading}
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('rtaEmailOnly') || 'Only @rta.ae emails are allowed'}
+                    </p>
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
+                      disabled={isAuthLoading}
+                    >
+                      {isAuthLoading ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      ) : (
+                        t('SendVerificationCode')
+                      )}
+                    </button>
+                  </form>
+                )}
+
+                {/* OTP Input Step */}
+                {step === 'otp_input' && (
+                  <form onSubmit={handleVerifyOtp} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {t('EnterOtp')}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="123456"
+                        maxLength={6}
+                        className="w-full px-4 py-3 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none tracking-[0.5em] text-center text-xl font-mono"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                        disabled={isAuthLoading}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
+                      disabled={isAuthLoading}
+                    >
+                      {isAuthLoading ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      ) : (
+                        t('VerifyAccess')
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep('email_input');
+                        setErrorMessage(null);
+                        setOtp('');
+                      }}
+                      className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mt-2"
+                      disabled={isAuthLoading}
+                    >
+                      {t('ChangeEmail')}
+                    </button>
+                  </form>
+                )}
+
+                {errorMessage && (
+                  <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm text-center animate-pulse">
+                    {errorMessage}
                   </div>
-                  <button
-                    type="submit"
-                    className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
-                    disabled={isAuthLoading}
-                  >
-                    {isAuthLoading ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    ) : (
-                      t('VerifyAccess')
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStep('email_input');
-                      setErrorMessage(null);
-                      setOtp('');
-                    }}
-                    className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mt-2"
-                    disabled={isAuthLoading}
-                  >
-                    {t('ChangeEmail')}
-                  </button>
-                </form>
-              )}
-
-              {errorMessage && (
-                <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm text-center animate-pulse">
-                  {errorMessage}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

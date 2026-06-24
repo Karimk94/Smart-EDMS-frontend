@@ -98,6 +98,31 @@ export default function EdmsUsersTab() {
     // Export State
     const [isExporting, setIsExporting] = useState(false);
 
+    const clearServerCacheMutation = useMutation({
+        mutationFn: async () => {
+            const response = await fetch('/api/admin/edocs/clear-cache', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.detail || data.message || 'Failed to start server cache refresh');
+            }
+
+            return data;
+        },
+        onSuccess: (data) => {
+            const cacheRoot = data.server_cache_root ? ` (${data.server_cache_root})` : '';
+            showToast(`Server eDOCS cache refresh started${cacheRoot}`, 'success');
+        },
+        onError: (err: any) => {
+            showToast(err.message || 'Failed to start server cache refresh', 'error');
+        },
+    });
+
     // Export to Excel function (using optimized backend endpoint)
     const handleExportToExcel = async () => {
         setIsExporting(true);
@@ -488,9 +513,25 @@ export default function EdmsUsersTab() {
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden p-6">
-            <div className="mb-8">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">EDMS Users Management</h2>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">Manage base EDMS accounts and assign users from HR directory.</p>
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">EDMS Users Management</h2>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">Manage base EDMS accounts and assign users from HR directory.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => clearServerCacheMutation.mutate()}
+                    disabled={clearServerCacheMutation.isPending}
+                    title="Refresh server eDOCS cache"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    {clearServerCacheMutation.isPending ? (
+                        <Spinner size="sm" />
+                    ) : (
+                        <Image src="/icons/refresh.svg" alt="" width={16} height={16} className="h-4 w-4 invert" />
+                    )}
+                    <span>{clearServerCacheMutation.isPending ? 'Refreshing...' : 'Refresh Cache'}</span>
+                </button>
             </div>
 
             <div className="mb-6">

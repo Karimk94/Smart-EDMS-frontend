@@ -318,30 +318,33 @@ export function useAdmin() {
         enabled: enabled && !!docnumber,
     });
 
-    const useAdminProfiles = (enabled: boolean = true) => useQuery({
-        queryKey: ['adminProfiles'],
+    const useAdminProfiles = (search: string = '', enabled: boolean = true) => useQuery({
+        queryKey: ['adminProfiles', search],
         queryFn: async (): Promise<AdminProfile[]> => {
-            const data = await apiClient.get('/api/admin/profiles');
+            const params = search.trim() ? `?search=${encodeURIComponent(search)}` : '';
+            const data = await apiClient.get(`/api/admin/profiles${params}`);
             return data.profiles;
         },
         enabled,
     });
 
-    const useProfileGroups = (profileId: number | null, enabled: boolean = true) => useQuery({
-        queryKey: ['profileGroups', profileId],
+    const useProfileGroups = (profileId: number | null, search: string = '', enabled: boolean = true) => useQuery({
+        queryKey: ['profileGroups', profileId, search],
         queryFn: async (): Promise<AdminGroup[]> => {
             if (!profileId) return [];
-            const data = await apiClient.get(`/api/admin/profiles/${profileId}/groups`);
+            const params = search.trim() ? `?search=${encodeURIComponent(search)}` : '';
+            const data = await apiClient.get(`/api/admin/profiles/${profileId}/groups${params}`);
             return data.groups;
         },
         enabled: enabled && !!profileId,
     });
 
-    const useGroupUsers = (groupId: number | null, enabled: boolean = true) => useQuery({
-        queryKey: ['groupUsers', groupId],
+    const useGroupUsers = (groupId: number | null, search: string = '', enabled: boolean = true) => useQuery({
+        queryKey: ['groupUsers', groupId, search],
         queryFn: async (): Promise<AdminGroupUser[]> => {
             if (!groupId) return [];
-            const data = await apiClient.get(`/api/admin/groups/${groupId}/users`);
+            const params = search.trim() ? `?search=${encodeURIComponent(search)}` : '';
+            const data = await apiClient.get(`/api/admin/groups/${groupId}/users${params}`);
             return data.users;
         },
         enabled: enabled && !!groupId,

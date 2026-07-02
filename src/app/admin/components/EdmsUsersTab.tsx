@@ -85,7 +85,7 @@ export default function EdmsUsersTab() {
     // Sub-states for cascading HR selects
     const [selectedAgency, setSelectedAgency] = useState<string>('');
     const [selectedDept, setSelectedDept] = useState<string>('');
-    
+
     // Read-only HR values from LKP_HR_EMPLOYEES
     const [hrAgencyDisplay, setHrAgencyDisplay] = useState<string>('');
     const [hrDepartmentDisplay, setHrDepartmentDisplay] = useState<string>('');
@@ -141,7 +141,7 @@ export default function EdmsUsersTab() {
                 const errorData = await response.json();
                 throw new Error(errorData.detail || 'Failed to fetch export data');
             }
-            
+
             const exportData = await response.json();
 
             if (exportData.length === 0) {
@@ -288,11 +288,11 @@ export default function EdmsUsersTab() {
         const hrAgency = personDetails.agency || '';
         const hrDept = personDetails.department || '';
         const hrSection = personDetails.section || '';
-        
+
         setHrAgencyDisplay(hrAgency);
         setHrDepartmentDisplay(hrDept);
         setHrSectionDisplay(hrSection);
-        
+
         setFormData({
             ...formData,
             user_id: personDetails.aliases?.[0]?.network_id?.split('\\')[1] || editPerson.user_id || '', // fallback
@@ -308,7 +308,7 @@ export default function EdmsUsersTab() {
                 ?.filter((g: any) => g.system_id !== editPerson.primary_group)
                 .map((g: any) => g.system_id.toString()) || []
         });
-        
+
         // We do not strict-resolve secid backwards into Agency -> Dept -> Section automatically here,
         // because EDMS base stores a single SECID. However, the user can change it via the dropdowns now.
     }
@@ -417,7 +417,7 @@ export default function EdmsUsersTab() {
 
     const handleHrSelect = (emp: HrEmployee) => {
         setSelectedHrEmployee(emp);
-        
+
         let foundAgencyId = emp.agencyid;
         let foundDeptId = emp.departmentid;
         let foundSectionId = emp.sectionid;
@@ -425,13 +425,13 @@ export default function EdmsUsersTab() {
         // Ensure we handle potential string/numeric mismatches by using the agencies list to verify
         const matchedAgency = agencies?.find((a: any) => String(a.system_id) === String(foundAgencyId));
         const finalAgency = matchedAgency ? String(matchedAgency.system_id) : String(foundAgencyId || '');
-        
+
         setSelectedAgency(finalAgency);
         // Store read-only values from HR employee record
         setHrAgencyDisplay(emp.agency || '');
         setHrDepartmentDisplay(emp.department || '');
         setHrSectionDisplay(emp.section || '');
-        
+
         // Cascading setters with slight delay to ensure TanStack Query / React state settles
         setTimeout(() => setSelectedDept(String(foundDeptId || '')), 100);
         setTimeout(() => setFinalSectionId(String(foundSectionId || '')), 200);
@@ -530,7 +530,7 @@ export default function EdmsUsersTab() {
                     ) : (
                         <Image src="/icons/refresh.svg" alt="" width={16} height={16} className="h-4 w-4 invert" />
                     )}
-                    <span>{clearServerCacheMutation.isPending ? 'Refreshing...' : 'Refresh Cache'}</span>
+                    <span hidden>{clearServerCacheMutation.isPending ? 'Refreshing...' : 'Refresh Cache'}</span>
                 </button>
             </div>
 
@@ -599,7 +599,7 @@ export default function EdmsUsersTab() {
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700 text-sm">
                                 {usersData?.users.map((user: EdmsPerson) => (
-                                <tr key={user.system_id} onDoubleClick={() => startEdit(user)} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition select-none">
+                                    <tr key={user.system_id} onDoubleClick={() => startEdit(user)} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition select-none">
                                         <td className="px-3 py-3 font-medium text-gray-900 dark:text-white truncate">{user.user_id}</td>
                                         <td className="px-3 py-3 dark:text-gray-300 truncate">{user.full_name}</td>
                                         <td className="px-3 py-3 text-gray-500 dark:text-gray-400 truncate">{user.email_address}</td>
@@ -628,7 +628,7 @@ export default function EdmsUsersTab() {
                         </table>
                     </div>
                 )}
-                
+
                 {/* Pagination */}
                 <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800">
                     <button onClick={() => setCurrentPage(c => Math.max(1, c - 1))} disabled={currentPage === 1} className="disabled:opacity-50 text-blue-600 dark:text-blue-400">Previous</button>
@@ -639,7 +639,7 @@ export default function EdmsUsersTab() {
 
             {/* Modal: HR Search */}
             {showHrSearchModal && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
                     onClick={(e) => { if (e.target === e.currentTarget) setShowHrSearchModal(false); }}
                 >
@@ -685,7 +685,7 @@ export default function EdmsUsersTab() {
 
             {/* Modal: Add / Edit User Form */}
             {(showAddModal || showEditModal) && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
                     onClick={(e) => { if (e.target === e.currentTarget) resetForms(); }}
                 >
@@ -734,7 +734,7 @@ export default function EdmsUsersTab() {
                                         </div>
 
                                         <h3 className="font-semibold text-gray-700 dark:text-gray-300 border-b pb-2 pt-4">Meta (Assignment)</h3>
-                                        
+
                                         <div>
                                             <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Agency</label>
                                             <div className="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800/80 dark:border-gray-700 text-gray-900 dark:text-gray-300">
@@ -775,7 +775,7 @@ export default function EdmsUsersTab() {
 
                                         <div className="z-20 relative">
                                             <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Primary Group *</label>
-                                            <InfiniteSelect 
+                                            <InfiniteSelect
                                                 t={t}
                                                 options={groupOptions}
                                                 value={formData.primary_group}
@@ -788,7 +788,7 @@ export default function EdmsUsersTab() {
 
                                         <div className="z-10 relative mt-4">
                                             <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Additional Groups</label>
-                                            <InfiniteSelect 
+                                            <InfiniteSelect
                                                 t={t}
                                                 options={additionalGroupOptions}
                                                 value={additionalGroupSelected}
@@ -797,7 +797,7 @@ export default function EdmsUsersTab() {
                                                 onSearch={setAdditionalGroupSearch}
                                                 searchValue={additionalGroupSearch}
                                             />
-                                            
+
                                             {/* Badges container */}
                                             {formData.additional_groups.length > 0 && (
                                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -807,8 +807,8 @@ export default function EdmsUsersTab() {
                                                         return (
                                                             <div key={`badg_${gId}`} className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm dark:bg-blue-900/30 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
                                                                 <span>{gName}</span>
-                                                                <button 
-                                                                    type="button" 
+                                                                <button
+                                                                    type="button"
                                                                     onClick={() => removeAdditionalGroup(gId)}
                                                                     className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-800 transition"
                                                                 >

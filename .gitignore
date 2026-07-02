@@ -46,3 +46,4 @@ deploy.zip
 files to install.zip
 .next-dev.err.log
 .next-dev.log
+.npm-cache

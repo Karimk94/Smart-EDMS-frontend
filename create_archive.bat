@@ -37,6 +37,14 @@ set "psfile=%temp%\create_archive_temp.ps1"
 >> "%psfile%" echo     if (-not (Test-Path $parent)) { $null = New-Item -ItemType Directory -Path $parent -Force }
 >> "%psfile%" echo     Copy-Item -Path (Join-Path $src $rel) -Destination $target
 >> "%psfile%" echo }
+>> "%psfile%" echo if (Test-Path (Join-Path $src '.npm-cache')) {
+>> "%psfile%" echo     Write-Host "Including offline .npm-cache..."
+>> "%psfile%" echo     Copy-Item -Path (Join-Path $src '.npm-cache') -Destination (Join-Path $tempDir '.npm-cache') -Recurse -Force
+>> "%psfile%" echo }
+>> "%psfile%" echo Get-ChildItem -Path $src -Filter '.env*' -File ^| ForEach-Object {
+>> "%psfile%" echo     Write-Host ("Including environment file: " + $_.Name)
+>> "%psfile%" echo     Copy-Item -Path $_.FullName -Destination (Join-Path $tempDir $_.Name) -Force
+>> "%psfile%" echo }
 >> "%psfile%" echo Compress-Archive -Path "$tempDir\*" -DestinationPath $dest -CompressionLevel Optimal
 >> "%psfile%" echo Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 >> "%psfile%" echo Write-Host ("Created: " + $dest)

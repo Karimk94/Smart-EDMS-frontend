@@ -7,6 +7,8 @@ import { EdmsUser, PersonResult, useAdmin } from "../../hooks/useAdmin";
 import QuotaPieChart from "../components/QuotaPieChart";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../../hooks/useAuth";
+import { useTranslations } from "../hooks/useTranslations";
 import EdmsUsersTab from "./components/EdmsUsersTab";
 import ProfilesTab from "./components/ProfilesTab";
 
@@ -44,6 +46,10 @@ const createDefaultAddTabPermissions = (): AddTabPermissionsState => ({
 export default function AdminPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasAccess, setHasAccess] = useState(false);
+
+    const { user } = useAuth();
+    const lang = user?.lang || 'en';
+    const t = useTranslations(lang as 'en' | 'ar');
 
     // Queries & Mutations from hook
     const {

@@ -121,7 +121,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const deleteFolderMutation = useDeleteFolder();
     const renameFolderMutation = useRenameFolder();
     const moveItemsMutation = useMoveItemsMutation();
-    const { download } = useDownload();
+    const { download, downloadAsync } = useDownload();
 
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<FolderItem | null>(null);
@@ -172,6 +172,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const [moveItemIds, setMoveItemIds] = useState<string[]>([]);
     const [isBatchMoving, setIsBatchMoving] = useState(false);
     const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+    const [isBatchDownloading, setIsBatchDownloading] = useState(false);
 
     // Use react-query hook for move modal folders with caching
     const { data: moveFolderItems = [], isLoading: isMoveFoldersLoading, isFetching: isMoveFoldersFetching } = useMoveModalFolders({
@@ -947,6 +948,42 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
     };
 
+    const handleBatchDownload = async () => {
+        if (selectedFileCount === 0) return;
+
+        setIsBatchDownloading(true);
+        let downloaded = 0;
+        let failed = 0;
+
+        for (const fileId of Array.from(selectedFileIds)) {
+            const item = items.find(i => i.id === fileId);
+            if (!item) continue;
+            
+            const mediaType = getMediaType(item);
+            const toastId = showToast((t('downloadingFile') || "Downloading ") + item.name + "...", 'info', 'subtle', 0);
+            
+            try {
+                await downloadAsync({ docId: item.id, docname: item.name, apiURL, mediaType });
+                downloaded++;
+            } catch (error) {
+                failed++;
+                showToast((t('errorDownloading') || "Error downloading ") + item.name, 'error');
+            } finally {
+                removeToast(toastId);
+            }
+        }
+        
+        if (downloaded > 0 && selectedFileCount > 1) {
+            showToast(t('successDownloading') || `Downloaded ${downloaded} file(s) successfully.`, 'success');
+        }
+        if (failed > 0 && selectedFileCount > 1) {
+            showToast(t('errorDownloadingBatch') || `${failed} file(s) could not be downloaded.`, 'error');
+        }
+
+        setIsBatchDownloading(false);
+        clearSelection();
+    };
+
     const handleRightClick = (e: React.MouseEvent, item: FolderItem) => {
         e.preventDefault();
         if (!isEditor) return;
@@ -1372,8 +1409,25 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                         </span>
                         <div className="flex items-center gap-2">
                             <button
+                                onClick={handleBatchDownload}
+                                disabled={isBatchMoving || isBatchDeleting || isBatchDownloading || selectedFileCount === 0}
+                                className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1"
+                            >
+                                {isBatchDownloading ? (
+                                    <>
+                                        <Image src="/icons/refresh.svg" alt="" width={14} height={14} className="animate-spin dark:invert" />
+                                        {t('downloading') || 'Downloading...'}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Image src="/download.svg" alt="" width={14} height={14} className="invert" />
+                                        {t('download') || 'Download'}
+                                    </>
+                                )}
+                            </button>
+                            <button
                                 onClick={() => openMoveModal(Array.from(selectedFileIds))}
-                                disabled={isBatchMoving || isBatchDeleting || selectedFileCount === 0}
+                                disabled={isBatchMoving || isBatchDeleting || isBatchDownloading || selectedFileCount === 0}
                                 className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
                             >
                                 {isBatchMoving ? (t('moving')) : (t('move') || 'Move')}
@@ -1382,21 +1436,21 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                 onClick={handleBatchDelete}
                                 isLoading={isBatchDeleting}
                                 loadingText={t('deleting') || 'Deleting...'}
-                                disabled={isBatchMoving || selectedFileCount === 0}
+                                disabled={isBatchMoving || isBatchDownloading || selectedFileCount === 0}
                                 className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
                             >
                                 {t('delete') || 'Delete'}
                             </LoadingButton>
                             <button
                                 onClick={clearSelection}
-                                disabled={isBatchMoving || isBatchDeleting}
+                                disabled={isBatchMoving || isBatchDeleting || isBatchDownloading}
                                 className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
                             >
                                 {t('clear') || 'Clear'}
                             </button>
                             <button
                                 onClick={toggleSelectionMode}
-                                disabled={isBatchMoving || isBatchDeleting}
+                                disabled={isBatchMoving || isBatchDeleting || isBatchDownloading}
                                 className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
                             >
                                 {t('doneSelecting') || 'Done'}

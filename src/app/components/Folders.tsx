@@ -7,6 +7,8 @@ import { useDownload } from '../../hooks/useDownload';
 import { FolderItem, useFolderContents } from '../../hooks/useFolderContents';
 import { useDeleteFolder, useMoveItemsMutation, useRenameFolder } from '../../hooks/useFolderMutations';
 import { useMoveModalFolders } from '../../hooks/useMoveModalFolders';
+import { useAuth } from '../../hooks/useAuth';
+import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
 import { CreateFolderModal } from './CreateFolderModal';
@@ -35,6 +37,24 @@ interface ContextMenuState {
     item: FolderItem | null;
 }
 
+function formatBytes(bytes?: number): string {
+    if (bytes === undefined || bytes === null || bytes === 0) return '--';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatDate(dateStr?: string): string {
+    if (!dateStr) return '--';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit'
+    }).format(date);
+}
+
 export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId, externalRefreshTrigger }) => {
     const searchParams = useSearchParams();
     const queryClient = useQueryClient();
@@ -42,6 +62,29 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const { useCheckAccess } = useAdmin();
     const { data: adminAccessData } = useCheckAccess();
     const hasAdminAccess = adminAccessData?.has_access === true;
+
+    const { user } = useAuth();
+    const { updateViewMode, isUpdatingViewMode } = useUserPreferences();
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [showDetailsSidebar, setShowDetailsSidebar] = useState(false);
+
+    useEffect(() => {
+        if (user?.view_mode) {
+            setViewMode(user.view_mode as 'grid' | 'list');
+        } else {
+            const saved = localStorage.getItem('view_mode') as 'grid' | 'list';
+            if (saved) setViewMode(saved);
+        }
+    }, [user?.view_mode]);
+
+    const handleToggleViewMode = async (mode: 'grid' | 'list') => {
+        setViewMode(mode);
+        try {
+            await updateViewMode(mode);
+        } catch (error) {
+            console.error("Failed to update view mode:", error);
+        }
+    };
 
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [selectedHistoryItem, setSelectedHistoryItem] = useState<FolderItem | null>(null);
@@ -62,6 +105,22 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     const [hiddenItemIds, setHiddenItemIds] = useState<Set<string>>(new Set());
     const items = (data?.contents || []).filter((item) => !hiddenItemIds.has(item.id));
+    
+    const isInsideStandardFolder = ['images', 'videos', 'files'].includes(currentFolderId || '');
+
+    const standardItems = items.filter(item => item.is_standard && !isInsideStandardFolder);
+
+    const userItems = items
+        .filter(item => !item.is_standard)
+        .sort((a, b) => {
+            const aIsFolder = a.type === 'folder';
+            const bIsFolder = b.type === 'folder';
+
+            if (aIsFolder && !bIsFolder) return -1;
+            if (!aIsFolder && bIsFolder) return 1;
+
+            return a.name.localeCompare(b.name);
+        });
     const [isOperationLoading, setIsOperationLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const isLoading = isInitialLoading || isOperationLoading;
@@ -137,13 +196,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     // Batch delete confirmation modal (replaces window.confirm)
     const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
 
-    const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+
     const [itemToRename, setItemToRename] = useState<FolderItem | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [isRenaming, setIsRenaming] = useState(false);
 
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+    const [focusedItemIndex, setFocusedItemIndex] = useState<number | null>(null);
+    const dragGhostRef = useRef<HTMLDivElement | null>(null);
     const [marqueeSelection, setMarqueeSelection] = useState<{
         startX: number;
         startY: number;
@@ -187,6 +249,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     const selectedFiles = items.filter((item) => selectedFileIds.has(item.id) && item.type === 'file');
     const selectedFileCount = selectedFiles.length;
+    const selectedItemCount = items.filter((item) => selectedFileIds.has(item.id)).length;
 
     // Debounce search term
     useEffect(() => {
@@ -235,8 +298,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     setConfirmModalOpen(false);
                     setItemToDelete(null);
                 }
-                if (isRenameModalOpen) {
-                    setIsRenameModalOpen(false);
+                if (itemToRename) {
+                    setItemToRename(null);
                 }
                 if (isShareModalOpen) {
                     setIsShareModalOpen(false);
@@ -244,11 +307,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             }
         };
 
-        if (confirmModalOpen || isRenameModalOpen || isShareModalOpen) {
+        if (confirmModalOpen || itemToRename || isShareModalOpen) {
             document.addEventListener('keydown', handleKeyDown);
         }
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [confirmModalOpen, isRenameModalOpen, isShareModalOpen]);
+    }, [confirmModalOpen, itemToRename, isShareModalOpen]);
 
     useEffect(() => {
         if (initialFolderId !== undefined) {
@@ -259,6 +322,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     useEffect(() => {
         setSelectedFileIds(new Set());
         setIsSelectionMode(false);
+        setLastClickedIndex(null);
+        setFocusedItemIndex(null);
     }, [currentFolderId, debouncedSearchTerm]);
 
     useEffect(() => {
@@ -565,6 +630,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     const clearSelection = () => {
         setSelectedFileIds(new Set());
+        setLastClickedIndex(null);
     };
 
     useEffect(() => {
@@ -603,6 +669,155 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         setSelectedFileIds(new Set([fileId]));
     };
 
+    // --- Google Drive-style click handlers ---
+
+    /** Single-click: select item. Ctrl+Click: additive. Shift+Click: range. */
+    const handleItemClick = (item: FolderItem, e: React.MouseEvent) => {
+        if (suppressItemClickRef.current) {
+            suppressItemClickRef.current = false;
+            return;
+        }
+
+        const itemIndex = userItems.findIndex((i) => i.id === item.id);
+
+        if (e.shiftKey && lastClickedIndex !== null && isEditor) {
+            // Shift+Click → range selection
+            e.preventDefault();
+            if (!isSelectionMode) setIsSelectionMode(true);
+            const start = Math.min(lastClickedIndex, itemIndex);
+            const end = Math.max(lastClickedIndex, itemIndex);
+            setSelectedFileIds((prev) => {
+                const next = new Set(prev);
+                for (let i = start; i <= end; i++) {
+                    next.add(userItems[i].id);
+                }
+                return next;
+            });
+            setFocusedItemIndex(itemIndex);
+            return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && isEditor) {
+            // Ctrl+Click → additive toggle
+            e.preventDefault();
+            if (!isSelectionMode) setIsSelectionMode(true);
+            toggleFileSelection(item.id);
+            setLastClickedIndex(itemIndex);
+            setFocusedItemIndex(itemIndex);
+            return;
+        }
+
+        // Plain click → select only this item
+        if (!isSelectionMode) setIsSelectionMode(true);
+        setSelectedFileIds(new Set([item.id]));
+        setLastClickedIndex(itemIndex);
+        setFocusedItemIndex(itemIndex);
+    };
+
+    /** Double-click: navigate into folder or open file */
+    const handleItemDoubleClick = (item: FolderItem) => {
+        handleNavigate(item);
+    };
+
+    // --- Keyboard navigation ---
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't intercept when modals are open or input is focused
+            const activeTag = document.activeElement?.tagName;
+            if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+            if (confirmModalOpen || itemToRename || isShareModalOpen || isMoveModalOpen || showCreateModal) return;
+            if (userItems.length === 0) return;
+
+            const cols = (() => {
+                const gridEl = gridAreaRef.current?.querySelector('.grid');
+                if (!gridEl) return 5;
+                const style = window.getComputedStyle(gridEl);
+                const templateCols = style.getPropertyValue('grid-template-columns');
+                return templateCols.split(' ').filter(Boolean).length || 5;
+            })();
+
+            const currentIdx = focusedItemIndex ?? -1;
+
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                const next = Math.min(currentIdx + 1, userItems.length - 1);
+                setFocusedItemIndex(next);
+                if (!e.shiftKey) {
+                    setSelectedFileIds(new Set([userItems[next].id]));
+                    setLastClickedIndex(next);
+                    if (!isSelectionMode) setIsSelectionMode(true);
+                } else {
+                    setSelectedFileIds((prev) => { const n = new Set(prev); n.add(userItems[next].id); return n; });
+                }
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                const next = Math.max(currentIdx - 1, 0);
+                setFocusedItemIndex(next);
+                if (!e.shiftKey) {
+                    setSelectedFileIds(new Set([userItems[next].id]));
+                    setLastClickedIndex(next);
+                    if (!isSelectionMode) setIsSelectionMode(true);
+                } else {
+                    setSelectedFileIds((prev) => { const n = new Set(prev); n.add(userItems[next].id); return n; });
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const next = Math.min(currentIdx + cols, userItems.length - 1);
+                setFocusedItemIndex(next);
+                if (!e.shiftKey) {
+                    setSelectedFileIds(new Set([userItems[next].id]));
+                    setLastClickedIndex(next);
+                    if (!isSelectionMode) setIsSelectionMode(true);
+                } else {
+                    setSelectedFileIds((prev) => {
+                        const n = new Set(prev);
+                        for (let i = currentIdx + 1; i <= next; i++) n.add(userItems[i].id);
+                        return n;
+                    });
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const next = Math.max(currentIdx - cols, 0);
+                setFocusedItemIndex(next);
+                if (!e.shiftKey) {
+                    setSelectedFileIds(new Set([userItems[next].id]));
+                    setLastClickedIndex(next);
+                    if (!isSelectionMode) setIsSelectionMode(true);
+                } else {
+                    setSelectedFileIds((prev) => {
+                        const n = new Set(prev);
+                        for (let i = next; i < currentIdx; i++) n.add(userItems[i].id);
+                        return n;
+                    });
+                }
+            } else if (e.key === 'Enter' && focusedItemIndex !== null && focusedItemIndex >= 0) {
+                e.preventDefault();
+                handleNavigate(userItems[focusedItemIndex]);
+            } else if (e.key === ' ' && focusedItemIndex !== null && focusedItemIndex >= 0) {
+                e.preventDefault();
+                toggleFileSelection(userItems[focusedItemIndex].id);
+            } else if (e.key === 'Delete' && selectedFileIds.size > 0 && isEditor) {
+                e.preventDefault();
+                handleBatchDelete();
+            } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                if (!isSelectionMode) setIsSelectionMode(true);
+                setSelectedFileIds(new Set(userItems.map((i) => i.id)));
+            } else if (e.key === 'F2' && selectedFileIds.size === 1 && isEditor) {
+                e.preventDefault();
+                const itemId = Array.from(selectedFileIds)[0];
+                const focusedItem = userItems.find((i) => i.id === itemId);
+                if (focusedItem && !focusedItem.is_standard) {
+                    setItemToRename(focusedItem);
+                    setRenameValue(focusedItem.name);
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [focusedItemIndex, userItems, isSelectionMode, selectedFileIds, isEditor, confirmModalOpen, itemToRename, isShareModalOpen, isMoveModalOpen, showCreateModal]);
+
     const isRectIntersecting = (a: DOMRect, b: { left: number; right: number; top: number; bottom: number }) => {
         return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
     };
@@ -610,16 +825,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const startMarqueeSelection = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!isEditor || e.button !== 0) return;
 
-        const ctrlHeld = e.ctrlKey || e.metaKey;
-        if (!isSelectionMode && !ctrlHeld) return;
-
         const target = e.target as HTMLElement;
         if (target.closest('button,input,textarea,label,a,[data-no-marquee="true"]')) return;
+        // Don't start marquee when clicking on an item tile
+        if (target.closest('[data-select-item="true"],[data-folder-item="true"]')) return;
 
+        const ctrlHeld = e.ctrlKey || e.metaKey;
         const additive = ctrlHeld;
-        if (!isSelectionMode && ctrlHeld) {
-            setIsSelectionMode(true);
-        }
 
         let zoomFactor = 1;
         if (typeof window !== 'undefined') {
@@ -758,7 +970,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
                 const intersected = new Set<string>();
                 items.forEach((item) => {
-                    if (item.type !== 'file') return;
                     const node = fileTileRefs.current[item.id];
                     if (!node) return;
                     const rect = node.getBoundingClientRect();
@@ -1085,7 +1296,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         else if (action === 'rename') {
             setItemToRename(targetItem);
             setRenameValue(targetItem.name);
-            setIsRenameModalOpen(true);
         }
         else if (action === 'delete') {
             setItemToDelete(targetItem);
@@ -1174,10 +1384,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
     };
 
-    const handleRenameSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleRenameSubmit = async (e?: React.FormEvent | React.FocusEvent) => {
+        if (e) e.preventDefault();
+        if (isRenaming) return; // Prevent double execution from onBlur + onSubmit
         if (!itemToRename || !renameValue || renameValue === itemToRename.name) {
-            setIsRenameModalOpen(false);
+            setItemToRename(null);
             return;
         }
 
@@ -1199,7 +1410,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             ));
 
             showToast(t('successRenaming'), 'success');
-            setIsRenameModalOpen(false);
             setItemToRename(null);
             didTriggerRefresh = true;
             refreshCurrentView(true);
@@ -1281,45 +1491,33 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     };
 
     const getFileColorClass = (item: FolderItem) => {
+        if (item.type === 'folder') return 'text-yellow-500 dark:text-yellow-400';
+        
         const type = getMediaType(item);
         const colorMap: Record<string, string> = {
-            'image': 'text-blue-500 dark:text-blue-400',
-            'video': 'text-red-500 dark:text-red-400',
+            'image': 'text-purple-500 dark:text-purple-400',
+            'video': 'text-pink-500 dark:text-pink-400',
+            'pdf': 'text-red-500 dark:text-red-400',
+            'word': 'text-blue-500 dark:text-blue-400',
             'excel': 'text-green-500 dark:text-green-400',
             'powerpoint': 'text-orange-500 dark:text-orange-400',
-            'word': 'text-blue-700 dark:text-blue-500',
-            'zip': 'text-purple-500 dark:text-purple-400',
-            'audio': 'text-teal-500 dark:text-teal-400',
-            'cad': 'text-blue-800 dark:text-blue-500',
-            'code': 'text-cyan-600 dark:text-cyan-400',
-            'email': 'text-slate-500 dark:text-slate-400',
-            'font': 'text-gray-600 dark:text-gray-400',
-            'database': 'text-indigo-500 dark:text-indigo-400',
-            'vector': 'text-pink-600 dark:text-pink-400',
-            'archive': 'text-amber-700 dark:text-amber-500',
-            'executable': 'text-slate-600 dark:text-slate-400',
-            'disc': 'text-gray-500 dark:text-gray-400',
-            'visio': 'text-blue-600 dark:text-blue-400',
-            'onenote': 'text-purple-700 dark:text-purple-400',
+            'zip': 'text-gray-500 dark:text-gray-400',
+            'text': 'text-gray-600 dark:text-gray-300',
+            'audio': 'text-cyan-500 dark:text-cyan-400',
+            'cad': 'text-indigo-500 dark:text-indigo-400',
+            'code': 'text-teal-500 dark:text-teal-400',
+            'archive': 'text-yellow-600 dark:text-yellow-500',
+            'executable': 'text-red-600 dark:text-red-500',
+            'disc': 'text-gray-400 dark:text-gray-500',
+            'database': 'text-blue-600 dark:text-blue-500',
+            'email': 'text-blue-400 dark:text-blue-300',
+            'font': 'text-gray-700 dark:text-gray-200',
+            'visio': 'text-blue-800 dark:text-blue-600',
+            'onenote': 'text-purple-700 dark:text-purple-500',
         };
+
         return colorMap[type] || 'text-yellow-500 dark:text-yellow-400';
     };
-
-    const isInsideStandardFolder = ['images', 'videos', 'files'].includes(currentFolderId || '');
-
-    const standardItems = items.filter(item => item.is_standard && !isInsideStandardFolder);
-
-    const userItems = items
-        .filter(item => !item.is_standard)
-        .sort((a, b) => {
-            const aIsFolder = a.type === 'folder';
-            const bIsFolder = b.type === 'folder';
-
-            if (aIsFolder && !bIsFolder) return -1;
-            if (!aIsFolder && bIsFolder) return 1;
-
-            return a.name.localeCompare(b.name);
-        });
 
     return (
         <div ref={containerRef} className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
@@ -1374,6 +1572,33 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                             <Image src="/icons/refresh.svg" alt="" width={20} height={20} className={`${isRefreshing || isFetching ? 'animate-spin' : ''} dark:invert`} />
                         </button>
 
+                        <div className="flex bg-gray-200 dark:bg-gray-700 rounded-lg p-1 mx-2">
+                            <button
+                                onClick={() => handleToggleViewMode('grid')}
+                                disabled={isUpdatingViewMode}
+                                className={`p-1.5 rounded-md transition ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                title={t('gridView') || 'Grid View'}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            </button>
+                            <button
+                                onClick={() => handleToggleViewMode('list')}
+                                disabled={isUpdatingViewMode}
+                                className={`p-1.5 rounded-md transition ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                title={t('listView') || 'List View'}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                            </button>
+                            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1 self-center"></div>
+                            <button
+                                onClick={() => setShowDetailsSidebar(!showDetailsSidebar)}
+                                className={`p-1.5 rounded-md transition ${showDetailsSidebar ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                title={t('details') || 'Details'}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            </button>
+                        </div>
+
                         {isEditor && (
                             <button
                                 onClick={toggleSelectionMode}
@@ -1402,10 +1627,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     </div>
                 </div>
 
-                {isSelectionMode && isEditor && (
+                {isSelectionMode && isEditor && selectedItemCount > 0 && (
                     <div className="absolute inset-0 z-10 flex items-center justify-between px-6 bg-blue-50 dark:bg-blue-950/90 border-b border-blue-200 dark:border-blue-800">
                         <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                            {(t('selectedFilesCount') || `${selectedFileCount} file(s) selected`).replace('{count}', String(selectedFileCount))}
+                            {(t('selectedFilesCount') || `${selectedItemCount} item(s) selected`).replace('{count}', String(selectedItemCount))}
                         </span>
                         <div className="flex items-center gap-2">
                             <button
@@ -1427,7 +1652,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                             </button>
                             <button
                                 onClick={() => openMoveModal(Array.from(selectedFileIds))}
-                                disabled={isBatchMoving || isBatchDeleting || isBatchDownloading || selectedFileCount === 0}
+                                disabled={isBatchMoving || isBatchDeleting || isBatchDownloading || selectedItemCount === 0}
                                 className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
                             >
                                 {isBatchMoving ? (t('moving')) : (t('move') || 'Move')}
@@ -1436,7 +1661,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                 onClick={handleBatchDelete}
                                 isLoading={isBatchDeleting}
                                 loadingText={t('deleting') || 'Deleting...'}
-                                disabled={isBatchMoving || isBatchDownloading || selectedFileCount === 0}
+                                disabled={isBatchMoving || isBatchDownloading || selectedItemCount === 0}
                                 className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
                             >
                                 {t('delete') || 'Delete'}
@@ -1460,6 +1685,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 )}
             </div>
 
+            <div className="flex-1 flex flex-row min-h-0 relative">
             <div
                 ref={gridAreaRef}
                 className="flex-1 overflow-y-auto p-6 relative"
@@ -1525,17 +1751,25 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
                             )}
 
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            <div className="mb-4">
+                                {viewMode === 'grid' ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                 {userItems.map((item) => {
                                     const isFile = item.type === 'file';
                                     const isSelected = selectedFileIds.has(item.id);
                                     const isDragOverTarget = dragOverFolderId === item.id;
 
                                     if (!isFile && item.type === 'folder') {
+                                        const isFocused = focusedItemIndex !== null && userItems[focusedItemIndex]?.id === item.id;
                                         return (
                                             <div
+                                                ref={(el) => {
+                                                    fileTileRefs.current[item.id] = el;
+                                                }}
+                                                data-folder-item="true"
                                                 key={item.id}
-                                                onClick={() => handleNavigate(item)}
+                                                onClick={(e) => handleItemClick(item, e)}
+                                                onDoubleClick={() => handleItemDoubleClick(item)}
                                                 onContextMenu={(e) => handleRightClick(e, item)}
                                                 onDragOver={(e) => {
                                                     if (!isEditor) return;
@@ -1553,7 +1787,30 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                                     e.stopPropagation(); // prevent grid-level OS-drop handler firing
                                                     setDragOverFolderId(null);
 
-                                                    // Only handle internal file drags (not OS files)
+                                                    // If this is an OS file drag, upload to this folder
+                                                    if (isOsDrag(e)) {
+                                                        externalDragCounterRef.current = 0;
+                                                        setIsExternalDragOver(false);
+
+                                                        let collectedFiles: File[] = [];
+                                                        const dragItems = Array.from(e.dataTransfer.items);
+                                                        if (dragItems.length > 0 && typeof dragItems[0].webkitGetAsEntry === 'function') {
+                                                            const entries = dragItems
+                                                                .map((dragItem) => dragItem.webkitGetAsEntry())
+                                                                .filter((entry): entry is FileSystemEntry => entry !== null);
+                                                            const nested = await Promise.all(entries.map(readFilesFromEntry));
+                                                            nested.forEach((f) => collectedFiles.push(...f));
+                                                        } else {
+                                                            collectedFiles = Array.from(e.dataTransfer.files);
+                                                        }
+
+                                                        if (collectedFiles.length > 0) {
+                                                            onUploadClick(item.id, item.name, collectedFiles);
+                                                        }
+                                                        return;
+                                                    }
+
+                                                    // Only handle internal file drags
                                                     let draggedIds: string[] = [];
                                                     try {
                                                         const raw = e.dataTransfer.getData('application/json');
@@ -1573,18 +1830,60 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                                     // Stage the move — show confirmation dialog instead of moving immediately
                                                     setPendingMoveConfirm({ fileIds: idsToMove, destination: item });
                                                 }}
-                                                className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:shadow-sm dark:hover:bg-[#2c2c2c] ${isDragOverTarget ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-500' : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'}`}
+                                                className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:shadow-sm dark:hover:bg-[#2c2c2c] ${isDragOverTarget ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-500' : isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'} ${isFocused ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-[#1e1e1e]' : ''}`}
                                             >
+                                                {/* Grip / drag icon on selected folders */}
+                                                {isSelected && isEditor && (
+                                                    <div className="absolute top-1 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-200 cursor-grab active:cursor-grabbing select-none" title={t('dragToMove') || 'Drag to move'}>
+                                                        <svg width="16" height="10" viewBox="0 0 16 10" fill="currentColor" className="text-gray-400 dark:text-gray-500">
+                                                            <circle cx="4" cy="2" r="1.2"/><circle cx="8" cy="2" r="1.2"/><circle cx="12" cy="2" r="1.2"/>
+                                                            <circle cx="4" cy="7" r="1.2"/><circle cx="8" cy="7" r="1.2"/><circle cx="12" cy="7" r="1.2"/>
+                                                        </svg>
+                                                    </div>
+                                                )}
+                                                {/* Checkbox on selected */}
+                                                {isEditor && isSelected && (
+                                                    <label className="absolute top-2 left-2 z-10 flex items-center justify-center w-5 h-5 rounded border border-blue-400 dark:border-blue-500 bg-blue-500 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleFileSelection(item.id, e.target.checked);
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="h-3.5 w-3.5 accent-blue-500"
+                                                        />
+                                                    </label>
+                                                )}
                                                 <div className="mb-3 transform group-hover:scale-105 transition-transform duration-200 text-gray-400 group-hover:text-blue-500">
                                                     {renderIcon(item, false)}
                                                 </div>
-                                                <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
-                                                    {item.name}
-                                                </span>
+                                                {itemToRename?.id === item.id ? (
+                                                    <form onSubmit={handleRenameSubmit} className="w-full px-1" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                                        <input
+                                                            type="text"
+                                                            value={renameValue}
+                                                            onChange={(e) => setRenameValue(e.target.value)}
+                                                            onBlur={handleRenameSubmit}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') setItemToRename(null);
+                                                            }}
+                                                            className="w-full text-sm font-medium text-center text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-blue-500 rounded px-1 py-0.5 outline-none focus:ring-2 focus:ring-blue-500"
+                                                            autoFocus
+                                                            onFocus={(e) => e.target.select()}
+                                                        />
+                                                    </form>
+                                                ) : (
+                                                    <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1" title={item.name}>
+                                                        {item.name}
+                                                    </span>
+                                                )}
                                             </div>
                                         );
                                     }
 
+                                    const isFocused = focusedItemIndex !== null && userItems[focusedItemIndex]?.id === item.id;
                                     return (
                                         <div
                                             ref={(el) => {
@@ -1592,34 +1891,45 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                             }}
                                             data-select-item="true"
                                             key={item.id}
-                                            onClick={(e) => {
-                                                if (suppressItemClickRef.current) {
-                                                    suppressItemClickRef.current = false;
-                                                    return;
-                                                }
-
-                                                if ((e.ctrlKey || e.metaKey) && isEditor) {
-                                                    e.preventDefault();
-                                                    if (!isSelectionMode) setIsSelectionMode(true);
-                                                    toggleFileSelection(item.id);
-                                                    return;
-                                                }
-                                                handleNavigate(item);
-                                            }}
+                                            onClick={(e) => handleItemClick(item, e)}
+                                            onDoubleClick={() => handleItemDoubleClick(item)}
                                             onContextMenu={(e) => handleRightClick(e, item)}
                                             draggable={isEditor}
                                             onDragStart={(e) => {
-                                                const payloadIds = isSelectionMode && isSelected && selectedFileCount > 1
-                                                    ? selectedFiles.map((file) => file.id)
+                                                const payloadIds = isSelected && selectedItemCount > 1
+                                                    ? Array.from(selectedFileIds)
                                                     : [item.id];
                                                 e.dataTransfer.setData('application/json', JSON.stringify({ fileIds: payloadIds }));
                                                 e.dataTransfer.effectAllowed = 'move';
+
+                                                // Custom drag ghost with count badge
+                                                if (payloadIds.length > 1 && dragGhostRef.current) {
+                                                    const ghost = dragGhostRef.current;
+                                                    ghost.textContent = `${payloadIds.length} items`;
+                                                    ghost.style.display = 'flex';
+                                                    document.body.appendChild(ghost);
+                                                    e.dataTransfer.setDragImage(ghost, 40, 20);
+                                                    requestAnimationFrame(() => {
+                                                        ghost.style.display = 'none';
+                                                        if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+                                                    });
+                                                }
                                             }}
                                             onDragEnd={() => setDragOverFolderId(null)}
-                                            className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700 ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent'}`}
+                                            className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700 ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent'} ${isFocused ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-[#1e1e1e]' : ''}`}
                                         >
-                                            {isEditor && isSelectionMode && (
-                                                <label className="absolute top-2 left-2 z-10 flex items-center justify-center w-5 h-5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f1f1f] cursor-pointer">
+                                            {/* Grip / drag icon on selected items */}
+                                            {isSelected && isEditor && (
+                                                <div className="absolute top-1 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-200 cursor-grab active:cursor-grabbing select-none" title={t('dragToMove') || 'Drag to move'}>
+                                                    <svg width="16" height="10" viewBox="0 0 16 10" fill="currentColor" className="text-gray-400 dark:text-gray-500">
+                                                        <circle cx="4" cy="2" r="1.2"/><circle cx="8" cy="2" r="1.2"/><circle cx="12" cy="2" r="1.2"/>
+                                                        <circle cx="4" cy="7" r="1.2"/><circle cx="8" cy="7" r="1.2"/><circle cx="12" cy="7" r="1.2"/>
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            {/* Checkbox on selected */}
+                                            {isEditor && isSelected && (
+                                                <label className="absolute top-2 left-2 z-10 flex items-center justify-center w-5 h-5 rounded border border-blue-400 dark:border-blue-500 bg-blue-500 cursor-pointer" onClick={(e) => e.stopPropagation()}>
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
@@ -1628,19 +1938,187 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                                             toggleFileSelection(item.id, e.target.checked);
                                                         }}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="h-3.5 w-3.5"
+                                                        className="h-3.5 w-3.5 accent-blue-500"
                                                     />
                                                 </label>
                                             )}
                                             <div className={`mb-3 transform group-hover:scale-105 transition-transform duration-200 ${isFile ? getFileColorClass(item) : 'text-gray-400 group-hover:text-blue-500'}`}>
                                                 {renderIcon(item, false)}
                                             </div>
-                                            <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1">
-                                                {item.name}
-                                            </span>
+                                            {itemToRename?.id === item.id ? (
+                                                <form onSubmit={handleRenameSubmit} className="w-full px-1" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="text"
+                                                        value={renameValue}
+                                                        onChange={(e) => setRenameValue(e.target.value)}
+                                                        onBlur={handleRenameSubmit}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Escape') setItemToRename(null);
+                                                        }}
+                                                        className="w-full text-sm font-medium text-center text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-blue-500 rounded px-1 py-0.5 outline-none focus:ring-2 focus:ring-blue-500"
+                                                        autoFocus
+                                                        onFocus={(e) => e.target.select()}
+                                                    />
+                                                </form>
+                                            ) : (
+                                                <span className="text-sm font-medium text-center text-gray-700 dark:text-gray-300 break-words w-full line-clamp-2 px-1" title={item.name}>
+                                                    {item.name}
+                                                </span>
+                                            )}
                                         </div>
                                     );
                                 })}
+                            </div>
+                            ) : (
+                                <div className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-[#1a1a1a]">
+                                    <table className="w-full text-left border-collapse text-sm">
+                                        <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700">
+                                            <tr>
+                                                <th className="px-4 py-3 font-semibold text-gray-500 dark:text-gray-400">Name</th>
+                                                <th className="px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 w-32">Type</th>
+                                                <th className="px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 w-32">Size</th>
+                                                <th className="px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 w-48">Last Modified</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                            {userItems.map((item) => {
+                                                const isFile = item.type === 'file';
+                                                const isSelected = selectedFileIds.has(item.id);
+                                                const isDragOverTarget = dragOverFolderId === item.id;
+                                                const isFocused = focusedItemIndex !== null && userItems[focusedItemIndex]?.id === item.id;
+
+                                                return (
+                                                    <tr
+                                                        ref={(el) => {
+                                                            fileTileRefs.current[item.id] = el;
+                                                        }}
+                                                        data-folder-item={!isFile ? "true" : undefined}
+                                                        data-select-item={isFile ? "true" : undefined}
+                                                        key={item.id}
+                                                        onClick={(e) => handleItemClick(item, e)}
+                                                        onDoubleClick={() => handleItemDoubleClick(item)}
+                                                        onContextMenu={(e) => handleRightClick(e, item)}
+                                                        draggable={isEditor}
+                                                        onDragOver={!isFile ? (e) => {
+                                                            if (!isEditor) return;
+                                                            e.preventDefault();
+                                                            setDragOverFolderId(item.id);
+                                                        } : undefined}
+                                                        onDragLeave={!isFile ? () => {
+                                                            if (dragOverFolderId === item.id) setDragOverFolderId(null);
+                                                        } : undefined}
+                                                        onDrop={!isFile ? async (e) => {
+                                                            if (!isEditor) return;
+                                                            e.preventDefault(); e.stopPropagation();
+                                                            setDragOverFolderId(null);
+
+                                                            // If this is an OS file drag, upload to this folder
+                                                            if (isOsDrag(e)) {
+                                                                externalDragCounterRef.current = 0;
+                                                                setIsExternalDragOver(false);
+
+                                                                let collectedFiles: File[] = [];
+                                                                const dragItems = Array.from(e.dataTransfer.items);
+                                                                if (dragItems.length > 0 && typeof dragItems[0].webkitGetAsEntry === 'function') {
+                                                                    const entries = dragItems
+                                                                        .map((dragItem) => dragItem.webkitGetAsEntry())
+                                                                        .filter((entry): entry is FileSystemEntry => entry !== null);
+                                                                    const nested = await Promise.all(entries.map(readFilesFromEntry));
+                                                                    nested.forEach((f) => collectedFiles.push(...f));
+                                                                } else {
+                                                                    collectedFiles = Array.from(e.dataTransfer.files);
+                                                                }
+
+                                                                if (collectedFiles.length > 0) {
+                                                                    onUploadClick(item.id, item.name, collectedFiles);
+                                                                }
+                                                                return;
+                                                            }
+
+                                                            let draggedIds: string[] = [];
+                                                            try {
+                                                                const raw = e.dataTransfer.getData('application/json');
+                                                                if (raw) {
+                                                                    const parsed = JSON.parse(raw);
+                                                                    if (Array.isArray(parsed?.fileIds)) draggedIds = parsed.fileIds;
+                                                                }
+                                                            } catch { draggedIds = []; }
+                                                            const idsToMove = draggedIds.length > 0 ? draggedIds : Array.from(selectedFileIds);
+                                                            if (idsToMove.length === 0) return;
+                                                            setPendingMoveConfirm({ fileIds: idsToMove, destination: item });
+                                                        } : undefined}
+                                                        onDragStart={(e) => {
+                                                            const payloadIds = isSelected && selectedItemCount > 1 ? Array.from(selectedFileIds) : [item.id];
+                                                            e.dataTransfer.setData('application/json', JSON.stringify({ fileIds: payloadIds }));
+                                                            e.dataTransfer.effectAllowed = 'move';
+                                                            if (payloadIds.length > 1 && dragGhostRef.current) {
+                                                                const ghost = dragGhostRef.current;
+                                                                ghost.textContent = `${payloadIds.length} items`;
+                                                                ghost.style.display = 'flex';
+                                                                document.body.appendChild(ghost);
+                                                                e.dataTransfer.setDragImage(ghost, 40, 20);
+                                                                requestAnimationFrame(() => { ghost.style.display = 'none'; if (ghost.parentNode) ghost.parentNode.removeChild(ghost); });
+                                                            }
+                                                        }}
+                                                        onDragEnd={() => setDragOverFolderId(null)}
+                                                        className={`group cursor-pointer transition-colors ${isDragOverTarget ? 'bg-blue-50 dark:bg-blue-900/30' : isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-[#2c2c2c]'} ${isFocused ? 'ring-2 ring-inset ring-blue-400' : ''}`}
+                                                    >
+                                                        <td className="px-4 py-3 flex items-center gap-3 relative">
+                                                            {isSelected && isEditor && (
+                                                                <div className="absolute left-1 cursor-grab active:cursor-grabbing text-gray-400" title={t('dragToMove') || 'Drag to move'}>
+                                                                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="4" r="1.2"/><circle cx="2" cy="8" r="1.2"/><circle cx="2" cy="12" r="1.2"/><circle cx="7" cy="4" r="1.2"/><circle cx="7" cy="8" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-shrink-0 w-6 h-6 flex justify-center items-center ml-2">
+                                                                {isEditor && isSelected ? (
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={(e) => { e.stopPropagation(); toggleFileSelection(item.id, e.target.checked); }}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        className="h-4 w-4 accent-blue-500 rounded cursor-pointer"
+                                                                    />
+                                                                ) : (
+                                                                    <span className={!isFile ? 'text-gray-400 dark:text-gray-500' : getFileColorClass(item)}>
+                                                                        {renderIcon(item, false)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {itemToRename?.id === item.id ? (
+                                                                <form onSubmit={handleRenameSubmit} className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={renameValue}
+                                                                        onChange={(e) => setRenameValue(e.target.value)}
+                                                                        onBlur={handleRenameSubmit}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Escape') setItemToRename(null);
+                                                                        }}
+                                                                        className="w-full text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-blue-500 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500"
+                                                                        autoFocus
+                                                                        onFocus={(e) => e.target.select()}
+                                                                    />
+                                                                </form>
+                                                            ) : (
+                                                                <span className="font-medium text-gray-800 dark:text-gray-200 truncate ml-1" title={item.name}>{item.name}</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 capitalize">
+                                                            {!isFile ? 'Folder' : getMediaType(item)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                                            {!isFile ? '--' : formatBytes(item.size)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                                            {formatDate(item.date)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                             </div>
 
                             {items.length === 0 && (
@@ -1653,6 +2131,88 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     </div>
                 )}
             </div>
+
+            {/* Details Sidebar */}
+            {showDetailsSidebar && (
+                <div className="w-80 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1f1f1f] flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 flex-shrink-0">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                        <h3 className="font-semibold text-gray-800 dark:text-gray-200">{t('details') || 'Details'}</h3>
+                        <button onClick={() => setShowDetailsSidebar(false)} className="p-1 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                            <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert opacity-60 hover:opacity-100" />
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-5">
+                        {(() => {
+                            if (selectedItemCount === 1) {
+                                const selectedId = Array.from(selectedFileIds)[0];
+                                const selectedItem = items.find((i) => i.id === selectedId);
+                                if (!selectedItem) return null;
+                                const isFile = selectedItem.type === 'file' || (selectedItem.type !== 'folder' && selectedItem.node_type !== 'N' && selectedItem.node_type !== 'F');
+                                const mediaType = !isFile ? 'folder' : getMediaType(selectedItem);
+                                return (
+                                    <div className="flex flex-col items-center">
+                                        <div className={`w-32 h-32 flex items-center justify-center rounded-2xl mb-5 ${isFile ? getFileColorClass(selectedItem) : 'text-gray-400 bg-gray-50 dark:bg-[#2a2a2a]'}`}>
+                                            <div className="transform scale-[2.5]">
+                                                {renderIcon(selectedItem, false)}
+                                            </div>
+                                        </div>
+                                        <h4 className="text-center font-bold text-gray-800 dark:text-gray-200 mb-8 break-words w-full px-2">{selectedItem.name}</h4>
+                                        
+                                        <div className="w-full space-y-4">
+                                            <h5 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-gray-800 pb-2">{t('properties') || 'Properties'}</h5>
+                                            <div className="flex flex-col gap-3.5 text-sm">
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">{t('type') || 'Type'}</span>
+                                                    <span className="text-gray-800 dark:text-gray-200 font-medium capitalize text-right">{mediaType}</span>
+                                                </div>
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">{t('size') || 'Size'}</span>
+                                                    <span className="text-gray-800 dark:text-gray-200 font-medium text-right">{!isFile ? '--' : formatBytes(selectedItem.size)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">{t('modified') || 'Modified'}</span>
+                                                    <span className="text-gray-800 dark:text-gray-200 font-medium text-right break-words">{formatDate(selectedItem.date)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            } else if (selectedItemCount > 1) {
+                                return (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 pt-10">
+                                        <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-full text-blue-500">
+                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                        </div>
+                                        <p className="text-center font-medium text-gray-700 dark:text-gray-300">
+                                            {selectedItemCount} {(t('itemsWord') || 'items')} selected
+                                        </p>
+                                    </div>
+                                );
+                            } else {
+                                return (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 pt-10">
+                                        <div className="p-5 bg-gray-50 dark:bg-[#2a2a2a] rounded-full text-gray-400">
+                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-semibold text-gray-700 dark:text-gray-300">{getCurrentFolderName()}</p>
+                                            <p className="text-sm mt-1.5 text-gray-400">{items.length} {(t('itemsWord') || 'items')} total</p>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        })()}
+                    </div>
+                </div>
+            )}
+            </div>
+
+            {/* Hidden drag ghost for multi-item drag preview */}
+            <div
+                ref={dragGhostRef}
+                style={{ display: 'none', position: 'fixed', top: -1000, left: -1000, pointerEvents: 'none', zIndex: 9999 }}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-xl whitespace-nowrap"
+            />
 
             {marqueeSelection && (
                 <div
@@ -2191,48 +2751,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 </div>
             )}
 
-            {/* Rename Modal */}
-            {isRenameModalOpen && (
-                <div
-                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setIsRenameModalOpen(false);
-                    }}
-                >
-                    <div className="bg-white dark:bg-[#333] rounded-lg p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-600">
-                        <h3 className="text-lg font-bold dark:text-white mb-4">{t('rename') || 'Rename'}</h3>
-                        <form onSubmit={handleRenameSubmit}>
-                            <div className="mb-4">
-                                <input
-                                    type="text"
-                                    value={renameValue}
-                                    onChange={(e) => setRenameValue(e.target.value)}
-                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    autoFocus
-                                />
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsRenameModalOpen(false)}
-                                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
-                                >
-                                    {t('cancel') || 'Cancel'}
-                                </button>
-                                <LoadingButton
-                                    type="submit"
-                                    isLoading={isRenaming}
-                                    loadingText={t('saving')}
-                                    disabled={!renameValue.trim()}
-                                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
-                                >
-                                    {t('save') || 'Save'}
-                                </LoadingButton>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+
         </div>
     );
 };

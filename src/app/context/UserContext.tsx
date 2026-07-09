@@ -16,6 +16,7 @@ interface User {
     theme: 'light' | 'dark';
     quota: number;
     remaining_quota: number;
+    view_mode?: 'grid' | 'list';
     tab_permissions?: TabPermission[];
 }
 

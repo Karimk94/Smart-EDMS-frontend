@@ -10,6 +10,8 @@ export interface FolderItem {
     media_type?: 'image' | 'video' | 'pdf' | 'text' | 'file' | 'folder' | 'excel' | 'powerpoint' | 'word' | 'zip' | 'audio' | 'cad' | 'code' | 'email' | 'font' | 'database' | 'vector' | 'archive' | 'executable' | 'disc' | 'visio' | 'onenote';
     is_standard?: boolean;
     count?: number;
+    size?: number;
+    date?: string;
     thumbnail_url?: string;
 }
 

@@ -281,3 +281,29 @@ html[lang="ar"] :where(
         @apply bg-white p-4 rounded-lg shadow-md flex flex-col dark:bg-gray-800;
     }
 }
+
+/* --- Google Drive-style folder enhancements --- */
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.15s ease-out;
+}

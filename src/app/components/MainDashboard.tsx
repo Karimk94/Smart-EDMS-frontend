@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useQueryClient } from '@tanstack/react-query';
 import { enGB } from 'date-fns/locale/en-GB';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { registerLocale } from 'react-datepicker';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useDocumentModals } from '../../hooks/useDocumentModals';
@@ -16,19 +16,21 @@ import { PersonOption } from '../../models/PersonOption';
 import { useToast } from '../context/ToastContext';
 import { useUser } from '../context/UserContext';
 import { useTranslations } from '../hooks/useTranslations';
-import { ClearCacheModal } from './ClearCacheModal';
 import { DocumentItemSkeleton } from './DocumentItemSkeleton';
 import { DocumentList } from './DocumentList';
 import { DocumentModals } from './DocumentModals';
 import { FilterBar } from './FilterBar';
 import { Folders } from './Folders';
-import { FolderUploadModal } from './FolderUploadModal';
 import { Header } from './Header';
 import { Pagination } from './Pagination';
 import { Sidebar } from './Sidebar';
 import { SidebarSkeleton } from './SidebarSkeleton';
 import { Spinner, PageSpinner } from './Spinner';
-import { UploadModal } from './UploadModal';
+
+// Lazy-loaded modals — only loaded on user interaction
+const UploadModal = React.lazy(() => import('./UploadModal').then(m => ({ default: m.UploadModal })));
+const FolderUploadModal = React.lazy(() => import('./FolderUploadModal').then(m => ({ default: m.FolderUploadModal })));
+const ClearCacheModal = React.lazy(() => import('./ClearCacheModal').then(m => ({ default: m.ClearCacheModal })));
 
 type ActiveSection = 'recent' | 'favorites' | 'folders' | 'profilesearch';
 
@@ -407,6 +409,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                     t={t} lang={lang} theme={theme}
                 />
 
+                <Suspense fallback={null}>
                 {isUploadModalOpen && isSectionWritable(activeSection) && (
                     <UploadModal onClose={() => setIsUploadModalOpen(false)} apiURL={API_PROXY_URL} onAnalyze={handleAnalyze} theme={theme} t={t} />
                 )}
@@ -425,6 +428,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                 )}
 
                 <ClearCacheModal isOpen={isClearCacheModalOpen} onClose={() => setIsClearCacheModalOpen(false)} onConfirm={confirmClearCache} />
+                </Suspense>
             </div>
         </>
     );

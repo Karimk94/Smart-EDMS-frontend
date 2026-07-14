@@ -155,6 +155,7 @@ export function useAdmin() {
             return apiClient.get('/api/admin/security-levels');
         },
         enabled,
+        staleTime: 5 * 60 * 1000, // 5 minutes (rarely changes)
     });
 
     const useSearchPeople = (query: string, enabled: boolean = false) => useQuery({
@@ -164,6 +165,7 @@ export function useAdmin() {
             return apiClient.get(`/api/admin/search-people?search=${encodeURIComponent(query)}`);
         },
         enabled: enabled && query.length >= 2,
+        staleTime: 60 * 1000, // 1 minute
     });
 
     const useProcessingQueueStatus = (enabled: boolean = true) => useQuery({
@@ -268,6 +270,7 @@ export function useAdmin() {
             return data.permissions;
         },
         enabled: enabled && !!userId,
+        staleTime: 60 * 1000,
     });
 
     const upsertTabPermissionMutation = useMutation({
@@ -316,6 +319,7 @@ export function useAdmin() {
             return data.history;
         },
         enabled: enabled && !!docnumber,
+        staleTime: 60 * 1000,
     });
 
     const useAdminProfiles = (search: string = '', enabled: boolean = true) => useQuery({
@@ -326,6 +330,7 @@ export function useAdmin() {
             return data.profiles;
         },
         enabled,
+        staleTime: 5 * 60 * 1000, // 5 minutes
     });
 
     const useProfileGroups = (profileId: number | null, search: string = '', enabled: boolean = true) => useQuery({
@@ -337,6 +342,7 @@ export function useAdmin() {
             return data.groups;
         },
         enabled: enabled && !!profileId,
+        staleTime: 60 * 1000, // 1 minute
     });
 
     const useGroupUsers = (groupId: number | null, search: string = '', enabled: boolean = true) => useQuery({
@@ -348,6 +354,7 @@ export function useAdmin() {
             return data.users;
         },
         enabled: enabled && !!groupId,
+        staleTime: 60 * 1000, // 1 minute
     });
 
     return {

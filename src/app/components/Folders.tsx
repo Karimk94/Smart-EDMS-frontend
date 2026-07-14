@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useAdmin } from '../../hooks/useAdmin';
 import { useDownload } from '../../hooks/useDownload';
 import { FolderItem, useFolderContents } from '../../hooks/useFolderContents';
@@ -11,12 +11,15 @@ import { useAuth } from '../../hooks/useAuth';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { Document } from '../../models/Document';
 import { useToast } from '../context/ToastContext';
-import { CreateFolderModal } from './CreateFolderModal';
-import { HistoryModal } from './HistoryModal';
 import { LoadingButton } from './LoadingButton';
-import SecurityModal from './SecurityModal';
-import ShareModal from './ShareModal';
 import { Spinner } from './Spinner';
+
+// Lazy-loaded modals — only loaded when user opens them via context menu
+const CreateFolderModal = React.lazy(() => import('./CreateFolderModal').then(m => ({ default: m.CreateFolderModal })));
+const HistoryModal = React.lazy(() => import('./HistoryModal').then(m => ({ default: m.HistoryModal })));
+const SecurityModal = React.lazy(() => import('./SecurityModal'));
+const ShareModal = React.lazy(() => import('./ShareModal'));
+
 
 
 interface FoldersProps {
@@ -469,7 +472,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         return <Image src={iconSrc} alt={altText} width={size} height={size} className={invertClass} />;
     };
 
-    const getMediaType = (item: FolderItem) => {
+    const getMediaType = useCallback((item: FolderItem) => {
         // If backend already resolved it to a specific type, rely on it
         if (item.media_type && item.media_type !== 'folder' && item.media_type !== 'file') {
             // Normalize docx to word if needed
@@ -500,10 +503,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         if (['one', 'onetoc2'].includes(ext || '')) return 'onenote';
         if (['json', 'xml', 'yml', 'yaml', 'ini', 'conf'].includes(ext || '')) return 'code';
         return 'file';
-    };
+    }, []);
 
     // Helper function to update URL without full page reload (shallow routing)
-    const updateUrlShallow = (folderId: string | null, newBreadcrumbs: { id: string | null; name: string }[]) => {
+    const updateUrlShallow = useCallback((folderId: string | null, newBreadcrumbs: { id: string | null; name: string }[]) => {
         if (folderId === null) {
             window.history.pushState(null, '', '/folders');
         } else if (['images', 'videos', 'files'].includes(folderId)) {
@@ -513,9 +516,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             const folderName = newBreadcrumbs.length > 0 ? newBreadcrumbs[newBreadcrumbs.length - 1].name : '';
             window.history.pushState(null, '', `/folder/${folderId}?breadcrumbs=${encodeURIComponent(breadcrumbsJson)}&name=${encodeURIComponent(folderName)}`);
         }
-    };
+    }, []);
 
-    const handleNavigate = (folder: FolderItem) => {
+    const handleNavigate = useCallback((folder: FolderItem) => {
         if (folder.name.toLowerCase().endsWith('.zip') || folder.media_type === 'file') {
             showToast(t('contentCannotBeDisplayed') || "Content cannot be displayed", 'info');
             return;
@@ -568,7 +571,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         setCurrentFolderId(folder.id);
         setBreadcrumbs(newBreadcrumbs);
         updateUrlShallow(folder.id, newBreadcrumbs);
-    };
+    }, [breadcrumbs, onDocumentClick, showToast, t, updateUrlShallow, getMediaType]);
 
     const handleBreadcrumbClick = (index: number) => {
         const target = breadcrumbs[index];
@@ -719,6 +722,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         handleNavigate(item);
     };
 
+    const handleBatchDelete = useCallback(() => {
+        if (selectedFileCount === 0) return;
+        setBatchDeleteConfirmOpen(true);
+    }, [selectedFileCount]);
+
     // --- Keyboard navigation ---
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -816,7 +824,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [focusedItemIndex, userItems, isSelectionMode, selectedFileIds, isEditor, confirmModalOpen, itemToRename, isShareModalOpen, isMoveModalOpen, showCreateModal]);
+    }, [focusedItemIndex, userItems, isSelectionMode, selectedFileIds, isEditor, confirmModalOpen, itemToRename, isShareModalOpen, isMoveModalOpen, showCreateModal, handleBatchDelete, handleNavigate]);
 
     const isRectIntersecting = (a: DOMRect, b: { left: number; right: number; top: number; bottom: number }) => {
         return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
@@ -1109,11 +1117,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         setMoveCurrentFolderId(target.id);
         setTargetMoveFolderId(target.id);
         // Hook automatically fetches data based on moveCurrentFolderId change
-    };
-
-    const handleBatchDelete = () => {
-        if (selectedFileCount === 0) return;
-        setBatchDeleteConfirmOpen(true);
     };
 
     const executeBatchDelete = async () => {
@@ -2390,6 +2393,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 </div>
             )}
 
+            <Suspense fallback={null}>
             {isHistoryModalOpen && selectedHistoryItem && (
                 <HistoryModal
                     isOpen={isHistoryModalOpen}
@@ -2435,6 +2439,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     t={t}
                 />
             )}
+            </Suspense>
 
             {confirmModalOpen && (
                 <div

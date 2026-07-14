@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { apiClient } from '../lib/apiClient';
 
 interface DownloadParams {
@@ -37,6 +38,19 @@ function triggerBrowserDownload(url: string, filename?: string) {
 }
 
 export function useDownload() {
+    const activeBlobUrls = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        const currentActiveUrls = activeBlobUrls.current;
+        // Cleanup all blob URLs when the component unmounts to prevent memory leaks
+        return () => {
+            currentActiveUrls.forEach(url => {
+                window.URL.revokeObjectURL(url);
+            });
+            currentActiveUrls.clear();
+        };
+    }, []);
+
     const downloadMutation = useMutation({
         mutationFn: async ({ docId, docname, apiURL, mediaType }: DownloadParams) => {
             const shouldWatermark = shouldUseWatermarkedDownload(docname, mediaType);
@@ -48,6 +62,7 @@ export function useDownload() {
                 return { directUrl: endpoint, filename: docname, useNativeDownload: true };
             }
 
+            // Note: apiClient.raw handles retry on transient failures automatically
             const response = await apiClient.raw(endpoint);
             const contentDisposition = response.headers.get('Content-Disposition');
             let filename = docname;
@@ -70,8 +85,15 @@ export function useDownload() {
             // Create download link
             if (!blob) return;
             const url = window.URL.createObjectURL(blob);
+            activeBlobUrls.current.add(url);
+
             triggerBrowserDownload(url, filename || 'download');
-            window.URL.revokeObjectURL(url);
+
+            // Optionally clean up immediately after a delay, but we rely on unmount cleanup
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                activeBlobUrls.current.delete(url);
+            }, 60000); // Clean up after 1 minute just in case component stays mounted
         },
     });
 
@@ -82,4 +104,5 @@ export function useDownload() {
         downloadError: downloadMutation.error,
     };
 }
+
 

@@ -1,28 +1,42 @@
 'use client';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError } from '../lib/apiClient';
 import { emitToast } from '../lib/toastBridge';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { QueryErrorBoundary } from './components/QueryErrorBoundary';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
         () =>
             new QueryClient({
+                queryCache: new QueryCache({
+                    onError: (error, query) => {
+                        // Global error logging for queries with structured context
+                        console.error(`[Query Error] ${query.queryKey.join(' -> ')}:`, {
+                            message: error.message,
+                            error,
+                            queryKey: query.queryKey,
+                        });
+                    },
+                }),
                 defaultOptions: {
                     queries: {
-                        // With SSR, we usually want to set some default staleTime
-                        // above 0 to avoid refetching immediately on the client
                         staleTime: 60 * 1000, // 1 minute
-                        gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
-                        retry: 1, // Retry failed requests once
-                        refetchOnWindowFocus: false, // Don't refetch on window focus for better UX
+                        gcTime: 5 * 60 * 1000, // 5 minutes
+                        retry: (failureCount, error) => {
+                            if (failureCount >= 2) return false;
+                            if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+                                return false;
+                            }
+                            return true;
+                        },
+                        retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
+                        refetchOnWindowFocus: false, 
                     },
                     mutations: {
-                        retry: 0, // Don't retry mutations by default
+                        retry: 0,
                         onError: (error) => {
-                            // Show a toast for every failed mutation
                             const message =
                                 error instanceof ApiError
                                     ? error.data?.detail || error.data?.error || error.message
@@ -36,9 +50,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
     return (
         <QueryClientProvider client={queryClient}>
-            <ErrorBoundary>
+            <QueryErrorBoundary>
                 {children}
-            </ErrorBoundary>
+            </QueryErrorBoundary>
         </QueryClientProvider>
     );
 }

@@ -6,6 +6,7 @@ import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../context/ToastContext';
 import { useTranslations } from '../../hooks/useTranslations';
 import { InfiniteSelect } from '../../components/InfiniteSelect';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import * as XLSX from 'xlsx';
 
 interface EdmsPerson {
@@ -160,10 +161,12 @@ export default function EdmsUsersTab() {
                 { wch: 20 }, // Username
                 { wch: 30 }, // Full Name
                 { wch: 35 }, // Email
+                { wch: 20 }, // Last Login Date
                 { wch: 40 }, // Groups
+                { wch: 40 }, // Agency - Department - Section
+                { wch: 15 }, // Service User
                 { wch: 15 }, // Allow Login
-                { wch: 15 }, // Disabled
-                { wch: 40 }  // Agency - Department - Section
+                { wch: 15 }  // Disabled
             ];
             worksheet['!cols'] = colWidths;
 
@@ -184,34 +187,38 @@ export default function EdmsUsersTab() {
         }
     };
 
+    const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+    const debouncedHrSearchQuery = useDebouncedValue(hrSearchQuery, 300);
+
     // Fetch EDMS Users
     const { data: usersData, isLoading: isLoadingUsers } = useQuery({
-        queryKey: ['edms-people', currentPage, searchQuery],
+        queryKey: ['edms-people', currentPage, debouncedSearchQuery],
         queryFn: async () => {
             const params = new URLSearchParams({
                 page: String(currentPage),
                 limit: String(perPage)
             });
-            if (searchQuery.length >= 3) {
-                params.append('search', searchQuery);
+            if (debouncedSearchQuery.length >= 3) {
+                params.append('search', debouncedSearchQuery);
             }
             const response = await fetch(`/api/edms-people?${params}`, { credentials: 'include' });
             if (!response.ok) throw new Error('Failed to fetch EDMS people');
             return response.json();
         },
-        enabled: searchQuery.length === 0 || searchQuery.length >= 3,
+        enabled: debouncedSearchQuery.length === 0 || debouncedSearchQuery.length >= 3,
+        placeholderData: (previousData) => previousData, // keepPreviousData for smooth pagination
     });
 
     // Fetch HR Employees
     const { data: hrEmployees, isLoading: isLoadingHr } = useQuery({
-        queryKey: ['hr-employees', hrSearchQuery],
+        queryKey: ['hr-employees', debouncedHrSearchQuery],
         queryFn: async () => {
-            if (hrSearchQuery.length < 3) return [];
-            const response = await fetch(`/api/edms-people/hr-employees?search=${encodeURIComponent(hrSearchQuery)}`, { credentials: 'include' });
+            if (debouncedHrSearchQuery.length < 3) return [];
+            const response = await fetch(`/api/edms-people/hr-employees?search=${encodeURIComponent(debouncedHrSearchQuery)}`, { credentials: 'include' });
             if (!response.ok) throw new Error('Failed to fetch HR employees');
             return response.json();
         },
-        enabled: hrSearchQuery.length >= 3,
+        enabled: debouncedHrSearchQuery.length >= 3,
     });
 
     // Fetch Groups

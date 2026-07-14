@@ -20,6 +20,7 @@
     "react": "^19",
     "react-datepicker": "^8.7.0",
     "react-dom": "^19",
+    "react-error-boundary": "^6.1.2",
     "react-select": "^5.10.2",
     "react-select-async-paginate": "^0.7.11",
     "xlsx": "^0.18.5"

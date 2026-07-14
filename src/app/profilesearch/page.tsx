@@ -3,7 +3,7 @@
 import { enGB } from 'date-fns/locale/en-GB';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { SearchCriterion, SearchType, useProfileMultiSearch, useProfileSearchScopes, useProfileSearchTypes } from '../../hooks/useProfileSearch';
@@ -11,20 +11,28 @@ import { useDocumentGroups } from '../../hooks/useDocumentGroups';
 import { Document } from '../../models/Document';
 import { DocumentItemSkeleton } from '../components/DocumentItemSkeleton';
 import { DocumentList } from '../components/DocumentList';
-import { ExcelModal } from '../components/ExcelModal';
-import { FileModal } from '../components/FileModal';
 import { Header } from '../components/Header';
-import { ImageModal } from '../components/ImageModal';
 import { Pagination } from '../components/Pagination';
-import { PdfModal } from '../components/PdfModal';
-import { PowerPointModal } from '../components/PowerPointModal';
 import { Sidebar } from '../components/Sidebar';
-import { PageSpinner } from '../components/Spinner';
-import { TxtModal } from '../components/TxtModal';
-import { VideoModal } from '../components/VideoModal';
-import { WordModal } from '../components/WordModal';
+import { PageSpinner, Spinner } from '../components/Spinner';
 import { useUser } from '../context/UserContext';
 import { useTranslations } from '../hooks/useTranslations';
+
+// Lazy-loaded modal components — only loaded when a user opens a document
+const ExcelModal = React.lazy(() => import('../components/ExcelModal').then(m => ({ default: m.ExcelModal })));
+const FileModal = React.lazy(() => import('../components/FileModal').then(m => ({ default: m.FileModal })));
+const ImageModal = React.lazy(() => import('../components/ImageModal').then(m => ({ default: m.ImageModal })));
+const PdfModal = React.lazy(() => import('../components/PdfModal').then(m => ({ default: m.PdfModal })));
+const PowerPointModal = React.lazy(() => import('../components/PowerPointModal').then(m => ({ default: m.PowerPointModal })));
+const TxtModal = React.lazy(() => import('../components/TxtModal').then(m => ({ default: m.TxtModal })));
+const VideoModal = React.lazy(() => import('../components/VideoModal').then(m => ({ default: m.VideoModal })));
+const WordModal = React.lazy(() => import('../components/WordModal').then(m => ({ default: m.WordModal })));
+
+const ModalLoadingFallback = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+        <Spinner size="lg" />
+    </div>
+);
 
 registerLocale('en-GB', enGB);
 
@@ -529,7 +537,8 @@ function ProfileSearchPageContent() {
                     </main>
                 </div>
 
-                {/* Modals */}
+                {/* Modals — lazy-loaded with Suspense */}
+                <Suspense fallback={<ModalLoadingFallback />}>
                 {selectedDoc && (() => {
                     const navHandlers = createNavigationHandlers(selectedDoc, setSelectedDoc);
                     const searchContext = getSearchContext(selectedDoc);
@@ -658,6 +667,7 @@ function ProfileSearchPageContent() {
                         {...searchContext}
                     />;
                 })()}
+                </Suspense>
             </div>
         </>
     );

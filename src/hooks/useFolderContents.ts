@@ -51,6 +51,7 @@ export function useFolderContents({
         },
         enabled: isEnabled,
         staleTime: 1000 * 60, // 1 minute
+        placeholderData: keepPreviousData,
     });
 }
 

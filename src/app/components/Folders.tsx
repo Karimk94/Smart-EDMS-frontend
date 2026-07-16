@@ -530,6 +530,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             setDebouncedSearchTerm('');
         }
 
+        // Prevent navigating to the exact same folder we are already in (avoids duplicate breadcrumbs on rapid double-clicks while loading)
+        if (breadcrumbs.length > 0 && breadcrumbs[breadcrumbs.length - 1].id === folder.id) {
+            return;
+        }
+
         if (folder.is_standard) {
             // For standard folders (images, videos, files), use internal state update
             setCurrentFolderId(folder.id);
@@ -1361,26 +1366,93 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 credentials: 'include',
             });
 
-            if (response.status === 413) {
+            if (!response.ok) {
+                if (response.status === 413) {
+                    let errMsg = t('folderTooLarge') || "Unable to download: folder size exceeds the limit. Please download individual files instead.";
+                    try {
+                        const errData = await response.json();
+                        if (errData && errData.detail) errMsg = errData.detail;
+                    } catch (e) {}
+                    showToast(errMsg, 'error');
+                } else if (response.status === 404) {
+                    showToast("Folder has no files to download", 'error');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 removeToast(toastId);
-                showToast(t('folderTooLarge') || "Unable to download: folder size exceeds the 300 MB limit. Please download individual files instead.", 'error');
                 return;
             }
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+            // Check if response is JSON (multipart manifest) or Blob (single ZIP)
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const manifest = await response.json();
+                removeToast(toastId);
+                
+                if (manifest.multipart && manifest.total_parts > 0) {
+                    const partsCount = manifest.total_parts;
+                    showToast(`Large folder detected. Downloading in ${partsCount} parts...`, 'info');
+                    
+                    // Download parts sequentially
+                    for (let i = 1; i <= partsCount; i++) {
+                        const partToastId = showToast(`Downloading part ${i} of ${partsCount}...`, 'info', 'subtle', 0);
+                        try {
+                            const partResponse = await fetch(`${apiURL}/folders/${item.id}/download-zip?part=${i}`, {
+                                method: 'GET',
+                                credentials: 'include',
+                            });
+                            
+                            if (!partResponse.ok) throw new Error(`HTTP ${partResponse.status}`);
+                            
+                            const blob = await partResponse.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            
+                            // Try to get filename from Content-Disposition header, fallback to part_filename
+                            const disposition = partResponse.headers.get('Content-Disposition');
+                            let filename = `${manifest.folder_name}_Part${i}of${partsCount}.zip`;
+                            if (disposition) {
+                                const match = disposition.match(/filename="?([^"]+)"?/);
+                                if (match && match[1]) filename = match[1];
+                            }
+                            
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        } catch (err) {
+                            console.error(`Failed to download part ${i}`, err);
+                            showToast(`Failed to download part ${i} of ${partsCount}`, 'error');
+                        } finally {
+                            removeToast(partToastId);
+                        }
+                    }
+                    showToast(`Finished downloading ${partsCount} parts`, 'success');
+                }
+            } else {
+                // Single ZIP file
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                // Try to get filename from Content-Disposition header
+                const disposition = response.headers.get('Content-Disposition');
+                let filename = `${item.name}.zip`;
+                if (disposition) {
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    if (match && match[1]) filename = match[1];
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                removeToast(toastId);
             }
-
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${item.name}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            removeToast(toastId);
         } catch (err) {
             removeToast(toastId);
             showToast(t('zipDownloadError') || "Failed to download folder as ZIP", 'error');

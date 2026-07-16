@@ -14,6 +14,7 @@ export interface EdmsUser {
     theme: string;
     remaining_quota: number;
     quota: number;
+    allow_large_downloads: boolean;
 }
 
 export interface SecurityLevel {
@@ -112,6 +113,7 @@ interface AddUserParams {
     security_level_id: number;
     lang: string;
     theme: string;
+    allow_large_downloads?: boolean;
 }
 
 interface UpdateUserParams {
@@ -121,6 +123,7 @@ interface UpdateUserParams {
     theme: string;
     remaining_quota: number | null;
     quota: number | null;
+    allow_large_downloads?: boolean;
 }
 
 export function useAdmin() {

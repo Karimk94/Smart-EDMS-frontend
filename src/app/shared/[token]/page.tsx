@@ -221,7 +221,7 @@ export default function SharedDocumentPage() {
   }, []);
 
   const t = useTranslations(lang);
-  const { showToast } = useToast();
+  const { showToast, removeToast } = useToast();
 
   // Shared Auth Hook
   const {
@@ -310,6 +310,7 @@ export default function SharedDocumentPage() {
   const [fileName, setFileName] = useState<string>('document');
   const [fileType, setFileType] = useState<string>('application/octet-stream');
   const [isDownloading, setIsDownloading] = useState(false); // Add downloading state
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(false); // Initial load state
 
   // Excel State
@@ -1124,6 +1125,113 @@ export default function SharedDocumentPage() {
     );
   };
 
+  const handleDownloadFolderZip = async () => {
+    if (!rootFolderId || !viewerEmail) return;
+
+    showToast(t('zipSkipsFoldersNotice') || "Note: only files in this folder will be downloaded. Subfolders are skipped.", 'info');
+    const toastId = showToast(t('downloadingZip') || "Preparing ZIP download...", 'info', 'subtle', 0);
+    setIsDownloadingZip(true);
+    try {
+      const response = await fetch(`/api/share/download-folder-zip/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 413) {
+          let errMsg = t('folderTooLarge') || "Unable to download: folder size exceeds the limit. Please download individual files instead.";
+          try {
+            const errData = await response.json();
+            if (errData && errData.detail) errMsg = errData.detail;
+          } catch (e) {}
+          showToast(errMsg, 'error');
+        } else if (response.status === 404) {
+          showToast("Folder has no files to download", 'error');
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        removeToast(toastId);
+        return;
+      }
+
+      // Check if response is JSON (multipart manifest) or Blob (single ZIP)
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const manifest = await response.json();
+        removeToast(toastId);
+        
+        if (manifest.multipart && manifest.total_parts > 0) {
+          const partsCount = manifest.total_parts;
+          showToast(`Large folder detected. Downloading in ${partsCount} parts...`, 'info');
+          
+          // Download parts sequentially
+          for (let i = 1; i <= partsCount; i++) {
+            const partToastId = showToast(`Downloading part ${i} of ${partsCount}...`, 'info', 'subtle', 0);
+            try {
+              const partResponse = await fetch(`/api/share/download-folder-zip/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&part=${i}`, {
+                method: 'GET',
+                credentials: 'include',
+              });
+              
+              if (!partResponse.ok) throw new Error(`HTTP ${partResponse.status}`);
+              
+              const blob = await partResponse.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              
+              // Try to get filename from Content-Disposition header, fallback to part_filename
+              const disposition = partResponse.headers.get('Content-Disposition');
+              let filename = `${manifest.folder_name}_Part${i}of${partsCount}.zip`;
+              if (disposition) {
+                const match = disposition.match(/filename="?([^"]+)"?/);
+                if (match && match[1]) filename = match[1];
+              }
+              
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              console.error(`Failed to download part ${i}`, err);
+              showToast(`Failed to download part ${i} of ${partsCount}`, 'error');
+            } finally {
+              removeToast(partToastId);
+            }
+          }
+          showToast(`Finished downloading ${partsCount} parts`, 'success');
+        }
+      } else {
+        // Single ZIP file
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Try to get filename from Content-Disposition header
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = `${currentFolderName}.zip`;
+        if (disposition) {
+          const match = disposition.match(/filename="?([^"]+)"?/);
+          if (match && match[1]) filename = match[1];
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        removeToast(toastId);
+      }
+    } catch (err) {
+      removeToast(toastId);
+      showToast(t('zipDownloadError') || "Failed to download folder as ZIP", 'error');
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  };
+
   // Render folder contents view
   const renderFolderContents = () => {
     // If a file is selected but not yet loaded, show loading state
@@ -1299,9 +1407,25 @@ export default function SharedDocumentPage() {
                 <Spinner size="xs" />
               )}
             </div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {folderContents.length} {t('items') || 'items'}
-            </span>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {folderContents.length} {t('items') || 'items'}
+              </span>
+              {folderContents.length > 0 && (
+                <button
+                  onClick={handleDownloadFolderZip}
+                  disabled={isDownloadingZip}
+                  className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center gap-2 ${isDownloadingZip ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  {isDownloadingZip ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Image src="/download.svg" alt="" width={16} height={16} className="w-4 h-4 invert" />
+                  )}
+                  {t('downloadAllAsZip' as any) || 'Download All as ZIP'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

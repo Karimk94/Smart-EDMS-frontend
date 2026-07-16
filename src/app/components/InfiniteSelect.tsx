@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Spinner } from './Spinner';
 
@@ -30,6 +31,7 @@ export const InfiniteSelect: React.FC<InfiniteSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const [dropdownMaxHeight, setDropdownMaxHeight] = useState(240);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -61,6 +63,15 @@ export const InfiniteSelect: React.FC<InfiniteSelectProps> = ({
 
     setOpenUpward(shouldOpenUp);
     setDropdownMaxHeight(nextMaxHeight);
+
+    setDropdownStyle({
+      position: 'fixed',
+      width: rect.width,
+      left: rect.left,
+      top: shouldOpenUp ? 'auto' : rect.bottom + 6,
+      bottom: shouldOpenUp ? window.innerHeight - rect.top + 6 : 'auto',
+      zIndex: 99999,
+    });
   }, [onSearch]);
 
   useEffect(() => {
@@ -130,11 +141,12 @@ export const InfiniteSelect: React.FC<InfiniteSelectProps> = ({
         </span>
       </button>
 
-      {isOpen && (
+      {isOpen && typeof document !== 'undefined' && createPortal(
         <div
           ref={dropdownRef}
-          className={`absolute z-[1000] w-full rounded-xl border border-gray-200 bg-white py-1 text-base shadow-2xl ring-1 ring-black/5 focus:outline-none sm:text-sm dark:border-gray-600 dark:bg-gray-700 ${openUpward ? 'bottom-[calc(100%+0.375rem)]' : 'top-[calc(100%+0.375rem)]'}`}
+          className="w-full rounded-xl border border-gray-200 bg-white py-1 text-base shadow-2xl ring-1 ring-black/5 focus:outline-none sm:text-sm dark:border-gray-600 dark:bg-gray-700"
           style={{
+            ...dropdownStyle,
             transformOrigin: openUpward ? 'bottom left' : 'top left',
           }}
         >
@@ -201,7 +213,8 @@ export const InfiniteSelect: React.FC<InfiniteSelectProps> = ({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

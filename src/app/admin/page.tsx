@@ -113,6 +113,7 @@ export default function AdminPage() {
     const [selectedSecurityLevel, setSelectedSecurityLevel] = useState<number | null>(null);
     const [selectedLang, setSelectedLang] = useState("en");
     const [selectedTheme, setSelectedTheme] = useState("light");
+    const [selectedAllowLargeDownloads, setSelectedAllowLargeDownloads] = useState(false);
     const [addTabPermissions, setAddTabPermissions] = useState<AddTabPermissionsState>(createDefaultAddTabPermissions);
 
     // People Search Query
@@ -125,6 +126,7 @@ export default function AdminPage() {
     const [editTheme, setEditTheme] = useState("light");
     const [editQuota, setEditQuota] = useState<number | null>(null);
     const [editTotalQuota, setEditTotalQuota] = useState<number | null>(null);
+    const [editAllowLargeDownloads, setEditAllowLargeDownloads] = useState(false);
 
     // Tab Permissions Query (per-user, only when editing a user)
     const { data: editUserTabPerms = [] } = useTabPermissions(
@@ -189,6 +191,7 @@ export default function AdminPage() {
                 security_level_id: selectedSecurityLevel,
                 lang: selectedLang,
                 theme: selectedTheme,
+                allow_large_downloads: selectedAllowLargeDownloads,
             });
 
             // Create default tab permissions for the new user
@@ -222,6 +225,7 @@ export default function AdminPage() {
         setSelectedSecurityLevel(null);
         setSelectedLang("en");
         setSelectedTheme("light");
+        setSelectedAllowLargeDownloads(false);
         setAddTabPermissions(createDefaultAddTabPermissions());
         setSearchQuery("");
         // searchResults is derived from query, so clearing query clears results
@@ -234,6 +238,7 @@ export default function AdminPage() {
         setEditTheme(user.theme);
         setEditQuota(user.remaining_quota);
         setEditTotalQuota(user.quota);
+        setEditAllowLargeDownloads(user.allow_large_downloads);
     };
 
     const closeEditModal = () => {
@@ -241,9 +246,9 @@ export default function AdminPage() {
         setEditSecurityLevel(null);
         setEditLang("en");
         setEditTheme("light");
-        setEditTheme("light");
         setEditQuota(null);
         setEditTotalQuota(null);
+        setEditAllowLargeDownloads(false);
     };
 
     useEffect(() => {
@@ -253,10 +258,10 @@ export default function AdminPage() {
             if (event.key === "Escape") {
                 setEditTarget(null);
                 setEditSecurityLevel(null);
-                setEditLang("en");
                 setEditTheme("light");
                 setEditQuota(null);
                 setEditTotalQuota(null);
+                setEditAllowLargeDownloads(false);
             }
         };
 
@@ -278,6 +283,7 @@ export default function AdminPage() {
                 theme: editTheme,
                 remaining_quota: editQuota,
                 quota: editTotalQuota,
+                allow_large_downloads: editAllowLargeDownloads,
             });
 
             showToast("User updated successfully", "success");
@@ -407,25 +413,25 @@ export default function AdminPage() {
                         onClick={() => setActiveAdminTab('users')}
                         className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
                     >
-                        Users
+                        {t('adminUsers') || 'Users'}
                     </button>
                     <button
                         onClick={() => setActiveAdminTab('worker')}
                         className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'worker' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
                     >
-                        Worker
+                        {t('worker') || 'Worker'}
                     </button>
                     <button
                         onClick={() => setActiveAdminTab('edms_users')}
                         className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'edms_users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
                     >
-                        EDMS Users
+                        {t('edmsUsers') || 'EDMS Users'}
                     </button>
                     <button
                         onClick={() => setActiveAdminTab('profiles')}
                         className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'profiles' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
                     >
-                        {t('adminProfiles')}
+                        {t('adminProfiles') || 'Profiles'}
                     </button>
                 </div>
 
@@ -638,9 +644,9 @@ export default function AdminPage() {
                     {/* Table Header with Search and Add Button */}
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="flex items-center gap-3">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">EDMS Users</h2>
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('edmsUsers') || 'EDMS Users'}</h2>
                             <span className="text-sm text-gray-500 dark:text-gray-400">
-                                ({totalUsers} total)
+                                ({totalUsers} {t('total') || 'total'})
                             </span>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -650,7 +656,7 @@ export default function AdminPage() {
                                     type="text"
                                     value={userFilter}
                                     onChange={(e) => setUserFilter(e.target.value)}
-                                    placeholder="Search users or names..."
+                                    placeholder={t('searchUsers') || "Search users or names..."}
                                     className="w-full sm:w-64 px-3 py-2 pl-9 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                                 />
                                 <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:invert" />
@@ -666,38 +672,39 @@ export default function AdminPage() {
                                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 text-sm font-medium"
                             >
                                 <Image src="/icons/plus.svg" alt="" width={16} height={16} className="h-4 w-4 invert" />
-                                Add User
+                                {t('addUser') || 'Add User'}
                             </button>
                         </div>
                     </div>
 
                     {/* Table */}
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Username
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Full Name
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Security Level
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Language
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Theme
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Quota (Usage)
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        {t('username') || 'Username'}
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        {t('fullName') || 'Full Name'}
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        {t('securityLevel') || 'Security Level'}
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        {t('language') || 'Language'}
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        {t('theme') || 'Theme'}
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        {t('quotaUsage') || 'Quota (Usage)'}
+                                    </th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        {t('actions') || 'Actions'}
+                                    </th>
+                                </tr>
+                            </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             {users.map((user) => (
                                 <tr
@@ -713,12 +720,19 @@ export default function AdminPage() {
                                         {user.full_name || user.username}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                                        <span className={`px-2 py-1 rounded text-xs font-medium ${user.security_level === 'Admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                                            user.security_level === 'Editor' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                            }`}>
-                                            {user.security_level}
-                                        </span>
+                                        <div className="flex flex-col gap-1">
+                                            <span className={`px-2 py-1 rounded text-xs font-medium w-fit ${user.security_level === 'Admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                                                user.security_level === 'Editor' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                                }`}>
+                                                {user.security_level}
+                                            </span>
+                                            {user.allow_large_downloads && (
+                                                <span className="px-2 py-1 rounded text-xs font-medium w-fit bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300" title="Can download folders > 1GB">
+                                                    &gt;1 GB Allowed
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                         {user.lang.toUpperCase()}
@@ -734,13 +748,13 @@ export default function AdminPage() {
                                             onClick={() => openEditModal(user)}
                                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                                         >
-                                            Edit
+                                            {t('edit') || 'Edit'}
                                         </button>
                                         <button
                                             onClick={() => setDeleteTarget(user)}
                                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                                         >
-                                            Delete
+                                            {t('delete') || 'Delete'}
                                         </button>
                                     </td>
                                 </tr>
@@ -748,7 +762,7 @@ export default function AdminPage() {
                             {users.length === 0 && !isLoadingUsers && (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                        {userFilter ? "No users match your search" : "No users found"}
+                                        {userFilter ? (t('noUsersMatch') || "No users match your search") : (t('noUsersFound') || "No users found")}
                                     </td>
                                 </tr>
                             )}
@@ -761,12 +775,13 @@ export default function AdminPage() {
                             )}
                         </tbody>
                     </table>
+                    </div>
 
                     {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalUsers)} of {totalUsers}
+                                {t('showing') || 'Showing'} {((currentPage - 1) * ITEMS_PER_PAGE) + 1} {t('to') || 'to'} {Math.min(currentPage * ITEMS_PER_PAGE, totalUsers)} {t('of') || 'of'} {totalUsers}
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
@@ -774,17 +789,17 @@ export default function AdminPage() {
                                     disabled={currentPage === 1 || isLoadingUsers}
                                     className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                                 >
-                                    First
+                                    {t('first') || 'First'}
                                 </button>
                                 <button
                                     onClick={() => goToPage(currentPage - 1)}
                                     disabled={currentPage === 1 || isLoadingUsers}
                                     className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                                 >
-                                    Previous
+                                    {t('previous') || 'Previous'}
                                 </button>
                                 <span className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
-                                    Page {currentPage} of {totalPages}
+                                    {t('page')} {currentPage} {t('of')} {totalPages}
                                 </span>
                                 <button
                                     onClick={() => goToPage(currentPage + 1)}
@@ -942,6 +957,20 @@ export default function AdminPage() {
                                         ))}
                                     </select>
                                 </div>
+                            </div>
+
+                            {/* Allow Large Downloads */}
+                            <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Allow Large Downloads</h4>
+                                    <p className="text-xs text-gray-500 mt-1">Allows downloading folders larger than 1 GB</p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedAllowLargeDownloads(!selectedAllowLargeDownloads)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedAllowLargeDownloads ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'} cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedAllowLargeDownloads ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
                             </div>
 
                             {/* Tab Permissions Toggles */}
@@ -1136,6 +1165,20 @@ export default function AdminPage() {
                                 </div>
                             </div>
                             <p className="text-xs text-gray-500 mt-1">Default 1GB = 1073741824 bytes</p>
+
+                            {/* Allow Large Downloads */}
+                            <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Allow Large Downloads</h4>
+                                    <p className="text-xs text-gray-500 mt-1">Allows downloading folders larger than 1 GB</p>
+                                </div>
+                                <button
+                                    onClick={() => setEditAllowLargeDownloads(!editAllowLargeDownloads)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editAllowLargeDownloads ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'} cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editAllowLargeDownloads ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
 
                             {/* Tab Permissions Toggles */}
                             {editTarget.security_level !== 'Admin' && (

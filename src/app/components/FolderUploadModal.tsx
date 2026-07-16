@@ -246,13 +246,13 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
               if (response.success) {
                 updateFileStatus(id, 'success', { progress: 100, docnumber: response.docnumber });
               } else {
-                updateFileStatus(id, 'error', { error: response.error || 'Upload failed.' });
+                updateFileStatus(id, 'error', { error: response.error || t('uploadFailed') });
               }
             } catch (e) {
-              updateFileStatus(id, 'error', { error: 'Failed to parse server response.' });
+              updateFileStatus(id, 'error', { error: t('failedToParseServerResponse') });
             }
           } else {
-            let errorMsg = `Server error: ${xhr.status}`;
+            let errorMsg = `${t('serverError')} ${xhr.status}`;
             try {
               const response = JSON.parse(xhr.responseText);
               errorMsg = response.error || errorMsg;
@@ -266,7 +266,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
         };
 
         xhr.onerror = () => {
-          updateFileStatus(id, 'error', { error: 'Network error during upload.' });
+          updateFileStatus(id, 'error', { error: t('networkErrorDuringUpload') });
           resolve();
         };
 
@@ -293,16 +293,16 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
   const pendingFilesCount = files.filter(f => f.status === 'pending').length;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Upload to folder">
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8" role="dialog" aria-modal="true" aria-label={t('uploadToFolder')}>
       {/* Distinct Header for Folder Upload */}
       <div className="flex-shrink-0 flex justify-between items-center mb-6 bg-blue-900/30 p-4 rounded-lg border border-blue-800">
         <div className="flex flex-col">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Image src="/folder.svg" alt="" width={24} height={24} className="brightness-0 invert" />
-            Upload to Folder
+            {t('uploadToFolder')}
           </h2>
           <p className="text-sm text-gray-300 mt-1">
-            Target Directory: <span className="text-blue-300 font-bold underline">{parentName || 'Home'}</span>
+            {t('targetDirectory')} <span className="text-blue-300 font-bold underline">{parentName || t('home')}</span>
           </p>
         </div>
         <button onClick={handleClose} disabled={isUploading} className="text-gray-400 hover:text-white disabled:opacity-50 p-1"><Image src="/icons/close.svg" alt="" width={24} height={24} className="invert" /></button>
@@ -316,12 +316,12 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             onDragLeave={onDragLeave}
             className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-blue-500 bg-[#222]' : 'border-gray-600'}`}>
             <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2 invert" />
-            <p className="mt-2 text-lg text-gray-300">Drag & Drop files here</p>
-            <p className="text-sm text-gray-500">or</p>
+            <p className="mt-2 text-lg text-gray-300">{t('dragAndDrop')}</p>
+            <p className="text-sm text-gray-500">{t('or')}</p>
 
             {/* Browse individual files */}
             <label htmlFor="folder-file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
-              Browse Files
+              {t('browseFiles')}
             </label>
             <input id="folder-file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
 
@@ -329,10 +329,10 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             <label
               htmlFor="folder-directory-upload"
               className="mt-2 cursor-pointer px-4 py-2 bg-indigo-700 text-white text-sm font-medium rounded-md hover:bg-indigo-800 transition flex items-center gap-2"
-              title="Select a folder — all files inside (including subfolders) will be added"
+              title={t('selectFolderTooltip')}
             >
               <Image src="/folder.svg" alt="" width={16} height={16} className="brightness-0 invert" />
-              Select Folder
+              {t('selectFolder')}
             </label>
             <input
               id="folder-directory-upload"
@@ -343,14 +343,14 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
               multiple
               onChange={handleFolderSelect}
             />
-            <p className="mt-2 text-xs text-gray-500">Selects all files inside the folder recursively</p>
+            <p className="mt-2 text-xs text-gray-500">{t('selectsAllFilesRecursively')}</p>
           </div>
         </div>
 
         <div className="w-full md:w-2/3 flex flex-col bg-[#282828] rounded-xl p-4 md:p-6 border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <span className="bg-blue-600 w-2 h-2 rounded-full"></span>
-            File Queue ({files.length})
+            {t('fileQueue')} ({files.length})
           </h3>
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 mb-4">
             {files.length > 0 ? (
@@ -365,8 +365,8 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
               ))
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                <p>No files selected.</p>
-                <p className="text-xs text-gray-600 mt-1">Files will be added to {parentName}</p>
+                <p>{t('noFilesSelected')}</p>
+                <p className="text-xs text-gray-600 mt-1">{t('filesWillBeAddedTo')} {parentName}</p>
               </div>
             )}
           </div>
@@ -385,7 +385,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
               disabled={isUploading}
               className="px-4 py-2 md:px-6 md:py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition disabled:bg-gray-500 disabled:cursor-not-allowed"
             >
-              {hasUploaded ? 'Finish' : 'Cancel'}
+              {hasUploaded ? t('finish') : t('cancel')}
             </button>
           </div>
         </div>

@@ -215,16 +215,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
                 updateFileStatus(id, 'success', { progress: 100, docnumber: response.docnumber });
                 successCount++;
               } else {
-                const errorMsg = response.error || 'Upload failed.';
+                const errorMsg = response.error || t('uploadFailed');
                 updateFileStatus(id, 'error', { error: errorMsg });
                 errorCount++;
               }
             } catch (e) {
-              updateFileStatus(id, 'error', { error: 'Failed to parse server response.' });
+              updateFileStatus(id, 'error', { error: t('failedToParseServerResponse') });
               errorCount++;
             }
           } else {
-            let errorMsg = `Server error: ${xhr.status}`;
+            let errorMsg = `${t('serverError')} ${xhr.status}`;
             try {
               const response = JSON.parse(xhr.responseText);
               errorMsg = response.error || errorMsg;
@@ -237,7 +237,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
         };
 
         xhr.onerror = () => {
-          updateFileStatus(id, 'error', { error: 'Network error during upload.' });
+          updateFileStatus(id, 'error', { error: t('networkErrorDuringUpload') });
           errorCount++;
           resolve();
         };
@@ -273,9 +273,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
   const successfulUploadsCount = files.filter(f => f.status === 'success' && f.docnumber != null).length;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Upload document">
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8" role="dialog" aria-modal="true" aria-label={t('uploadDocument')}>
       <div className="flex-shrink-0 flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white">Upload Documents</h2>
+        <h2 className="text-2xl font-bold text-white">{t('uploadDocuments')}</h2>
         <button onClick={onClose} disabled={isUploading} className="text-gray-400 hover:text-white text-3xl disabled:opacity-50">&times;</button>
       </div>
 
@@ -286,17 +286,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
             onDragOver={onDragOver}
             className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-red-500 bg-[#222]' : 'border-gray-600'}`}>
             <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2 invert" />
-            <p className="mt-2 text-lg text-gray-300">Drag & Drop files here</p>
-            <p className="text-sm text-gray-500">or</p>
+            <p className="mt-2 text-lg text-gray-300">{t('dragAndDrop')}</p>
+            <p className="text-sm text-gray-500">{t('or')}</p>
             <label htmlFor="file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-600 transition">
-              Browse Files
+              {t('browseFiles')}
             </label>
             <input id="file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
           </div>
         </div>
 
         <div className="w-full md:w-2/3 flex flex-col bg-[#282828] rounded-xl p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Upload Queue ({files.length})</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">{t('uploadQueue')} ({files.length})</h3>
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 mb-4">
             {files.length > 0 ? (
               files.map(f => (
@@ -310,7 +310,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
               ))
             ) : (
               <div className="h-full flex items-center justify-center text-gray-500">
-                Select files to begin.
+                {t('selectFilesToBegin')}
               </div>
             )}
           </div>
@@ -329,14 +329,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
               disabled={successfulUploadsCount === 0 || isUploading}
               className="px-4 py-2 md:px-6 md:py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
             >
-              Analyze with AI ({successfulUploadsCount})
+              {t('analyzeWithAI')} ({successfulUploadsCount})
             </button>
             <button
               onClick={onClose}
               disabled={isUploading}
               className="px-4 py-2 md:px-6 md:py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition disabled:bg-gray-500 disabled:cursor-not-allowed"
             >
-              Close
+              {t('close')}
             </button>
           </div>
         </div>

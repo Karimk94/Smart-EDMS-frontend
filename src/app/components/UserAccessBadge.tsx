@@ -10,6 +10,7 @@ type UserPermission = {
 
 type HeaderUser = {
   username?: string;
+  full_name?: string;
   security_level?: string;
   tab_permissions?: UserPermission[];
 };
@@ -97,9 +98,9 @@ export const UserAccessBadge: React.FC<UserAccessBadgeProps> = ({
         className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
       >
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-semibold">
-          {user.username.charAt(0).toUpperCase()}
+          {(user.full_name || user.username).charAt(0).toUpperCase()}
         </span>
-        <span className="max-w-[120px] truncate font-medium">{user.username}</span>
+        <span className="max-w-[120px] truncate font-medium">{user.full_name || user.username}</span>
       </button>
 
       <div

@@ -5,6 +5,7 @@ import { apiClient } from '../lib/apiClient';
 
 interface User {
     username: string;
+    full_name?: string;
     security_level: string;
     lang: 'en' | 'ar';
     theme: 'light' | 'dark';

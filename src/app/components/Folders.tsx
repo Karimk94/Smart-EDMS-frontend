@@ -126,14 +126,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         });
     const [isOperationLoading, setIsOperationLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
     const isLoading = isInitialLoading || isOperationLoading;
 
-    // Auto-clear operation loading & refreshing when fetch settles
+    // Auto-clear operation loading, refreshing & navigation when fetch settles
     const prevIsFetchingRef = useRef(false);
     useEffect(() => {
         if (prevIsFetchingRef.current && !isFetching) {
             setIsOperationLoading(false);
             setIsRefreshing(false);
+            setIsNavigating(false);
         }
         prevIsFetchingRef.current = isFetching;
     }, [isFetching]);
@@ -537,6 +539,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
         if (folder.is_standard) {
             // For standard folders (images, videos, files), use internal state update
+            setIsNavigating(true);
             setCurrentFolderId(folder.id);
             setBreadcrumbs([{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
             updateUrlShallow(folder.id, [{ id: null, name: t('home') || 'Home' }, { id: folder.id, name: t(folder.id) || folder.name }]);
@@ -572,6 +575,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
 
         // Internal state navigation for dynamic folders (no full page reload)
+        setIsNavigating(true);
         const newBreadcrumbs = [...breadcrumbs, { id: folder.id, name: folder.name }];
         setCurrentFolderId(folder.id);
         setBreadcrumbs(newBreadcrumbs);
@@ -580,6 +584,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     const handleBreadcrumbClick = (index: number) => {
         const target = breadcrumbs[index];
+        // Don't navigate if already on this crumb
+        if (index === breadcrumbs.length - 1) return;
+        setIsNavigating(true);
         if (target.id === null) {
             // Navigate back to root folders
             setCurrentFolderId(null);
@@ -1597,6 +1604,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     return (
         <div ref={containerRef} className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
 
+            {/* Navigation progress bar — appears immediately on folder click */}
+            <div
+                className={`absolute top-0 left-0 right-0 z-50 h-[3px] overflow-hidden transition-opacity duration-300 ${isNavigating || (isFetching && !isRefreshing) ? 'opacity-100' : 'opacity-0'}`}
+                aria-hidden="true"
+            >
+                <div className="h-full bg-gradient-to-r from-blue-400 via-blue-600 to-blue-400 animate-nav-progress" />
+            </div>
+
             <div className="relative border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
                 <div className="flex items-center justify-between px-6 py-4">
                     <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 overflow-x-auto no-scrollbar flex-grow">
@@ -1787,6 +1802,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     </div>
                 )}
                 {isLoading ? (
+                    <div className="py-8">
+                        <Spinner size="lg" center label={t('loading') || 'Loading...'} />
+                    </div>
+                ) : isNavigating ? (
                     <div className="py-8">
                         <Spinner size="lg" center label={t('loading') || 'Loading...'} />
                     </div>

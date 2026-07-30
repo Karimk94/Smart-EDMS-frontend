@@ -240,6 +240,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const [isBatchMoving, setIsBatchMoving] = useState(false);
     const [isBatchDeleting, setIsBatchDeleting] = useState(false);
     const [isBatchDownloading, setIsBatchDownloading] = useState(false);
+    const [downloadingItemIds, setDownloadingItemIds] = useState<Set<string>>(new Set());
 
     // Use react-query hook for move modal folders with caching
     const { data: moveFolderItems = [], isLoading: isMoveFoldersLoading, isFetching: isMoveFoldersFetching } = useMoveModalFolders({
@@ -1349,15 +1350,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
     const handleDownload = (item: FolderItem) => {
         const toastId = showToast(t('downloading') || "Downloading...", 'info', 'subtle', 0);
+        setDownloadingItemIds(prev => { const next = new Set(prev); next.add(item.id); return next; });
         const mediaType = getMediaType(item);
         download(
             { docId: item.id, docname: item.name, apiURL, mediaType },
             {
                 onSuccess: () => {
                     removeToast(toastId);
+                    setDownloadingItemIds(prev => { const next = new Set(prev); next.delete(item.id); return next; });
                 },
                 onError: () => {
                     removeToast(toastId);
+                    setDownloadingItemIds(prev => { const next = new Set(prev); next.delete(item.id); return next; });
                     showToast(t('errorDownloading'), 'error');
                 }
             }
@@ -1367,6 +1371,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const handleDownloadFolderZip = async (item: FolderItem) => {
         showToast(t('zipSkipsFoldersNotice') || "Note: only files in this folder will be downloaded. Subfolders are skipped.", 'info');
         const toastId = showToast(t('downloadingZip') || "Preparing ZIP download...", 'info', 'subtle', 0);
+        setDownloadingItemIds(prev => { const next = new Set(prev); next.add(item.id); return next; });
         try {
             const response = await fetch(`${apiURL}/folders/${item.id}/download-zip`, {
                 method: 'GET',
@@ -1463,6 +1468,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         } catch (err) {
             removeToast(toastId);
             showToast(t('zipDownloadError') || "Failed to download folder as ZIP", 'error');
+        } finally {
+            setDownloadingItemIds(prev => { const next = new Set(prev); next.delete(item.id); return next; });
         }
     };
 
@@ -1604,13 +1611,6 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     return (
         <div ref={containerRef} className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
 
-            {/* Navigation progress bar — appears immediately on folder click */}
-            <div
-                className={`absolute top-0 left-0 right-0 z-50 h-[3px] overflow-hidden transition-opacity duration-300 ${isNavigating || (isFetching && !isRefreshing) ? 'opacity-100' : 'opacity-0'}`}
-                aria-hidden="true"
-            >
-                <div className="h-full bg-gradient-to-r from-blue-400 via-blue-600 to-blue-400 animate-nav-progress" />
-            </div>
 
             <div className="relative border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525]">
                 <div className="flex items-center justify-between px-6 py-4">
@@ -1926,6 +1926,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                                 }}
                                                 className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:shadow-sm dark:hover:bg-[#2c2c2c] ${isDragOverTarget ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-500' : isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'} ${isFocused ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-[#1e1e1e]' : ''}`}
                                             >
+                                                {/* Downloading overlay (ZIP download) */}
+                                                {downloadingItemIds.has(item.id) && (
+                                                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-white/70 dark:bg-[#1e1e1e]/70 backdrop-blur-[1px]">
+                                                        <Spinner size="sm" />
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('downloading') || 'Downloading...'}</span>
+                                                    </div>
+                                                )}
                                                 {/* Grip / drag icon on selected folders */}
                                                 {isSelected && isEditor && (
                                                     <div className="absolute top-1 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-200 cursor-grab active:cursor-grabbing select-none" title={t('dragToMove') || 'Drag to move'}>
@@ -2012,6 +2019,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                             onDragEnd={() => setDragOverFolderId(null)}
                                             className={`group relative flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm dark:hover:bg-[#2c2c2c] dark:hover:border-gray-700 ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent'} ${isFocused ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-[#1e1e1e]' : ''}`}
                                         >
+                                            {/* Downloading overlay */}
+                                            {downloadingItemIds.has(item.id) && (
+                                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-white/70 dark:bg-[#1e1e1e]/70 backdrop-blur-[1px]">
+                                                    <Spinner size="sm" />
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('downloading') || 'Downloading...'}</span>
+                                                </div>
+                                            )}
                                             {/* Grip / drag icon on selected items */}
                                             {isSelected && isEditor && (
                                                 <div className="absolute top-1 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-200 cursor-grab active:cursor-grabbing select-none" title={t('dragToMove') || 'Drag to move'}>
@@ -2158,6 +2172,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                                         className={`group cursor-pointer transition-colors ${isDragOverTarget ? 'bg-blue-50 dark:bg-blue-900/30' : isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-[#2c2c2c]'} ${isFocused ? 'ring-2 ring-inset ring-blue-400' : ''}`}
                                                     >
                                                         <td className="px-4 py-3 flex items-center gap-3 relative">
+                                                            {downloadingItemIds.has(item.id) && (
+                                                                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-[#1a1a1a]/60 backdrop-blur-[1px] rounded">
+                                                                    <Spinner size="xs" />
+                                                                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">{t('downloading') || 'Downloading...'}</span>
+                                                                </div>
+                                                            )}
                                                             {isSelected && isEditor && (
                                                                 <div className="absolute left-1 cursor-grab active:cursor-grabbing text-gray-400" title={t('dragToMove') || 'Drag to move'}>
                                                                     <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="4" r="1.2"/><circle cx="2" cy="8" r="1.2"/><circle cx="2" cy="12" r="1.2"/><circle cx="7" cy="4" r="1.2"/><circle cx="7" cy="8" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg>

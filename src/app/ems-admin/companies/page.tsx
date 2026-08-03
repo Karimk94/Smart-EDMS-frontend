@@ -17,6 +17,8 @@ interface Company {
     DISABLED: string;
     LAST_UPDATE: string;
     SYSTEM_ID: number;
+    DEPTID: number;
+    DEPT_NAME: string;
 }
 
 interface CompaniesResponse {
@@ -41,6 +43,20 @@ export default function CompaniesPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [addName, setAddName] = useState('');
     const [addTranslation, setAddTranslation] = useState('');
+    const [addDeptSystemId, setAddDeptSystemId] = useState<number | ''>('');
+
+    // Fetch departments for the add-company dropdown
+    const { data: departmentsData } = useQuery({
+        queryKey: ['departments-for-dropdown'],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            params.append('page', '1');
+            params.append('per_page', '1000');
+            const response = await fetch(`/api/departments?${params}`, { credentials: 'include' });
+            if (!response.ok) throw new Error('Failed to fetch departments');
+            return response.json();
+        },
+    });
 
     // State for search
     const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +114,7 @@ export default function CompaniesPage() {
                 body: JSON.stringify({
                     name: addName,
                     translation: addTranslation,
+                    dept_system_id: addDeptSystemId,
                 }),
             });
             let data;
@@ -118,6 +135,7 @@ export default function CompaniesPage() {
             showToast(t('companyAddedSuccess'), 'success');
             setAddName('');
             setAddTranslation('');
+            setAddDeptSystemId('');
             setShowAddModal(false);
             queryClient.invalidateQueries({ queryKey: ['companies'] });
         },
@@ -174,7 +192,7 @@ export default function CompaniesPage() {
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!addName.trim() || !addTranslation.trim()) {
+        if (!addName.trim() || !addTranslation.trim() || !addDeptSystemId) {
             showToast(t('fillAllFields'), 'error');
             return;
         }
@@ -259,6 +277,24 @@ export default function CompaniesPage() {
                                         minLength={2}
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        {t('department')} *
+                                    </label>
+                                    <select
+                                        value={addDeptSystemId}
+                                        onChange={(e) => setAddDeptSystemId(e.target.value ? Number(e.target.value) : '')}
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        required
+                                    >
+                                        <option value="">{t('selectADepartment')}</option>
+                                        {departmentsData?.departments?.map((dept: any) => (
+                                            <option key={dept.SYSTEM_ID} value={dept.SYSTEM_ID}>
+                                                [{dept.SYSTEM_ID}] {dept.NAME}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div className="flex gap-4 pt-4">
                                     <button
                                         type="submit"
@@ -273,6 +309,7 @@ export default function CompaniesPage() {
                                             setShowAddModal(false);
                                             setAddName('');
                                             setAddTranslation('');
+                                            setAddDeptSystemId('');
                                         }}
                                         className="flex-1 px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg font-medium"
                                     >
@@ -342,6 +379,7 @@ export default function CompaniesPage() {
                                             <th className="px-6 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">{t('code')}</th>
                                             <th className="px-6 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">{t('name')}</th>
                                             <th className="px-6 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">{t('translation')}</th>
+                                            <th className="px-6 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">{t('department')}</th>
                                             <th className="px-6 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">{t('status')}</th>
                                             <th className="px-6 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">{t('lastUpdate')}</th>
                                             <th className="px-6 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">{t('actions')}</th>
@@ -368,11 +406,17 @@ export default function CompaniesPage() {
                                                 <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                                                     {company.TRANSLATION}
                                                 </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span className="font-mono text-xs text-gray-500 dark:text-gray-400">[{company.DEPTID}]</span>
+                                                        {company.DEPT_NAME}
+                                                    </span>
+                                                </td>
                                                 <td className="px-6 py-4 text-sm">
                                                     <span
                                                         className={`px-3 py-1 rounded-full text-xs font-medium ${company.DISABLED === 'Y'
-                                                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                                                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                                            : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                                             }`}
                                                     >
                                                         {company.DISABLED === 'Y' ? t('disabled') : t('active')}

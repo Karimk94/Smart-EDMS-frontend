@@ -146,10 +146,22 @@ export function PortalLanding() {
         return true;
     });
 
-    if (
+    const isCheckingAccess =
         isLoading ||
         (!mounted && !isAuthenticated) ||
-        (isAuthenticated && (isCheckingAdminAccess || isCheckingEmsAdminAccess))
+        (isAuthenticated && (isCheckingAdminAccess || isCheckingEmsAdminAccess));
+
+    useEffect(() => {
+        if (!isCheckingAccess && isAuthenticated && systems.length === 1) {
+            const singleSystem = systems[0];
+            const targetUrl = `${singleSystem.href}?lang=${lang}&theme=${theme}`;
+            router.replace(targetUrl);
+        }
+    }, [isCheckingAccess, isAuthenticated, systems, lang, theme, router]);
+
+    if (
+        isCheckingAccess ||
+        (isAuthenticated && systems.length === 1)
     ) {
         return <PageSpinner label={t('loading') || 'Loading...'} />;
     }

@@ -1,4 +1,4 @@
-export type UploadStatus = 'pending' | 'uploading' | 'processing' | 'success' | 'error';
+export type UploadStatus = 'pending' | 'uploading' | 'processing' | 'success' | 'error' | 'cancelled';
 
 export interface UploadableFile {
     id: string;

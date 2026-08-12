@@ -58,6 +58,13 @@ const removeExtension = (filename: string) => {
   return filename.replace(/\.[^/.]+$/, "");
 };
 
+const generateIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+};
+
 import { UploadModalProps } from '../../interfaces/PropsInterfaces';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -69,6 +76,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileIdCounter = useRef(0);
+  // In-flight XHRs and idempotency keys per file id, used for cancellation
+  const xhrMap = useRef<Map<string, { xhr: XMLHttpRequest; idempotencyKey: string }>>(new Map());
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -81,6 +90,28 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // Abort any in-flight uploads if the modal unmounts mid-upload
+  useEffect(() => {
+    return () => {
+      xhrMap.current.forEach(({ xhr, idempotencyKey }) => {
+        try {
+          xhr.abort();
+          fetch(`${apiURL}/upload_document/cancel`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idempotency_key: idempotencyKey }),
+            // keepalive lets the cancel request survive page navigation
+            keepalive: true,
+          }).catch(() => { /* best effort */ });
+        } catch {
+          // ignore
+        }
+      });
+      xhrMap.current.clear();
+    };
+  }, [apiURL]);
 
   const extractExifDate = async (file: File): Promise<Date | null> => {
     try {
@@ -174,18 +205,49 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     setFiles(prev => prev.map(f => f.id === id ? { ...f, editedDateTaken: newDate, dateSource: undefined } : f));
   };
 
+  /**
+   * Cancels an in-progress upload:
+   * 1) aborts the XHR (stops the browser -> API transfer and closes the connection)
+   * 2) calls POST /upload_document/cancel so the API stops the API -> DMS transfer
+   *    between chunks and deletes the partially-created document.
+   */
+  const handleCancelUpload = (id: string) => {
+    const entry = xhrMap.current.get(id);
+    if (!entry) return;
+
+    // Mark as cancelled immediately so the onabort handler treats the abort as intentional
+    updateFileStatus(id, 'cancelled', { error: undefined });
+
+    try {
+      entry.xhr.abort();
+    } catch {
+      // ignore abort errors
+    }
+
+    fetch(`${apiURL}/upload_document/cancel`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idempotency_key: entry.idempotencyKey }),
+    }).catch(() => { /* best effort — the disconnect watcher on the API also handles this */ });
+  };
+
   const handleUpload = async () => {
-    const pendingFiles = files.filter(f => f.status === 'pending');
+    // Cancelled files are included so they can be re-uploaded after a cancel
+    const pendingFiles = files.filter(f => f.status === 'pending' || f.status === 'cancelled');
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
     let successCount = 0;
     let errorCount = 0;
+    let cancelledCount = 0;
 
     const uploadPromises = pendingFiles.map(uploadableFile => {
       return new Promise<void>((resolve) => {
         const { id, file, editedFileName, editedDateTaken } = uploadableFile;
         updateFileStatus(id, 'uploading', { progress: 0 });
+
+        const idempotencyKey = generateIdempotencyKey();
 
         const formData = new FormData();
         formData.append('file', file);
@@ -199,6 +261,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiURL}/upload_document`, true);
+        xhr.withCredentials = true;
+        // Identifies this upload so it can be cancelled via /upload_document/cancel
+        xhr.setRequestHeader('Idempotency-Key', idempotencyKey);
+
+        xhrMap.current.set(id, { xhr, idempotencyKey });
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -208,6 +275,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
         };
 
         xhr.onload = () => {
+          xhrMap.current.delete(id);
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const response = JSON.parse(xhr.responseText);
@@ -223,11 +291,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
               updateFileStatus(id, 'error', { error: t('failedToParseServerResponse') });
               errorCount++;
             }
+          } else if (xhr.status === 499) {
+            // Server confirmed the upload was cancelled / client disconnected
+            cancelledCount++;
+            updateFileStatus(id, 'cancelled', { progress: 0 });
           } else {
             let errorMsg = `${t('serverError')} ${xhr.status}`;
             try {
               const response = JSON.parse(xhr.responseText);
-              errorMsg = response.error || errorMsg;
+              errorMsg = response.error || response.detail || errorMsg;
             } catch (e) {
             }
             updateFileStatus(id, 'error', { error: errorMsg });
@@ -237,8 +309,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
         };
 
         xhr.onerror = () => {
+          xhrMap.current.delete(id);
           updateFileStatus(id, 'error', { error: t('networkErrorDuringUpload') });
           errorCount++;
+          resolve();
+        };
+
+        xhr.onabort = () => {
+          xhrMap.current.delete(id);
+          // Intentional cancellation — do not treat as an error
+          updateFileStatus(id, 'cancelled', { progress: 0 });
+          cancelledCount++;
           resolve();
         };
 
@@ -249,16 +330,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     await Promise.all(uploadPromises);
     setIsUploading(false);
 
-    if (errorCount === 0 && successCount > 0) {
+    if (errorCount === 0 && cancelledCount === 0 && successCount > 0) {
       showToast(`${t('SuccessfullyUploaded')} ${successCount} ${t('file(s)')}`, 'success');
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-    } else if (errorCount > 0 && successCount > 0) {
+    } else if (successCount > 0) {
       showToast(`${t('uploadCompletedWith')} ${errorCount} ${t('error(s)')} `, 'warning');
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-    } else if (errorCount > 0 && successCount === 0) {
+    } else if (errorCount > 0) {
       showToast(t('AllUploadsFailed'), 'error');
+    } else if (cancelledCount > 0) {
+      showToast(t('uploadCancelled'), 'warning');
     }
   };
 
@@ -269,7 +352,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     }
   };
 
-  const pendingFilesCount = files.filter(f => f.status === 'pending').length;
+  const pendingFilesCount = files.filter(f => f.status === 'pending' || f.status === 'cancelled').length;
   const successfulUploadsCount = files.filter(f => f.status === 'success' && f.docnumber != null).length;
 
   return (
@@ -306,6 +389,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
                   onRemove={() => removeFile(f.id)}
                   onUpdateFileName={handleUpdateFileName}
                   onUpdateDateTaken={handleUpdateDateTaken}
+                  onCancel={() => handleCancelUpload(f.id)}
+                  t={t as (key: string) => string}
                 />
               ))
             ) : (

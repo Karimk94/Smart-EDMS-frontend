@@ -129,11 +129,18 @@ async function fetchWithRetry<T>(
 
 async function handleResponse(response: Response): Promise<any> {
     if (response.status === 401) {
+        let data: any = {};
+        try {
+            data = await response.json();
+        } catch {
+            // Response body is not JSON
+        }
         // Auto-redirect to login on 401
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/shared')) {
             window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
         }
-        throw new ApiError('Unauthorized', 401);
+        const message = data?.detail || data?.error || data?.message || 'Unauthorized';
+        throw new ApiError(message, 401, data);
     }
 
     if (!response.ok) {

@@ -6,7 +6,6 @@ import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { LoadingButton } from '../components/LoadingButton';
 import { PageSpinner } from '../components/Spinner';
-import { useToast } from '../context/ToastContext';
 import { useTranslations } from '../hooks/useTranslations';
 
 const SECTION_ROUTES: Record<string, string> = {
@@ -29,11 +28,11 @@ function getDefaultRoute(tabPermissions?: { tab_key: string; can_read: boolean }
 
 // Safe redirect: only allow relative paths starting with /
 function getSafeRedirect(url: string | null, tabPermissions?: { tab_key: string; can_read: boolean }[]): string {
-  if (!url) return getDefaultRoute(tabPermissions);
+  if (!url) return '/';
   // Block absolute URLs, protocol-relative URLs, and data URIs
-  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url) || url.startsWith('//')) return getDefaultRoute(tabPermissions);
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url) || url.startsWith('//')) return '/';
   // Must start with /
-  if (!url.startsWith('/')) return getDefaultRoute(tabPermissions);
+  if (!url.startsWith('/')) return '/';
   return url;
 }
 
@@ -70,7 +69,6 @@ function LoginContent() {
   const t = useTranslations(lang);
 
   const router = useRouter();
-  const { showToast } = useToast();
   const { login, isLoggingIn, isAuthenticated, isLoadingUser, user } = useAuth();
 
   // Redirect if already authenticated
@@ -105,7 +103,6 @@ function LoginContent() {
       router.push(redirectPath);
     } catch (err: any) {
       console.error('Login exception:', err);
-      showToast(err.message || t('loginFailed'), 'error');
     }
   };
 
@@ -169,7 +166,10 @@ function LoginContent() {
           </button>
         </div>
 
-        <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+        <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+          <div className="flex justify-center mb-2">
+            <Image src="/logo.png" alt="Company Logo" width={140} height={56} className="h-14 w-auto object-contain" priority />
+          </div>
           <h1 className="text-2xl font-bold text-center">{t('loginTitle')}</h1>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>

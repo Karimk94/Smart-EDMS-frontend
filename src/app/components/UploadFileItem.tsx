@@ -27,11 +27,15 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
   uploadableFile,
   onRemove,
   onUpdateFileName,
-  onUpdateDateTaken
+  onUpdateDateTaken,
+  onCancel,
+  t
 }) => {
   const { id, file, status, progress, error, editedFileName, editedDateTaken, dateSource } = uploadableFile;
-  const isActionable = status === 'pending' || status === 'error';
+  // Cancelled files can be edited / removed / re-uploaded, just like pending or errored ones
+  const isActionable = status === 'pending' || status === 'error' || status === 'cancelled';
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const translate = t || ((key: string) => key);
 
   const handleFileNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdateFileName(id, e.target.value);
@@ -52,6 +56,8 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
         return <Image src="/icons/check.svg" alt="" width={24} height={24} className="text-green-500 dark:invert" />;
       case 'error':
         return <Image src="/icons/close.svg" alt="" width={24} height={24} className="text-red-500 dark:invert" />;
+      case 'cancelled':
+        return <Image src="/icons/close.svg" alt="" width={24} height={24} className="opacity-50 dark:invert" />;
       default:
         return <div className="w-6 h-6 bg-gray-600 rounded-full"></div>;
     }
@@ -125,9 +131,20 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
           </div>
         )}
         {status === 'error' && <p className="text-xs text-red-400 mt-1 truncate">{error}</p>}
+        {status === 'cancelled' && <p className="text-xs text-gray-400 mt-1 italic">{translate('uploadCancelled')}</p>}
       </div>
+      {status === 'uploading' && onCancel && (
+        <button
+          onClick={onCancel}
+          title={translate('cancelUpload')}
+          aria-label={translate('cancelUpload')}
+          className="text-red-400 hover:text-red-300 mt-1 p-1 leading-none"
+        >
+          <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
+        </button>
+      )}
       {isActionable && (
-        <button onClick={onRemove} className="text-gray-400 hover:text-white mt-1 p-1 leading-none">
+        <button onClick={onRemove} title={translate('removeFile')} className="text-gray-400 hover:text-white mt-1 p-1 leading-none">
           <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
         </button>
       )}

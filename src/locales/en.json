@@ -465,6 +465,10 @@
   "failedToParseServerResponse": "Failed to parse server response.",
   "serverError": "Server error:",
   "networkErrorDuringUpload": "Network error during upload.",
+  "uploadCancelled": "Upload cancelled.",
+  "AllUploadsFailed": "All uploads failed. Please check the errors.",
+  "cancelUpload": "Cancel upload",
+  "removeFile": "Remove file",
   "fileQueue": "File Queue",
   "uploadDocument": "Upload document",
   "selectFolderTooltip": "Select a folder — all files inside (including subfolders) will be added",
@@ -484,5 +488,14 @@
   "quotaUsage": "Quota (Usage)",
   "noUsersMatch": "No users match your search",
   "noUsersFound": "No users found",
-  "showing": "Showing"
+  "showing": "Showing",
+  "noResults": "No results",
+  "tabAccess": "Tab Access",
+  "noTabPermissions": "No explicit tab permissions",
+  "noAccess": "No Access",
+  "tabRecent": "Recent",
+  "tabFavorites": "Favorites",
+  "tabFolders": "Folders",
+  "tabProfileSearch": "Profile Search",
+  "tabEmsAdmin": "EMS Admin"
 }

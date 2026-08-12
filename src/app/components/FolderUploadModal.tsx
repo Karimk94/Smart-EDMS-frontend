@@ -60,6 +60,13 @@ const removeExtension = (filename: string) => {
   return filename.replace(/\.[^/.]+$/, "");
 };
 
+const generateIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+};
+
 import { FolderUploadModalProps } from '../../interfaces/PropsInterfaces';
 import Image from 'next/image';
 
@@ -71,6 +78,8 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
   const [isDragOver, setIsDragOver] = useState(false);
   const [hasUploaded, setHasUploaded] = useState(false);
   const fileIdCounter = useRef(0);
+  // In-flight XHRs and idempotency keys per file id, used for cancellation
+  const xhrMap = useRef<Map<string, { xhr: XMLHttpRequest; idempotencyKey: string }>>(new Map());
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -93,6 +102,28 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
     // from deps to avoid stale-closure issues with the counter ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Abort any in-flight uploads if the modal unmounts mid-upload
+  useEffect(() => {
+    return () => {
+      xhrMap.current.forEach(({ xhr, idempotencyKey }) => {
+        try {
+          xhr.abort();
+          fetch(`${apiURL}/upload_document/cancel`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idempotency_key: idempotencyKey }),
+            // keepalive lets the cancel request survive page navigation
+            keepalive: true,
+          }).catch(() => { /* best effort */ });
+        } catch {
+          // ignore
+        }
+      });
+      xhrMap.current.clear();
+    };
+  }, [apiURL]);
 
   const extractExifDate = async (file: File): Promise<Date | null> => {
     try {
@@ -203,8 +234,36 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
     setFiles(prev => prev.map(f => f.id === id ? { ...f, editedDateTaken: newDate, dateSource: undefined } : f));
   };
 
+  /**
+   * Cancels an in-progress upload:
+   * 1) aborts the XHR (stops the browser -> API transfer and closes the connection)
+   * 2) calls POST /upload_document/cancel so the API stops the API -> DMS transfer
+   *    between chunks and deletes the partially-created document.
+   */
+  const handleCancelUpload = (id: string) => {
+    const entry = xhrMap.current.get(id);
+    if (!entry) return;
+
+    // Mark as cancelled immediately so the onabort handler treats the abort as intentional
+    updateFileStatus(id, 'cancelled', { error: undefined });
+
+    try {
+      entry.xhr.abort();
+    } catch {
+      // ignore abort errors
+    }
+
+    fetch(`${apiURL}/upload_document/cancel`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idempotency_key: entry.idempotencyKey }),
+    }).catch(() => { /* best effort — the disconnect watcher on the API also handles this */ });
+  };
+
   const handleUpload = async () => {
-    const pendingFiles = files.filter(f => f.status === 'pending');
+    // Cancelled files are included so they can be re-uploaded after a cancel
+    const pendingFiles = files.filter(f => f.status === 'pending' || f.status === 'cancelled');
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
@@ -214,6 +273,8 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
       return new Promise<void>((resolve) => {
         const { id, file, editedFileName, editedDateTaken } = uploadableFile;
         updateFileStatus(id, 'uploading', { progress: 0 });
+
+        const idempotencyKey = generateIdempotencyKey();
 
         const formData = new FormData();
         formData.append('file', file);
@@ -231,6 +292,11 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiURL}/upload_document`, true);
+        xhr.withCredentials = true;
+        // Identifies this upload so it can be cancelled via /upload_document/cancel
+        xhr.setRequestHeader('Idempotency-Key', idempotencyKey);
+
+        xhrMap.current.set(id, { xhr, idempotencyKey });
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -240,6 +306,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
         };
 
         xhr.onload = () => {
+          xhrMap.current.delete(id);
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const response = JSON.parse(xhr.responseText);
@@ -251,11 +318,14 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
             } catch (e) {
               updateFileStatus(id, 'error', { error: t('failedToParseServerResponse') });
             }
+          } else if (xhr.status === 499) {
+            // Server confirmed the upload was cancelled / client disconnected
+            updateFileStatus(id, 'cancelled', { progress: 0 });
           } else {
             let errorMsg = `${t('serverError')} ${xhr.status}`;
             try {
               const response = JSON.parse(xhr.responseText);
-              errorMsg = response.error || errorMsg;
+              errorMsg = response.error || response.detail || errorMsg;
             } catch (e) {
             }
             updateFileStatus(id, 'error', { error: errorMsg });
@@ -266,7 +336,15 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
         };
 
         xhr.onerror = () => {
+          xhrMap.current.delete(id);
           updateFileStatus(id, 'error', { error: t('networkErrorDuringUpload') });
+          resolve();
+        };
+
+        xhr.onabort = () => {
+          xhrMap.current.delete(id);
+          // Intentional cancellation — do not treat as an error
+          updateFileStatus(id, 'cancelled', { progress: 0 });
           resolve();
         };
 
@@ -290,7 +368,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
     }
   };
 
-  const pendingFilesCount = files.filter(f => f.status === 'pending').length;
+  const pendingFilesCount = files.filter(f => f.status === 'pending' || f.status === 'cancelled').length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex flex-col p-4 md:p-8" role="dialog" aria-modal="true" aria-label={t('uploadToFolder')}>
@@ -361,6 +439,8 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
                   onRemove={() => removeFile(f.id)}
                   onUpdateFileName={handleUpdateFileName}
                   onUpdateDateTaken={handleUpdateDateTaken}
+                  onCancel={() => handleCancelUpload(f.id)}
+                  t={t as (key: string) => string}
                 />
               ))
             ) : (

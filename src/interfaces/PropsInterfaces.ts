@@ -13,12 +13,12 @@ export interface EnhancedModalProps {
     onNavigatePrevious?: () => void;
     canNavigateNext?: boolean;
     canNavigatePrevious?: boolean;
-    
+
     // Group/collage information
     currentDocIndex?: number; // 0-based index in group
     totalInGroup?: number;   // Total documents in group
     isGrouped?: boolean;     // Whether this doc is part of a group
-    
+
     // Search context for highlighting
     searchTerm?: string;
     searchMatchType?: 'like' | 'exact' | 'startsWith';
@@ -51,6 +51,10 @@ export interface UploadFileItemProps {
     onRemove: () => void;
     onUpdateFileName: (id: string, newName: string) => void;
     onUpdateDateTaken: (id: string, newDate: Date | null) => void;
+    /** Called to abort the in-flight XHR upload for this file */
+    onCancel?: () => void;
+    /** Translation function (optional; falls back to raw keys) */
+    t?: (key: string) => string;
 }
 
 export interface EventStackProps {

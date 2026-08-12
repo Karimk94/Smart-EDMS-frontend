@@ -340,7 +340,7 @@ export default function EmsSectionsPage() {
                                 <option value="">{t('selectAnAgency')}</option>
                                 {agencies.map((agency) => (
                                     <option key={agency.SYSTEM_ID} value={agency.SYSTEM_ID}>
-                                        {agency.NAME}
+                                        [{agency.SYSTEM_ID}] {agency.NAME}
                                     </option>
                                 ))}
                             </select>
@@ -358,7 +358,7 @@ export default function EmsSectionsPage() {
                                 <option value="">{t('selectADepartment')}</option>
                                 {departments.map((dept) => (
                                     <option key={dept.DEPTID} value={dept.DEPTID}>
-                                        {dept.NAME} ({dept.SHORT})
+                                        [{dept.DEPTID}] {dept.NAME} ({dept.SHORT})
                                     </option>
                                 ))}
                             </select>

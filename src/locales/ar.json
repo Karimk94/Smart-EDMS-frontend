@@ -495,5 +495,20 @@
   "tabFavorites": "المفضلة",
   "tabFolders": "المجلدات",
   "tabProfileSearch": "بحث الملفات",
-  "tabEmsAdmin": "إدارة EMS"
+  "tabEmsAdmin": "إدارة EMS",
+  "loginHistory": "سجل تسجيل الدخول",
+  "searchLoginLogs": "ابحث عن اسم المستخدم أو الاسم أو مستوى الأمان أو مصدر التطبيق...",
+  "appSource": "مصدر التطبيق",
+  "ipAddress": "عنوان IP",
+  "loginDate": "تاريخ الدخول",
+  "logoutDate": "تاريخ الخروج",
+  "noLoginLogsMatch": "لا توجد سجلات دخول تطابق بحثك",
+  "noLoginLogsFound": "لم يتم العثور على سجلات دخول",
+  "activeSessions": "الجلسات النشطة",
+  "confirmTerminateSession": "إنهاء جلسة",
+  "sessionTerminated": "تم إنهاء الجلسة لـ",
+  "currentSession": "الحالية",
+  "yourSession": "أنت",
+  "terminate": "إنهاء",
+  "noActiveSessions": "لا توجد جلسات نشطة"
 }

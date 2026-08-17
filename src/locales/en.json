@@ -497,5 +497,20 @@
   "tabFavorites": "Favorites",
   "tabFolders": "Folders",
   "tabProfileSearch": "Profile Search",
-  "tabEmsAdmin": "EMS Admin"
+  "tabEmsAdmin": "EMS Admin",
+  "loginHistory": "Login History",
+  "searchLoginLogs": "Search username, name, security level or app source...",
+  "appSource": "App Source",
+  "ipAddress": "IP Address",
+  "loginDate": "Login Date",
+  "logoutDate": "Logout Date",
+  "noLoginLogsMatch": "No login logs match your search",
+  "noLoginLogsFound": "No login logs found",
+  "activeSessions": "Active Sessions",
+  "confirmTerminateSession": "Terminate session for",
+  "sessionTerminated": "Session terminated for",
+  "currentSession": "Current",
+  "yourSession": "You",
+  "terminate": "Terminate",
+  "noActiveSessions": "No active sessions"
 }

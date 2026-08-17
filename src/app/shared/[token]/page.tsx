@@ -691,12 +691,10 @@ export default function SharedDocumentPage() {
   // Navigate to a folder
   const navigateToFolder = (folder: FolderItem) => {
     setCurrentFolderId(folder.id);
-    setCurrentFolderId(folder.id);
   };
 
   // Handle breadcrumb click
   const handleBreadcrumbClick = (item: BreadcrumbItem) => {
-    setCurrentFolderId(item.id);
     setCurrentFolderId(item.id);
   };
 
@@ -1128,11 +1126,14 @@ export default function SharedDocumentPage() {
   const handleDownloadFolderZip = async () => {
     if (!rootFolderId || !viewerEmail) return;
 
-    showToast(t('zipSkipsFoldersNotice') || "Note: only files in this folder will be downloaded. Subfolders are skipped.", 'info');
     const toastId = showToast(t('downloadingZip') || "Preparing ZIP download...", 'info', 'subtle', 0);
     setIsDownloadingZip(true);
     try {
-      const response = await fetch(`/api/share/download-folder-zip/${token}?viewer_email=${encodeURIComponent(viewerEmail)}`, {
+      const zipParams = new URLSearchParams({ viewer_email: viewerEmail });
+      if (currentFolderId && currentFolderId !== rootFolderId) {
+        zipParams.append('folder_id', currentFolderId);
+      }
+      const response = await fetch(`/api/share/download-folder-zip/${token}?${zipParams.toString()}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -1168,7 +1169,9 @@ export default function SharedDocumentPage() {
           for (let i = 1; i <= partsCount; i++) {
             const partToastId = showToast(`Downloading part ${i} of ${partsCount}...`, 'info', 'subtle', 0);
             try {
-              const partResponse = await fetch(`/api/share/download-folder-zip/${token}?viewer_email=${encodeURIComponent(viewerEmail)}&part=${i}`, {
+              const partParams = new URLSearchParams(zipParams);
+              partParams.set('part', String(i));
+              const partResponse = await fetch(`/api/share/download-folder-zip/${token}?${partParams.toString()}`, {
                 method: 'GET',
                 credentials: 'include',
               });

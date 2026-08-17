@@ -108,6 +108,44 @@ export interface HistoryEntry {
     form_name: string;
 }
 
+export interface LoginLogEntry {
+    system_id: number;
+    people_system_id: number;
+    session_id: string | null;
+    username: string;
+    full_name: string;
+    security_level: string | null;
+    login_date: string | null;
+    logout_date: string | null;
+    last_activity: string | null;
+    is_active: boolean;
+    app_source: string | null;
+    ip_address: string | null;
+}
+
+export interface ActiveSession {
+    system_id: number;
+    session_id: string;
+    people_system_id: number;
+    username: string;
+    full_name: string;
+    security_level: string | null;
+    login_date: string | null;
+    last_activity: string | null;
+    app_source: string | null;
+    ip_address: string | null;
+}
+
+interface LoginHistoryResponse {
+    logs: LoginLogEntry[];
+    total: number;
+    has_more: boolean;
+}
+
+interface ActiveSessionsResponse {
+    sessions: ActiveSession[];
+}
+
 interface AddUserParams {
     user_system_id: number;
     security_level_id: number;
@@ -360,6 +398,40 @@ export function useAdmin() {
         staleTime: 60 * 1000, // 1 minute
     });
 
+    const useLoginHistory = (page: number, search: string, enabled: boolean = true) => useQuery({
+        queryKey: ['loginHistory', page, search],
+        queryFn: async (): Promise<LoginHistoryResponse> => {
+            const params = new URLSearchParams({
+                search,
+                page: String(page),
+                limit: '20',
+            });
+            return apiClient.get(`/api/admin/login-history?${params}`);
+        },
+        enabled,
+        placeholderData: (previousData) => previousData,
+    });
+
+    const useActiveSessions = (enabled: boolean = true) => useQuery({
+        queryKey: ['activeSessions'],
+        queryFn: async (): Promise<ActiveSession[]> => {
+            const data = await apiClient.get('/api/admin/active-sessions');
+            return data.sessions;
+        },
+        enabled,
+        refetchInterval: 15000,
+        staleTime: 5000,
+    });
+
+    const terminateSessionMutation = useMutation({
+        mutationFn: async (sessionId: string) => {
+            return apiClient.post('/api/admin/active-sessions/terminate', { session_id: sessionId });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['activeSessions'] });
+        },
+    });
+
     return {
         useCheckAccess,
         useUsers,
@@ -371,6 +443,10 @@ export function useAdmin() {
         useAdminProfiles,
         useProfileGroups,
         useGroupUsers,
+        useLoginHistory,
+        useActiveSessions,
+        terminateSession: terminateSessionMutation.mutateAsync,
+        isTerminatingSession: terminateSessionMutation.isPending,
         retryFailedQueue: retryFailedQueueMutation.mutateAsync,
         isRetryingFailedQueue: retryFailedQueueMutation.isPending,
         retrySelectedQueue: retrySelectedQueueMutation.mutateAsync,

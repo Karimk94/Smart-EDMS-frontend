@@ -11,6 +11,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { useTranslations } from "../hooks/useTranslations";
 import EdmsUsersTab from "./components/EdmsUsersTab";
 import ProfilesTab from "./components/ProfilesTab";
+import LoginLogsTab from "./components/LoginLogsTab";
+import ActiveSessionsTab from "./components/ActiveSessionsTab";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -147,7 +149,7 @@ export default function AdminPage() {
     const [retryingDocnumber, setRetryingDocnumber] = useState<number | null>(null);
     const [expandedErrorRows, setExpandedErrorRows] = useState<Record<number, boolean>>({});
     const [queueViewFilter, setQueueViewFilter] = useState<'failed' | 'in_progress' | 'queued'>('failed');
-    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles'>('users');
+    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions'>('users');
 
     const router = useRouter();
     const { showToast } = useToast();
@@ -407,7 +409,7 @@ export default function AdminPage() {
 
     return (
         <div className="p-6">
-            <div className="max-w-6xl mx-auto">
+            <div className="max-w-full mx-auto">
                 <div className="mb-4 flex items-center gap-2">
                     <button
                         onClick={() => setActiveAdminTab('users')}
@@ -433,7 +435,25 @@ export default function AdminPage() {
                     >
                         {t('adminProfiles') || 'Profiles'}
                     </button>
+                    <button
+                        onClick={() => setActiveAdminTab('login_history')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'login_history' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        {t('loginHistory') || 'Login History'}
+                    </button>
+                    <button
+                        onClick={() => setActiveAdminTab('active_sessions')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'active_sessions' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        {t('activeSessions') || 'Active Sessions'}
+                    </button>
                 </div>
+
+                {/* Login History Tab */}
+                {activeAdminTab === 'login_history' && <LoginLogsTab />}
+
+                {/* Active Sessions Tab */}
+                {activeAdminTab === 'active_sessions' && <ActiveSessionsTab />}
 
                 {/* Profiles Tab */}
                 {activeAdminTab === 'profiles' && <ProfilesTab />}
@@ -679,7 +699,7 @@ export default function AdminPage() {
 
                     {/* Table */}
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -713,10 +733,10 @@ export default function AdminPage() {
                                     title="Double-click to edit"
                                     className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
                                 >
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                    <td className="px-6 py-4 break-words text-sm font-medium text-gray-900 dark:text-white">
                                         {user.username}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                    <td className="px-6 py-4 break-words text-sm text-gray-500 dark:text-gray-300">
                                         {user.full_name || user.username}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
@@ -761,14 +781,14 @@ export default function AdminPage() {
                             ))}
                             {users.length === 0 && !isLoadingUsers && (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         {userFilter ? (t('noUsersMatch') || "No users match your search") : (t('noUsersFound') || "No users found")}
                                     </td>
                                 </tr>
                             )}
                             {isLoadingUsers && users.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         <Spinner size="sm" center />
                                     </td>
                                 </tr>

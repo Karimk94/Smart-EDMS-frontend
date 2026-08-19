@@ -422,6 +422,11 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
               onChange={handleFolderSelect}
             />
             <p className="mt-2 text-xs text-gray-500">{t('selectsAllFilesRecursively')}</p>
+
+            {/* Rate limit notice */}
+            <p className="mt-3 text-xs text-amber-400 bg-amber-900/30 px-3 py-2 rounded-md border border-amber-700/50">
+              ⚠️ {t('uploadRateLimit')}
+            </p>
           </div>
         </div>
 

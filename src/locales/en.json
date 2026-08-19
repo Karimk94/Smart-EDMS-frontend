@@ -512,5 +512,6 @@
   "currentSession": "Current",
   "yourSession": "You",
   "terminate": "Terminate",
-  "noActiveSessions": "No active sessions"
+  "noActiveSessions": "No active sessions",
+  "uploadRateLimit": "Maximum 100 files per minute allowed"
 }

@@ -375,6 +375,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
               {t('browseFiles')}
             </label>
             <input id="file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
+
+            {/* Rate limit notice */}
+            <p className="mt-3 text-xs text-amber-400 bg-amber-900/30 px-3 py-2 rounded-md border border-amber-700/50">
+              ⚠️ {t('uploadRateLimit')}
+            </p>
           </div>
         </div>
 

@@ -510,5 +510,6 @@
   "currentSession": "الحالية",
   "yourSession": "أنت",
   "terminate": "إنهاء",
-  "noActiveSessions": "لا توجد جلسات نشطة"
+  "noActiveSessions": "لا توجد جلسات نشطة",
+  "uploadRateLimit": "الحد الأقصى 100 ملف في الدقيقة"
 }

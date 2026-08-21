@@ -511,5 +511,6 @@
   "yourSession": "أنت",
   "terminate": "إنهاء",
   "noActiveSessions": "لا توجد جلسات نشطة",
-  "uploadRateLimit": "الحد الأقصى 100 ملف في الدقيقة"
+  "uploadRateLimit": "الحد الأقصى 100 ملف في الدقيقة",
+  "loadingPage": "جاري تحميل الصفحة..."
 }

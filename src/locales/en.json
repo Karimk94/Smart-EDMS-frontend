@@ -514,5 +514,6 @@
   "terminate": "Terminate",
   "noActiveSessions": "No active sessions",
   "uploadRateLimit": "Maximum 100 files per minute allowed",
-  "loadingPage": "Loading page..."
+  "loadingPage": "Loading page...",
+  "successDownloading": "File downloaded successfully"
 }

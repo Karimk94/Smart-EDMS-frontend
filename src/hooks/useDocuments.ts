@@ -81,7 +81,13 @@ export function useDocuments({
             if (searchTerm) params.append('search', searchTerm);
             if (selectedPerson && selectedPerson.length > 0) {
                 const personNames = selectedPerson
-                    .map((p) => p.label.split(' - ')[0])
+                    .map((p) => {
+                        const parts = p.label.split(' - ');
+                        if (lang === 'ar' && parts.length > 1) {
+                            return parts[parts.length - 1].trim();
+                        }
+                        return parts[0].trim();
+                    })
                     .join(',');
                 params.append('persons', personNames);
                 if (selectedPerson.length > 1) {

@@ -513,5 +513,6 @@
   "noActiveSessions": "لا توجد جلسات نشطة",
   "uploadRateLimit": "الحد الأقصى 100 ملف في الدقيقة",
   "loadingPage": "جاري تحميل الصفحة...",
-  "successDownloading": "تم تنزيل الملف بنجاح"
+  "successDownloading": "تم تنزيل الملف بنجاح",
+  "folderUploadInfo": "سيتم إنشاء مجلد وحدث جديدين بهذا الاسم، وسيتم رفع جميع الملفات إليهما"
 }

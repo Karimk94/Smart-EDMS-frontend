@@ -515,5 +515,6 @@
   "noActiveSessions": "No active sessions",
   "uploadRateLimit": "Maximum 100 files per minute allowed",
   "loadingPage": "Loading page...",
-  "successDownloading": "File downloaded successfully"
+  "successDownloading": "File downloaded successfully",
+  "folderUploadInfo": "A new folder and event will be created with this name, and all files will be uploaded to it."
 }

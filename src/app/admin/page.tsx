@@ -13,6 +13,7 @@ import EdmsUsersTab from "./components/EdmsUsersTab";
 import ProfilesTab from "./components/ProfilesTab";
 import LoginLogsTab from "./components/LoginLogsTab";
 import ActiveSessionsTab from "./components/ActiveSessionsTab";
+import SqlQueryTab from "./components/SqlQueryTab";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -149,7 +150,7 @@ export default function AdminPage() {
     const [retryingDocnumber, setRetryingDocnumber] = useState<number | null>(null);
     const [expandedErrorRows, setExpandedErrorRows] = useState<Record<number, boolean>>({});
     const [queueViewFilter, setQueueViewFilter] = useState<'failed' | 'in_progress' | 'queued'>('failed');
-    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions'>('users');
+    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions' | 'sql_query'>('users');
 
     const router = useRouter();
     const { showToast } = useToast();
@@ -447,6 +448,12 @@ export default function AdminPage() {
                     >
                         {t('activeSessions') || 'Active Sessions'}
                     </button>
+                    <button
+                        onClick={() => setActiveAdminTab('sql_query')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'sql_query' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        {t('sqlQuery') || 'SQL Query'}
+                    </button>
                 </div>
 
                 {/* Login History Tab */}
@@ -460,6 +467,9 @@ export default function AdminPage() {
 
                 {/* EDMS Users Management */}
                 {activeAdminTab === 'edms_users' && <EdmsUsersTab />}
+
+                {/* SQL Query Tab */}
+                {activeAdminTab === 'sql_query' && <SqlQueryTab />}
 
                 {/* Processing Queue Status */}
                 {activeAdminTab === 'worker' && (

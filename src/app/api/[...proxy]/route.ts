@@ -152,23 +152,43 @@ async function proxyHandler(req: NextRequest): Promise<NextResponse> {
 
       let responseBody = response.body;
 
-      if (isJson && !response.ok) {
-        const json = await response.json();
-
-        if (json.detail && !json.error) {
-          const errorMsg = typeof json.detail === 'string'
-            ? json.detail
-            : Array.isArray(json.detail)
-              ? json.detail.map((e: any) => e.msg).join(", ")
-              : JSON.stringify(json.detail);
-          json.error = errorMsg;
+      if (!response.ok) {
+        if (isJson) {
+          const json = await response.json().catch(() => null);
+          if (json) {
+            if (json.detail && !json.error) {
+              const errorMsg = typeof json.detail === 'string'
+                ? json.detail
+                : Array.isArray(json.detail)
+                  ? json.detail.map((e: any) => e.msg).join(", ")
+                  : JSON.stringify(json.detail);
+              json.error = errorMsg;
+            }
+            if (!json.detail && json.error) {
+              json.detail = json.error;
+            }
+            responseBody = JSON.stringify(json) as any;
+          }
+        } else {
+          // Upstream returned plain text or HTML error (e.g. IIS Bad Request / 502)
+          const text = await response.text().catch(() => '');
+          let cleanMessage = text;
+          if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+            cleanMessage = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+          }
+          responseBody = JSON.stringify({
+            detail: cleanMessage || response.statusText || `Request failed with status ${response.status}`,
+            error: cleanMessage || response.statusText || `Request failed with status ${response.status}`
+          }) as any;
         }
-        responseBody = JSON.stringify(json) as any;
       }
 
       const newHeaders = new Headers(response.headers);
       newHeaders.delete('content-length');
       newHeaders.delete('content-encoding');
+      if (!response.ok) {
+        newHeaders.set('content-type', 'application/json');
+      }
 
       return new NextResponse(responseBody, {
         status: response.status,

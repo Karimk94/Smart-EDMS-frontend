@@ -87,16 +87,41 @@ export default function SqlQueryTab() {
         setCurrentPage(1);
 
         try {
+            const cleanQuery = query.trim().replace(/;+\s*$/, '');
             const response = await fetch('/api/admin/sql-query', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
+                body: JSON.stringify({ query: cleanQuery })
             });
 
-            const data = await response.json();
+            // Safely parse JSON or text error response
+            let data: any = null;
+            const contentType = response.headers.get("content-type") || "";
+
+            if (contentType.includes("application/json")) {
+                try {
+                    data = await response.json();
+                } catch {
+                    // Fallback to text parsing below if JSON parsing fails
+                }
+            }
+
+            if (!data) {
+                const text = await response.text().catch(() => "");
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = { detail: text };
+                }
+            }
 
             if (!response.ok) {
-                throw new Error(data.detail || 'Query execution failed');
+                let errorMessage = data?.detail || data?.error || data?.message;
+                if (!errorMessage || errorMessage.trim() === 'Bad Request') {
+                    // If generic 400 Bad Request was received, provide an informative explanation
+                    errorMessage = 'Table or query error: The requested table does not exist or is not permitted. Please click "Show Schema" to view allowed tables.';
+                }
+                throw new Error(errorMessage);
             }
 
             setResult(data);
@@ -317,10 +342,22 @@ export default function SqlQueryTab() {
                     {error && (
                         <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
                             <div className="flex items-start gap-3">
-                                <Image src="/error.svg" alt="" width={20} height={20} className="h-5 w-5 mt-0.5" />
-                                <div>
-                                    <h4 className="text-sm font-medium text-red-800 dark:text-red-200">Query Error</h4>
-                                    <p className="text-sm text-red-600 dark:text-red-300 mt-1">{error}</p>
+                                <Image src="/error.svg" alt="" width={20} height={20} className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                    <h4 className="text-sm font-semibold text-red-800 dark:text-red-200">Query Error</h4>
+                                    <p className="text-sm text-red-700 dark:text-red-300 mt-1 whitespace-pre-wrap">{error}</p>
+                                    <div className="mt-2.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowSchema(true);
+                                                if (tables.length === 0) fetchSchema();
+                                            }}
+                                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                                        >
+                                            View allowed tables and schema &rarr;
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -431,7 +468,7 @@ export default function SqlQueryTab() {
                         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                             <Image src="/icons/database.svg" alt="" width={48} height={48} className="h-12 w-12 mx-auto mb-4 opacity-50 dark:invert" />
                             <p>Enter a SELECT query and click Execute to see results</p>
-                            <p className="text-sm mt-2">Use templates above or click "Show Schema" to view available tables</p>
+                            <p className="text-sm mt-2">Use templates above or click &quot;Show Schema&quot; to view available tables</p>
                         </div>
                     )}
                 </div>

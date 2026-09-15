@@ -105,8 +105,11 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
 
   // Abort any in-flight uploads if the modal unmounts mid-upload
   useEffect(() => {
+    // Capture the current ref value so the cleanup function uses a stable
+    // snapshot rather than reading xhrMap.current at cleanup time.
+    const currentXhrMap = xhrMap.current;
     return () => {
-      xhrMap.current.forEach(({ xhr, idempotencyKey }) => {
+      currentXhrMap.forEach(({ xhr, idempotencyKey }) => {
         try {
           xhr.abort();
           fetch(`${apiURL}/upload_document/cancel`, {
@@ -121,7 +124,7 @@ export const FolderUploadModal: React.FC<FolderUploadModalProps> = ({ onClose, a
           // ignore
         }
       });
-      xhrMap.current.clear();
+      currentXhrMap.clear();
     };
   }, [apiURL]);
 

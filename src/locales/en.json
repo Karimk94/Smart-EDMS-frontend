@@ -517,5 +517,16 @@
   "loadingPage": "Loading page...",
   "successDownloading": "File downloaded successfully",
   "folderUploadInfo": "A new folder and event will be created with this name, and all files will be uploaded to it.",
-  "sqlQuery": "SQL Query"
+  "sqlQuery": "SQL Query",
+  "folderUploadDetected": "Folder detected:",
+  "eventCreated": "Event created successfully",
+  "eventFound": "Found existing event, adding files to it",
+  "newFolder": "New folder",
+  "statusPending": "Not analyzed yet",
+  "statusReady": "Ready for review",
+  "statusApproved": "Approved",
+  "markFolderVerified": "Mark folder as verified",
+  "markFolderPending": "Mark folder as pending",
+  "statusUpdated": "Status updated successfully",
+  "errorUpdatingStatus": "Error updating status"
 }

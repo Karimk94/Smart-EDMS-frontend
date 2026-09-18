@@ -515,5 +515,16 @@
   "loadingPage": "جاري تحميل الصفحة...",
   "successDownloading": "تم تنزيل الملف بنجاح",
   "folderUploadInfo": "سيتم إنشاء مجلد وحدث جديدين بهذا الاسم، وسيتم رفع جميع الملفات إليهما",
-  "sqlQuery": "استعلام SQL"
+  "sqlQuery": "استعلام SQL",
+  "folderUploadDetected": "تم اكتشاف مجلد:",
+  "eventCreated": "تم إنشاء الحدث بنجاح",
+  "eventFound": "تم العثور على حدث موجود، إضافة الملفات إليه",
+  "newFolder": "مجلد جديد",
+  "statusPending": "لم يتم تحليله بعد",
+  "statusReady": "جاهز للمراجعة",
+  "statusApproved": "تمت الموافقة",
+  "markFolderVerified": "وضع علامة على المجلد كـ 'تم التحقق'",
+  "markFolderPending": "وضع علامة على المجلد كـ 'قيد الانتظار'",
+  "statusUpdated": "تم تحديث الحالة بنجاح",
+  "errorUpdatingStatus": "خطأ في تحديث الحالة"
 }

@@ -14,6 +14,7 @@ import ProfilesTab from "./components/ProfilesTab";
 import LoginLogsTab from "./components/LoginLogsTab";
 import ActiveSessionsTab from "./components/ActiveSessionsTab";
 import SqlQueryTab from "./components/SqlQueryTab";
+import CheckedOutTab from "./components/CheckedOutTab";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -150,7 +151,7 @@ export default function AdminPage() {
     const [retryingDocnumber, setRetryingDocnumber] = useState<number | null>(null);
     const [expandedErrorRows, setExpandedErrorRows] = useState<Record<number, boolean>>({});
     const [queueViewFilter, setQueueViewFilter] = useState<'failed' | 'in_progress' | 'queued'>('failed');
-    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions' | 'sql_query'>('users');
+    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions' | 'sql_query' | 'checked_out'>('users');
 
     const router = useRouter();
     const { showToast } = useToast();
@@ -454,6 +455,15 @@ export default function AdminPage() {
                     >
                         {t('sqlQuery') || 'SQL Query'}
                     </button>
+                    <button
+                        onClick={() => setActiveAdminTab('checked_out')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1.5 ${activeAdminTab === 'checked_out' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Checked Out
+                    </button>
                 </div>
 
                 {/* Login History Tab */}
@@ -470,6 +480,9 @@ export default function AdminPage() {
 
                 {/* SQL Query Tab */}
                 {activeAdminTab === 'sql_query' && <SqlQueryTab />}
+
+                {/* Checked-Out Documents Tab */}
+                {activeAdminTab === 'checked_out' && <CheckedOutTab />}
 
                 {/* Processing Queue Status */}
                 {activeAdminTab === 'worker' && (

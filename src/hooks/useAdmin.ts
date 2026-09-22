@@ -146,6 +146,33 @@ interface ActiveSessionsResponse {
     sessions: ActiveSession[];
 }
 
+export interface CheckedOutDocument {
+    docnumber: number;
+    system_id: number;
+    checkout_date: string | null;
+    typist: string | null;
+    docname: string;
+}
+
+interface CheckedOutResponse {
+    documents: CheckedOutDocument[];
+    total: number;
+    days: number;
+}
+
+interface CheckinResult {
+    docnumber: number;
+    success: boolean;
+    result_code: number | null;
+}
+
+export interface BulkCheckinResponse {
+    results: CheckinResult[];
+    checked_in: number;
+    failed: number;
+    total: number;
+}
+
 interface AddUserParams {
     user_system_id: number;
     security_level_id: number;
@@ -432,6 +459,30 @@ export function useAdmin() {
         },
     });
 
+    // Checked-Out Documents
+    const useCheckedOutDocuments = (days: number = 1, dateFrom?: string, dateTo?: string, enabled: boolean = true) => useQuery({
+        queryKey: ['checkedOutDocs', days, dateFrom, dateTo],
+        queryFn: async (): Promise<CheckedOutResponse> => {
+            const params = new URLSearchParams();
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            if (!dateFrom && !dateTo) params.append('days', String(days));
+            
+            return apiClient.get(`/api/admin/checked-out?${params.toString()}`);
+        },
+        enabled,
+        staleTime: 30000,
+    });
+
+    const bulkCheckinMutation = useMutation({
+        mutationFn: async (docnumbers: number[]): Promise<BulkCheckinResponse> => {
+            return apiClient.post('/api/admin/checked-out/checkin', { docnumbers });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['checkedOutDocs'] });
+        },
+    });
+
     return {
         useCheckAccess,
         useUsers,
@@ -445,6 +496,7 @@ export function useAdmin() {
         useGroupUsers,
         useLoginHistory,
         useActiveSessions,
+        useCheckedOutDocuments,
         terminateSession: terminateSessionMutation.mutateAsync,
         isTerminatingSession: terminateSessionMutation.isPending,
         retryFailedQueue: retryFailedQueueMutation.mutateAsync,
@@ -468,5 +520,7 @@ export function useAdmin() {
         upsertTabPermission: upsertTabPermissionMutation.mutateAsync,
         isUpsertingTabPermission: upsertTabPermissionMutation.isPending,
         initTabPermissions: initTabPermissionsMutation.mutateAsync,
+        bulkCheckin: bulkCheckinMutation.mutateAsync,
+        isBulkCheckingIn: bulkCheckinMutation.isPending,
     };
 }

@@ -31,6 +31,9 @@ interface FoldersProps {
     isEditor: boolean;
     initialFolderId?: string | null;
     externalRefreshTrigger?: number;
+    folderSearchTerm?: string;
+    onFolderSearchChange?: (term: string) => void;
+    onFolderSearchFetchingChange?: (fetching: boolean) => void;
 }
 
 interface ContextMenuState {
@@ -58,7 +61,7 @@ function formatDate(dateStr?: string): string {
     }).format(date);
 }
 
-export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId, externalRefreshTrigger }) => {
+export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick, onUploadClick, t, apiURL, isEditor, initialFolderId, externalRefreshTrigger, folderSearchTerm, onFolderSearchChange, onFolderSearchFetchingChange }) => {
     const searchParams = useSearchParams();
     const queryClient = useQueryClient();
 
@@ -69,6 +72,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const { user } = useAuth();
     const { updateViewMode, isUpdatingViewMode } = useUserPreferences();
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [groupBy, setGroupBy] = useState<'none' | 'type'>('none');
     const [showDetailsSidebar, setShowDetailsSidebar] = useState(false);
 
     useEffect(() => {
@@ -96,13 +100,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([
         { id: null, name: t('home') || 'Home' }
     ]);
+    const [dragOverCrumbIndex, setDragOverCrumbIndex] = useState<number | null>(null);
 
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    // Use the global folderSearchTerm directly (MainDashboard handles debouncing)
+    const searchTerm = folderSearchTerm || '';
 
     const { data, isLoading: isInitialLoading, isFetching } = useFolderContents({
         parentId: currentFolderId,
-        searchTerm: debouncedSearchTerm,
+        searchTerm: searchTerm,
         apiURL
     });
 
@@ -138,7 +143,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             setIsNavigating(false);
         }
         prevIsFetchingRef.current = isFetching;
-    }, [isFetching]);
+        onFolderSearchFetchingChange?.(isFetching);
+    }, [isFetching, onFolderSearchFetchingChange]);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -257,13 +263,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const selectedFileCount = selectedFiles.length;
     const selectedItemCount = items.filter((item) => selectedFileIds.has(item.id)).length;
 
-    // Debounce search term
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
-        }, 500);
-        return () => clearTimeout(handler);
-    }, [searchTerm]);
+
 
     // Sync breadcrumbs from backend data if available
     useEffect(() => {
@@ -330,11 +330,11 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         setIsSelectionMode(false);
         setLastClickedIndex(null);
         setFocusedItemIndex(null);
-    }, [currentFolderId, debouncedSearchTerm]);
+    }, [currentFolderId, searchTerm]);
 
     useEffect(() => {
         setHiddenItemIds(new Set());
-    }, [currentFolderId, debouncedSearchTerm]);
+    }, [currentFolderId, searchTerm]);
 
     // React to external refresh trigger (e.g. upload-complete from parent)
     const prevTriggerRef = useRef(externalRefreshTrigger);
@@ -411,10 +411,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         return `/folder/${item.id}?breadcrumbs=${encodeURIComponent(json)}&name=${encodeURIComponent(item.name)}`;
     };
 
-    const renderIcon = (item: FolderItem, isStandard = false) => {
+    const renderIcon = (item: FolderItem, isStandard = false, customSize?: number) => {
         let iconSrc = '/folder-icon.svg';
         let altText = 'Folder';
-        let size = 56; // Maps to h-14 w-14
+        let size = customSize || 56; // Maps to h-14 w-14
         let invertClass = "";
 
         let type: string = 'folder';
@@ -529,8 +529,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
         // Clear search when navigating into a folder so its contents are shown
         if (folder.type === 'folder' || folder.is_standard || folder.node_type === 'N' || folder.node_type === 'F') {
-            setSearchTerm('');
-            setDebouncedSearchTerm('');
+            onFolderSearchChange?.('');
         }
 
         // Prevent navigating to the exact same folder we are already in (avoids duplicate breadcrumbs on rapid double-clicks while loading)
@@ -581,7 +580,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         setCurrentFolderId(folder.id);
         setBreadcrumbs(newBreadcrumbs);
         updateUrlShallow(folder.id, newBreadcrumbs);
-    }, [breadcrumbs, onDocumentClick, showToast, t, updateUrlShallow, getMediaType]);
+    }, [breadcrumbs, onDocumentClick, showToast, t, updateUrlShallow, getMediaType, onFolderSearchChange]);
 
     const handleBreadcrumbClick = (index: number) => {
         const target = breadcrumbs[index];
@@ -609,12 +608,12 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             setIsRefreshing(true);
         }
         // Force refetch from server, bypassing stale time cache
-        queryClient.refetchQueries({ queryKey: ['folders', currentFolderId, debouncedSearchTerm] });
+        queryClient.refetchQueries({ queryKey: ['folders', currentFolderId, searchTerm] });
         queryClient.invalidateQueries({ queryKey: ['documents'] });
     };
 
     const updateItemsInCurrentView = (updater: (item: FolderItem) => FolderItem) => {
-        queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
+        queryClient.setQueryData(['folders', currentFolderId, searchTerm], (previous: any) => {
             if (!previous?.contents) return previous;
 
             return {
@@ -634,7 +633,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             return next;
         });
 
-        queryClient.setQueryData(['folders', currentFolderId, debouncedSearchTerm], (previous: any) => {
+        queryClient.setQueryData(['folders', currentFolderId, searchTerm], (previous: any) => {
             if (!previous?.contents) return previous;
 
             return {
@@ -747,6 +746,13 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             const activeTag = document.activeElement?.tagName;
             if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
             if (confirmModalOpen || itemToRename || isShareModalOpen || isMoveModalOpen || showCreateModal) return;
+
+            if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+                e.preventDefault();
+                refreshCurrentView(true);
+                return;
+            }
+
             if (userItems.length === 0) return;
 
             const cols = (() => {
@@ -1608,6 +1614,21 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         return colorMap[type] || 'text-yellow-500 dark:text-yellow-400';
     };
 
+    const groups = React.useMemo(() => {
+        if (groupBy === 'none') {
+            return [{ title: '', items: userItems }];
+        }
+        if (groupBy === 'type') {
+            const folders = userItems.filter((i) => i.type === 'folder');
+            const files = userItems.filter((i) => i.type === 'file');
+            return [
+                { title: t('folders') || 'Folders', items: folders },
+                { title: t('files') || 'Files', items: files }
+            ].filter(g => g.items.length > 0);
+        }
+        return [{ title: '', items: userItems }];
+    }, [groupBy, userItems, t]);
+
     return (
         <div ref={containerRef} className="flex flex-col h-full bg-white dark:bg-[#1e1e1e] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative">
 
@@ -1631,8 +1652,31 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                 {index > 0 && <span className="mx-2 text-gray-400">/</span>}
                                 <button
                                     onClick={() => handleBreadcrumbClick(index)}
-                                    className={`hover:text-blue-500 hover:underline transition-colors ${index === breadcrumbs.length - 1 ? 'font-bold text-gray-900 dark:text-white' : ''
-                                        }`}
+                                    onDragOver={(e) => {
+                                        if (!isEditor || index === breadcrumbs.length - 1) return;
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        e.dataTransfer.dropEffect = 'move';
+                                        setDragOverCrumbIndex(index);
+                                    }}
+                                    onDragLeave={() => setDragOverCrumbIndex(null)}
+                                    onDrop={(e) => {
+                                        setDragOverCrumbIndex(null);
+                                        if (!isEditor || index === breadcrumbs.length - 1) return;
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        try {
+                                            const payloadStr = e.dataTransfer.getData('text/plain');
+                                            if (!payloadStr) return;
+                                            const payload = JSON.parse(payloadStr);
+                                            if (payload && payload.source === 'edms-folders-grid' && payload.ids && payload.ids.length > 0) {
+                                                moveFilesToFolder(payload.ids, crumb.id);
+                                            }
+                                        } catch (err) {
+                                            console.error("Error parsing drop payload", err);
+                                        }
+                                    }}
+                                    className={`hover:text-blue-500 hover:underline transition-colors px-2 py-1 rounded-md ${index === breadcrumbs.length - 1 ? 'font-bold text-gray-900 dark:text-white' : ''} ${dragOverCrumbIndex === index ? 'bg-blue-100 dark:bg-blue-900/50 outline-dashed outline-2 outline-blue-500' : ''}`}
                                 >
                                     {crumb.name}
                                 </button>
@@ -1641,25 +1685,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     </nav>
 
                     <div className="flex items-center space-x-3 ml-4">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder={t('search') || "Search in folder..."}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-48 transition-all focus:w-64"
-                            />
-                            <Image src="/search-icon.svg" alt="" width={16} height={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-60 dark:invert" />
-                            {searchTerm && (
-                                <button
-                                    onClick={() => { setSearchTerm(''); setDebouncedSearchTerm(''); }}
-                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                                    aria-label="Clear search"
-                                >
-                                    <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
-                                </button>
-                            )}
-                        </div>
+                        {/* Internal Search Bar Removed - Now using Global Header Search Bar */}
 
                         <button
                             onClick={() => refreshCurrentView()}
@@ -1672,6 +1698,18 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                         >
                             <Image src="/icons/refresh.svg" alt="" width={20} height={20} className={`${isRefreshing || isFetching ? 'animate-spin' : ''} dark:invert`} />
                         </button>
+
+                        <div className="flex items-center mx-2 gap-2">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">{t('groupBy') || 'Group By:'}</span>
+                            <select
+                                value={groupBy}
+                                onChange={(e) => setGroupBy(e.target.value as 'none' | 'type')}
+                                className="bg-gray-100 dark:bg-gray-700 text-sm border-none rounded-md p-1 outline-none focus:ring-1 focus:ring-blue-500 text-gray-700 dark:text-gray-200"
+                            >
+                                <option value="none">{t('none') || 'None'}</option>
+                                <option value="type">{t('type') || 'Type'}</option>
+                            </select>
+                        </div>
 
                         <div className="flex bg-gray-200 dark:bg-gray-700 rounded-lg p-1 mx-2">
                             <button
@@ -1728,7 +1766,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                     </div>
                 </div>
 
-                {isSelectionMode && isEditor && selectedItemCount > 0 && (
+                {isSelectionMode && isEditor && selectedItemCount > 1 && (
                     <div className="absolute inset-0 z-10 flex items-center justify-between px-6 bg-blue-50 dark:bg-blue-950/90 border-b border-blue-200 dark:border-blue-800">
                         <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
                             {(t('selectedFilesCount') || `${selectedItemCount} item(s) selected`).replace('{count}', String(selectedItemCount))}
@@ -1859,7 +1897,14 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                             <div className="mb-4">
                                 {viewMode === 'grid' ? (
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                {userItems.map((item) => {
+                                {groups.map((group, gIdx) => (
+                                    <React.Fragment key={`grid-${gIdx}`}>
+                                        {group.title && (
+                                            <div className="col-span-full mt-2 mb-2 first:mt-0">
+                                                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-1">{group.title}</h3>
+                                            </div>
+                                        )}
+                                        {group.items.map((item) => {
                                     const isFile = item.type === 'file';
                                     const isSelected = selectedFileIds.has(item.id);
                                     const isDragOverTarget = dragOverFolderId === item.id;
@@ -2087,6 +2132,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                         </div>
                                     );
                                 })}
+                                    </React.Fragment>
+                                ))}
                             </div>
                             ) : (
                                 <div className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-[#1a1a1a]">
@@ -2100,7 +2147,16 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                            {userItems.map((item) => {
+                                            {groups.map((group, gIdx) => (
+                                                <React.Fragment key={`list-${gIdx}`}>
+                                                    {group.title && (
+                                                        <tr>
+                                                            <td colSpan={6} className="px-4 py-2 bg-gray-50 dark:bg-[#252525] text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                                {group.title}
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                    {group.items.map((item) => {
                                                 const isFile = item.type === 'file';
                                                 const isSelected = selectedFileIds.has(item.id);
                                                 const isDragOverTarget = dragOverFolderId === item.id;
@@ -2205,7 +2261,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                                                     />
                                                                 ) : (
                                                                     <span className={!isFile ? 'text-gray-400 dark:text-gray-500' : getFileColorClass(item)}>
-                                                                        {renderIcon(item, false)}
+                                                                        {renderIcon(item, false, 24)}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -2240,6 +2296,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                                     </tr>
                                                 );
                                             })}
+                                                </React.Fragment>
+                                            ))}
                                         </tbody>
                                     </table>
                                 </div>

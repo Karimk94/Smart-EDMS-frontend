@@ -35,6 +35,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
     d.setDate(d.getDate() + 7);
     return d.toISOString().split('T')[0];
   });
+  const [note, setNote] = useState('');
 
   if (!isOpen) return null;
 
@@ -100,7 +101,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
         documentName,
         expiryDate,
         shareMode,
-        targetEmails: emailsToProcess.length > 0 ? emailsToProcess : undefined
+        targetEmails: emailsToProcess.length > 0 ? emailsToProcess : undefined,
+        note: note.trim() || undefined
       });
 
       if (data.links && data.links.length > 0) {
@@ -137,6 +139,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
     setShareMode('open');
     setTargetEmail('');
     setTargetEmails([]);
+    setNote('');
     onClose();
   };
 
@@ -268,6 +271,22 @@ const ShareModal: React.FC<ShareModalProps> = ({
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+
+            {/* Optional note for recipient */}
+            <div className="mb-4">
+              <label htmlFor="share-note" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('shareNote') || 'Note for recipient (optional)'}
+              </label>
+              <textarea
+                id="share-note"
+                rows={3}
+                maxLength={2000}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('shareNotePlaceholder') || 'Add a message to include in the recipient email...'}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none"
               />
             </div>
 

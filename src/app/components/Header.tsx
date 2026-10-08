@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Center: Search Bar */}
         <div className="flex-1 flex justify-center px-4 items-center">
-          {activeSection !== 'folders' && activeSection !== 'profilesearch' && (
+          {activeSection !== 'profilesearch' && (
             <div className="w-full max-w-md">
               <SearchBar onSearch={onSearch} t={t} lang={lang} isLoading={isLoading} />
             </div>

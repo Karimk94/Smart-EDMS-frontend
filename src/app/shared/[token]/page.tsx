@@ -1754,6 +1754,21 @@ export default function SharedDocumentPage() {
                 </div>
               )}
 
+              {/* Note from sender */}
+              {shareInfo?.note && (
+                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Image src="/icons/info.svg" alt="" width={20} height={20} className="w-5 h-5 dark:invert" />
+                    <span className="font-medium text-blue-700 dark:text-blue-300 text-sm">
+                      {t('sharedNoteLabel') || 'Note from sender'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
+                    {shareInfo.note}
+                  </p>
+                </div>
+              )}
+
               <p className="text-center text-gray-600 dark:text-gray-300 mb-8">
                 {step === 'otp_input'
                   ? `${t('OtpSentMessage')} ${email}`

@@ -322,6 +322,9 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         isEditor={isSectionWritable('folders')}
                         initialFolderId={initialFolderId}
                         externalRefreshTrigger={folderRefreshTrigger}
+                        folderSearchTerm={searchTerm}
+                        onFolderSearchChange={handleSearch}
+                        onFolderSearchFetchingChange={setIsSearching}
                     />
                 </Suspense>
             );

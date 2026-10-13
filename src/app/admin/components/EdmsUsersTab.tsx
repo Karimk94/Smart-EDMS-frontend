@@ -359,7 +359,7 @@ export default function EdmsUsersTab() {
                 primary_group: parseInt(formData.primary_group) || 0,
                 allow_login: formData.allow_login,
                 disabled: formData.disabled,
-                secid: 0,
+                secid: formData.secid ? (parseInt(formData.secid) || 0) : 0,
                 additional_groups: formData.additional_groups.map(g => parseInt(g)).filter(Boolean),
                 network_aliases: formData.network_aliases.split('\n').filter(a => a.trim()),
                 hr_login: selectedHrEmployee?.login,
@@ -396,7 +396,7 @@ export default function EdmsUsersTab() {
                 primary_group: parseInt(formData.primary_group) || 0,
                 allow_login: formData.allow_login,
                 disabled: formData.disabled,
-                secid: 0,
+                secid: editPerson.secid || (formData.secid ? parseInt(formData.secid) : 0),
                 additional_groups: formData.additional_groups.map(g => parseInt(g)).filter(Boolean),
                 network_aliases: formData.network_aliases.split('\n').filter(a => a.trim()),
             };

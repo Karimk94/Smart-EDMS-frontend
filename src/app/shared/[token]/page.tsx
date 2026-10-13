@@ -170,8 +170,8 @@ const resolveMediaType = (item: FolderItem): string => {
   }
 
   const ext = getFileExtension(item.name);
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image';
-  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext)) return 'image';
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'hevc', 'm4v'].includes(ext)) return 'video';
   if (['pdf'].includes(ext)) return 'pdf';
   if (['doc', 'docx'].includes(ext)) return 'word';
   if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) return 'excel';

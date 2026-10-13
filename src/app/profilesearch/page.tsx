@@ -208,9 +208,13 @@ function ProfileSearchPageContent() {
 
     const handleDocumentClick = (doc: Document) => {
         if (doc.media_type === 'zip') return;
-        if (doc.media_type === 'video') setSelectedVideo(doc);
-        else if (doc.media_type === 'image') setSelectedDoc(doc);
-        else if (doc.media_type === 'pdf') setSelectedPdf(doc);
+        const ext = doc.docname.split('.').pop()?.toLowerCase();
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'];
+        const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'hevc', 'm4v'];
+
+        if (doc.media_type === 'video' || (ext && videoExtensions.includes(ext))) setSelectedVideo(doc);
+        else if (doc.media_type === 'image' || (ext && imageExtensions.includes(ext))) setSelectedDoc(doc);
+        else if (doc.media_type === 'pdf' || ext === 'pdf') setSelectedPdf(doc);
         else if (doc.media_type === 'text') setSelectedTxt(doc);
         else if (doc.media_type === 'excel') setSelectedExcel(doc);
         else if (doc.media_type === 'powerpoint') setSelectedPPT(doc);

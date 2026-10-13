@@ -21,6 +21,15 @@ export function useDocumentMutations() {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['documents'] });
+            queryClient.setQueryData(['documentMetadata', variables.doc_id], (old: any) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    ...(variables.abstract !== undefined ? { abstract: variables.abstract, title: variables.abstract } : {}),
+                    ...(variables.date_taken !== undefined ? { date: variables.date_taken } : {})
+                };
+            });
+            queryClient.invalidateQueries({ queryKey: ['documentMetadata', variables.doc_id] });
         },
     });
 

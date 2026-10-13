@@ -255,7 +255,9 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     const handleUpdateMetadataSuccess = () => {
         queryClient.invalidateQueries({ queryKey: ['documents'] });
-        documentModals.closeAll();
+        if (activeSection === 'folders') {
+            queryClient.invalidateQueries({ queryKey: ['folders'] });
+        }
     };
 
     const handleAnalyze = (uploadedFiles: UploadableFile[]) => {

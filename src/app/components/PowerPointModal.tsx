@@ -70,8 +70,8 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({
   const [initialDate, setInitialDate] = useState<Date | null>(safeParseDate(doc.date));
 
   const [isEditingAbstract, setIsEditingAbstract] = useState(false);
-  const [abstract, setAbstract] = useState(doc.title || '');
-  const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
+  const [abstract, setAbstract] = useState(doc.abstract || '');
+  const [initialAbstract, setInitialAbstract] = useState(doc.abstract || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -82,8 +82,8 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({
   }, [doc.is_favorite]);
 
   useEffect(() => {
-    setAbstract(doc.title || '');
-    setInitialAbstract(doc.title || '');
+    setAbstract(doc.abstract || '');
+    setInitialAbstract(doc.abstract || '');
     const newDate = safeParseDate(doc.date);
     setDocumentDate(newDate);
     setInitialDate(newDate);

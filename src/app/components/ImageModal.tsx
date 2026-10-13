@@ -13,6 +13,7 @@ import { LoadingButton } from './LoadingButton';
 import { ModalNavigationBar } from './ModalNavigationBar';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
+import { useDocumentMetadata } from '../../hooks/useDocumentMetadata';
 
 const safeParseDate = (dateString: string): Date | null => {
   if (!dateString || dateString === "N/A") return null;
@@ -86,8 +87,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({
   const [initialDate, setInitialDate] = useState<Date | null>(safeParseDate(doc.date));
 
   const [isEditingAbstract, setIsEditingAbstract] = useState(false);
-  const [abstract, setAbstract] = useState(doc.title || '');
-  const [initialAbstract, setInitialAbstract] = useState(doc.title || '');
+  const [abstract, setAbstract] = useState(doc.abstract || '');
+  const [initialAbstract, setInitialAbstract] = useState(doc.abstract || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -135,15 +136,34 @@ export const ImageModal: React.FC<ImageModalProps> = ({
     setIsFavorite(doc.is_favorite);
   }, [doc.is_favorite]);
 
+  const { data: metaData } = useDocumentMetadata(doc.doc_id, {
+    enabled: !!doc.doc_id,
+  });
+
   useEffect(() => {
-    setAbstract(doc.title || '');
-    setInitialAbstract(doc.title || '');
-    const newDate = safeParseDate(doc.date);
-    setDocumentDate(newDate);
-    setInitialDate(newDate);
     setIsEditingAbstract(false);
     setIsEditingDate(false);
-  }, [doc.title, doc.date]);
+  }, [doc.doc_id]);
+
+  useEffect(() => {
+    const hasAuthoritativeMeta = metaData && Number(metaData.doc_id) === Number(doc.doc_id);
+    const resolvedAbstract = hasAuthoritativeMeta
+      ? (metaData.abstract || '')
+      : (doc.abstract || doc.title || '');
+
+    const resolvedDate = hasAuthoritativeMeta && metaData.date
+      ? safeParseDate(metaData.date)
+      : safeParseDate(doc.date);
+
+    if (!isEditingAbstract) {
+      setAbstract(resolvedAbstract);
+      setInitialAbstract(resolvedAbstract);
+    }
+    if (!isEditingDate) {
+      setDocumentDate(resolvedDate);
+      setInitialDate(resolvedDate);
+    }
+  }, [doc.doc_id, doc.abstract, doc.title, doc.date, metaData, isEditingAbstract, isEditingDate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -235,8 +255,15 @@ export const ImageModal: React.FC<ImageModalProps> = ({
     try {
       await updateMetadata(payload);
 
-      if (payload.abstract !== undefined) setInitialAbstract(payload.abstract);
-      if (payload.date_taken !== undefined) setInitialDate(documentDate);
+      if (payload.abstract !== undefined) {
+        setInitialAbstract(payload.abstract);
+        setAbstract(payload.abstract);
+        doc.abstract = payload.abstract;
+      }
+      if (payload.date_taken !== undefined) {
+        setInitialDate(documentDate);
+        if (payload.date_taken) doc.date = payload.date_taken;
+      }
 
       setIsEditingDate(false);
       setIsEditingAbstract(false);

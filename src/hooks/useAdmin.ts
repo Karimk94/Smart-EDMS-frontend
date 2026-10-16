@@ -191,6 +191,46 @@ interface UpdateUserParams {
     allow_large_downloads?: boolean;
 }
 
+export interface OracleSession {
+    SID: number;
+    "SERIAL#": number;
+    STATUS: string | null;
+    USERNAME: string | null;
+    SCHEMANAME: string | null;
+    OSUSER: string | null;
+    MACHINE: string | null;
+    PROGRAM: string | null;
+    MODULE: string | null;
+    ACTION: string | null;
+    SQL_ID: string | null;
+    EVENT: string | null;
+    WAIT_CLASS: string | null;
+    SECONDS_IN_WAIT: number | null;
+    STATE: string | null;
+    LOGON_TIME: string | null;
+    MINUTES_CONNECTED: number | null;
+    SECONDS_IDLE: number | null;
+    MINUTES_IDLE: number | null;
+    BLOCKING_SESSION: number | null;
+    BLOCKING_INSTANCE: number | null;
+    CLIENT_INFO: string | null;
+    SERVICE_NAME: string | null;
+}
+
+export interface OracleKillLogEntry {
+    timestamp: string;
+    sid: number;
+    serial: number;
+    username?: string | null;
+    machine?: string | null;
+    program?: string | null;
+    minutes_connected?: number | null;
+    killed_by: string;
+    reason: string;
+    success: boolean;
+    message: string;
+}
+
 export function useAdmin() {
     const queryClient = useQueryClient();
 
@@ -483,6 +523,56 @@ export function useAdmin() {
         },
     });
 
+    const useOracleSessions = (enabled: boolean = true) => useQuery({
+        queryKey: ['oracleSessions'],
+        queryFn: async (): Promise<{ sessions: OracleSession[]; total: number }> => {
+            return apiClient.get('/api/admin/oracle-sessions');
+        },
+        enabled,
+        refetchInterval: 15000,
+    });
+
+    const useOracleKillLog = (enabled: boolean = true) => useQuery({
+        queryKey: ['oracleKillLog'],
+        queryFn: async (): Promise<{ log: OracleKillLogEntry[] }> => {
+            return apiClient.get('/api/admin/oracle-sessions/kill-log');
+        },
+        enabled,
+    });
+
+    const killOracleSessionMutation = useMutation({
+        mutationFn: async ({ sid, serial }: { sid: number; serial: number }) => {
+            return apiClient.post('/api/admin/oracle-sessions/kill', { sid, serial });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['oracleSessions'] });
+            queryClient.invalidateQueries({ queryKey: ['oracleKillLog'] });
+        },
+    });
+
+    const killAllLongOracleSessionsMutation = useMutation({
+        mutationFn: async (params?: { threshold_minutes?: number; idle_threshold_minutes?: number } | number): Promise<{ killed: number; failed: number; total: number; message: string }> => {
+            const payload = typeof params === 'number'
+                ? { threshold_minutes: 0, idle_threshold_minutes: params }
+                : { threshold_minutes: params?.threshold_minutes ?? 0, idle_threshold_minutes: params?.idle_threshold_minutes ?? 60 };
+            return apiClient.post('/api/admin/oracle-sessions/kill-all-long', payload);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['oracleSessions'] });
+            queryClient.invalidateQueries({ queryKey: ['oracleKillLog'] });
+        },
+    });
+
+    const killOracleSessionsBatchMutation = useMutation({
+        mutationFn: async ({ targets, reason }: { targets: { sid: number; serial: number; [key: string]: any }[]; reason?: string }): Promise<{ killed: number; failed: number; total: number; message: string }> => {
+            return apiClient.post('/api/admin/oracle-sessions/kill-batch', { targets, reason: reason || 'filtered-bulk-kill' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['oracleSessions'] });
+            queryClient.invalidateQueries({ queryKey: ['oracleKillLog'] });
+        },
+    });
+
     return {
         useCheckAccess,
         useUsers,
@@ -522,5 +612,13 @@ export function useAdmin() {
         initTabPermissions: initTabPermissionsMutation.mutateAsync,
         bulkCheckin: bulkCheckinMutation.mutateAsync,
         isBulkCheckingIn: bulkCheckinMutation.isPending,
+        useOracleSessions,
+        useOracleKillLog,
+        killOracleSession: killOracleSessionMutation.mutateAsync,
+        isKillingOracleSession: killOracleSessionMutation.isPending,
+        killAllLongOracleSessions: killAllLongOracleSessionsMutation.mutateAsync,
+        isKillingAllLong: killAllLongOracleSessionsMutation.isPending,
+        killOracleSessionsBatch: killOracleSessionsBatchMutation.mutateAsync,
+        isKillingBatch: killOracleSessionsBatchMutation.isPending,
     };
 }

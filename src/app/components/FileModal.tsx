@@ -93,7 +93,7 @@ export const FileModal: React.FC<FileModalProps> = ({
     const isText = (ext && textExtensions.includes(ext)) || !hasExtension;
 
     setIsTextFile(!!isText);
-  }, [doc.title, doc.date, doc.docname]);
+  }, [doc.title, doc.date, doc.docname, doc.abstract]);
 
   const ext = doc.docname.split('.').pop()?.toLowerCase();
   const textExtensions = ['txt', 'csv', 'json', 'xml', 'log', 'md', 'yml', 'yaml', 'ini', 'conf'];

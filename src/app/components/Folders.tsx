@@ -602,7 +602,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         }
     };
 
-    const refreshCurrentView = (showOverlay = false) => {
+    const refreshCurrentView = useCallback((showOverlay = false) => {
         if (showOverlay) {
             setIsOperationLoading(true);
         } else {
@@ -611,7 +611,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
         // Force refetch from server, bypassing stale time cache
         queryClient.refetchQueries({ queryKey: ['folders', currentFolderId, searchTerm] });
         queryClient.invalidateQueries({ queryKey: ['documents'] });
-    };
+    }, [queryClient, currentFolderId, searchTerm]);
 
     const updateItemsInCurrentView = (updater: (item: FolderItem) => FolderItem) => {
         queryClient.setQueryData(['folders', currentFolderId, searchTerm], (previous: any) => {
@@ -844,7 +844,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [focusedItemIndex, userItems, isSelectionMode, selectedFileIds, isEditor, confirmModalOpen, itemToRename, isShareModalOpen, isMoveModalOpen, showCreateModal, handleBatchDelete, handleNavigate]);
+    }, [focusedItemIndex, userItems, isSelectionMode, selectedFileIds, isEditor, confirmModalOpen, itemToRename, isShareModalOpen, isMoveModalOpen, showCreateModal, handleBatchDelete, handleNavigate, refreshCurrentView]);
 
     const isRectIntersecting = (a: DOMRect, b: { left: number; right: number; top: number; bottom: number }) => {
         return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);

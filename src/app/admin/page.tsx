@@ -13,6 +13,7 @@ import EdmsUsersTab from "./components/EdmsUsersTab";
 import ProfilesTab from "./components/ProfilesTab";
 import LoginLogsTab from "./components/LoginLogsTab";
 import ActiveSessionsTab from "./components/ActiveSessionsTab";
+import OracleSessionsTab from "./components/OracleSessionsTab";
 import SqlQueryTab from "./components/SqlQueryTab";
 import CheckedOutTab from "./components/CheckedOutTab";
 
@@ -151,7 +152,9 @@ export default function AdminPage() {
     const [retryingDocnumber, setRetryingDocnumber] = useState<number | null>(null);
     const [expandedErrorRows, setExpandedErrorRows] = useState<Record<number, boolean>>({});
     const [queueViewFilter, setQueueViewFilter] = useState<'failed' | 'in_progress' | 'queued'>('failed');
-    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions' | 'sql_query' | 'checked_out'>('users');
+    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions' | 'oracle_sessions' | 'sql_query' | 'checked_out'>('users');
+    const [lastSmartTab, setLastSmartTab] = useState<'users' | 'worker' | 'login_history' | 'active_sessions'>('users');
+    const [lastEdmsTab, setLastEdmsTab] = useState<'edms_users' | 'oracle_sessions' | 'checked_out' | 'sql_query' | 'profiles'>('edms_users');
 
     const router = useRouter();
     const { showToast } = useToast();
@@ -412,65 +415,196 @@ export default function AdminPage() {
     return (
         <div className="p-6">
             <div className="max-w-full mx-auto">
-                <div className="mb-4 flex items-center gap-2">
-                    <button
-                        onClick={() => setActiveAdminTab('users')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        {t('adminUsers') || 'Users'}
-                    </button>
-                    <button
-                        onClick={() => setActiveAdminTab('worker')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'worker' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        {t('worker') || 'Worker'}
-                    </button>
-                    <button
-                        onClick={() => setActiveAdminTab('edms_users')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'edms_users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        {t('edmsUsers') || 'EDMS Users'}
-                    </button>
-                    <button
-                        onClick={() => setActiveAdminTab('profiles')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'profiles' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        {t('adminProfiles') || 'Profiles'}
-                    </button>
-                    <button
-                        onClick={() => setActiveAdminTab('login_history')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'login_history' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        {t('loginHistory') || 'Login History'}
-                    </button>
-                    <button
-                        onClick={() => setActiveAdminTab('active_sessions')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'active_sessions' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        {t('activeSessions') || 'Active Sessions'}
-                    </button>
-                    <button
-                        onClick={() => setActiveAdminTab('sql_query')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${activeAdminTab === 'sql_query' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        {t('sqlQuery') || 'SQL Query'}
-                    </button>
-                    <button
-                        onClick={() => setActiveAdminTab('checked_out')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1.5 ${activeAdminTab === 'checked_out' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                    >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        Checked Out
-                    </button>
-                </div>
+                {/* ── Single-Line Hierarchical Admin Navigation ── */}
+                {(() => {
+                    const isSmartEdms = (['users', 'worker', 'login_history', 'active_sessions'] as const).includes(activeAdminTab as any);
+
+                    return (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-1.5 mb-4 flex items-center gap-1.5 flex-wrap transition-colors">
+                            {/* 1. Smart EDMS Group (Parent + Children on the same line) */}
+                            <div className={`flex items-center gap-1 p-0.5 rounded-lg transition-all ${
+                                isSmartEdms
+                                    ? "bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60"
+                                    : ""
+                            }`}>
+                                <button
+                                    onClick={() => {
+                                        if (!isSmartEdms) {
+                                            setActiveAdminTab(lastSmartTab);
+                                        }
+                                    }}
+                                    title="Smart EDMS Application Administration"
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        isSmartEdms
+                                            ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-500/30"
+                                            : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                    }`}
+                                >
+                                    <span>🚀</span>
+                                    <span>Smart EDMS</span>
+                                    <span className="text-[10px] ml-0.5 opacity-80">{isSmartEdms ? "▾" : "▸"}</span>
+                                </button>
+
+                                {/* Smart EDMS Children (Shown on the same line when clicked) */}
+                                {isSmartEdms && (
+                                    <div className="flex items-center gap-1 pl-1">
+                                        <button
+                                            onClick={() => { setActiveAdminTab('users'); setLastSmartTab('users'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'users'
+                                                    ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 font-semibold shadow-xs border border-blue-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <span>👥</span>
+                                            <span>{t('adminUsers') || 'Users'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('worker'); setLastSmartTab('worker'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'worker'
+                                                    ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 font-semibold shadow-xs border border-blue-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <span>⚡</span>
+                                            <span>{t('worker') || 'Worker'}</span>
+                                            {queueStatus?.summary?.failed ? (
+                                                <span className="ml-1 px-1.5 py-0.2 bg-red-500 text-white rounded-full text-[10px] font-bold">
+                                                    {queueStatus.summary.failed}
+                                                </span>
+                                            ) : null}
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('login_history'); setLastSmartTab('login_history'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'login_history'
+                                                    ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 font-semibold shadow-xs border border-blue-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <span>📜</span>
+                                            <span>{t('loginHistory') || 'Login History'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('active_sessions'); setLastSmartTab('active_sessions'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'active_sessions'
+                                                    ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 font-semibold shadow-xs border border-blue-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <span>🟢</span>
+                                            <span>{t('activeSessions') || 'Active Sessions'}</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Subtle Divider between System Groups */}
+                            <div className="h-5 w-[1px] bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
+
+                            {/* 2. EDMS Group (Parent + Children on the same line) */}
+                            <div className={`flex items-center gap-1 p-0.5 rounded-lg transition-all ${
+                                !isSmartEdms
+                                    ? "bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60"
+                                    : ""
+                            }`}>
+                                <button
+                                    onClick={() => {
+                                        if (isSmartEdms) {
+                                            setActiveAdminTab(lastEdmsTab);
+                                        }
+                                    }}
+                                    title="OpenText EDOCS & Oracle Database Administration"
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        !isSmartEdms
+                                            ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-500/30"
+                                            : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                    }`}
+                                >
+                                    <span>🗄️</span>
+                                    <span>EDMS</span>
+                                    <span className="text-[10px] ml-0.5 opacity-80">{!isSmartEdms ? "▾" : "▸"}</span>
+                                </button>
+
+                                {/* EDMS Children (Shown on the same line when clicked) */}
+                                {!isSmartEdms && (
+                                    <div className="flex items-center gap-1 pl-1">
+                                        <button
+                                            onClick={() => { setActiveAdminTab('edms_users'); setLastEdmsTab('edms_users'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'edms_users'
+                                                    ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs border border-indigo-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <span>👤</span>
+                                            <span>{t('edmsUsers') || 'EDMS Users'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('oracle_sessions'); setLastEdmsTab('oracle_sessions'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'oracle_sessions'
+                                                    ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs border border-indigo-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                            </svg>
+                                            <span>Oracle Sessions</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('checked_out'); setLastEdmsTab('checked_out'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'checked_out'
+                                                    ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs border border-indigo-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                            <span>Checked Out</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('sql_query'); setLastEdmsTab('sql_query'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'sql_query'
+                                                    ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs border border-indigo-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <span>💻</span>
+                                            <span>{t('sqlQuery') || 'SQL Query'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('profiles'); setLastEdmsTab('profiles'); }}
+                                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                                                activeAdminTab === 'profiles'
+                                                    ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs border border-indigo-200 dark:border-gray-700"
+                                                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/60"
+                                            }`}
+                                        >
+                                            <span>📁</span>
+                                            <span>{t('adminProfiles') || 'Profiles'}</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Login History Tab */}
                 {activeAdminTab === 'login_history' && <LoginLogsTab />}
 
                 {/* Active Sessions Tab */}
                 {activeAdminTab === 'active_sessions' && <ActiveSessionsTab />}
+
+                {/* Oracle Sessions Monitor Tab */}
+                {activeAdminTab === 'oracle_sessions' && <OracleSessionsTab />}
 
                 {/* Profiles Tab */}
                 {activeAdminTab === 'profiles' && <ProfilesTab />}

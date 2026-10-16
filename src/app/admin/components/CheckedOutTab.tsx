@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useAdmin } from "../../../hooks/useAdmin";
 import { Spinner } from "../../components/Spinner";
 import { useToast } from "../../context/ToastContext";
@@ -55,7 +55,7 @@ export default function CheckedOutTab() {
         true
     );
 
-    const documents = data?.documents ?? [];
+    const documents = useMemo(() => data?.documents ?? [], [data?.documents]);
     const total = data?.total ?? 0;
 
     // ---- Selection helpers ----

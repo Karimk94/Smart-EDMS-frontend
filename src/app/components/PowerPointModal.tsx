@@ -95,7 +95,7 @@ export const PowerPointModal: React.FC<PowerPointModalProps> = ({
 
     setThumbnailUrl(null);
     setParseError(null);
-  }, [doc.title, doc.date, doc.docname, doc.doc_id]);
+  }, [doc.title, doc.date, doc.docname, doc.doc_id, doc.abstract]);
 
   const { data: arrayBuffer, isLoading: isFetchingContent } = useDocumentContent(doc.doc_id, {
     responseType: 'arraybuffer',

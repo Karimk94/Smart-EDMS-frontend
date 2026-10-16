@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import { useAnalysis } from '../../hooks/useAnalysis';
 import { useDocumentContent } from '../../hooks/useDocumentContent';
@@ -116,7 +116,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
     enabled: !!doc.doc_id
   });
 
-  const getFallbackThumbnailUrl = () => {
+  const getFallbackThumbnailUrl = useCallback(() => {
     if (doc.thumbnail_url && doc.thumbnail_url.trim()) {
       if (doc.thumbnail_url.startsWith('http')) return doc.thumbnail_url;
       const clean = doc.thumbnail_url.replace(/^\//, '');
@@ -124,7 +124,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
     }
     const cleanCache = `cache/${doc.doc_id}.jpg`;
     return apiURL ? `${apiURL.replace(/\/+$/, '')}/${cleanCache}` : `/${cleanCache}`;
-  };
+  }, [doc.thumbnail_url, doc.doc_id, apiURL]);
 
   useEffect(() => {
     setIsLoading(isFetchingImage);
@@ -210,7 +210,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
         }
       };
     }
-  }, [isFetchingImage, imageError, imageBlob, doc.docname, doc.doc_id, doc.thumbnail_url, apiURL]);
+  }, [isFetchingImage, imageError, imageBlob, doc.docname, getFallbackThumbnailUrl]);
 
   useEffect(() => {
     setIsFavorite(doc.is_favorite);

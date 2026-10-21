@@ -532,5 +532,7 @@
     "errorUpdatingStatus": "خطأ في تحديث الحالة",
     "groupBy": "تجميع حسب:",
     "none": "بلا",
-    "type": "النوع"
+    "type": "النوع",
+    "gridView": "عرض الشبكة",
+    "listView": "عرض القائمة"
 }

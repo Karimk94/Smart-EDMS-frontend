@@ -534,5 +534,7 @@
     "errorUpdatingStatus": "Error updating status",
     "groupBy": "Group By:",
     "none": "None",
-    "type": "Type"
+    "type": "Type",
+    "gridView": "Grid View",
+    "listView": "List View"
 }

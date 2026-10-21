@@ -13,6 +13,10 @@ export class Document {
     searchMatchField?: string; // Field where the search term was found
     searchMatchValue?: string; // The value that was searched for
     searchFieldValue?: string; // The actual value from the matched field
+    typist?: string;
+    display_value?: string;
+    extension?: string;
+    form_values?: Record<string, any>;
 
     constructor(data: Partial<Document>) {
         this.doc_id = data.doc_id || 0;
@@ -29,9 +33,17 @@ export class Document {
             search_match_field?: string;
             search_match_value?: string;
             search_field_value?: string;
+            typist?: string;
+            display_value?: string;
+            extension?: string;
+            form_values?: Record<string, any>;
         };
         this.searchMatchField = data.searchMatchField || rawData.search_match_field;
         this.searchMatchValue = data.searchMatchValue || rawData.search_match_value;
         this.searchFieldValue = data.searchFieldValue || rawData.search_field_value;
+        this.typist = data.typist || rawData.typist;
+        this.display_value = data.display_value || rawData.display_value;
+        this.extension = data.extension || rawData.extension;
+        this.form_values = data.form_values || rawData.form_values;
     }
 }

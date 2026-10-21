@@ -3,11 +3,12 @@
 import { enGB } from 'date-fns/locale/en-GB';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { SearchCriterion, SearchType, useProfileMultiSearch, useProfileSearchScopes, useProfileSearchTypes } from '../../hooks/useProfileSearch';
 import { useDocumentGroups } from '../../hooks/useDocumentGroups';
+import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { Document } from '../../models/Document';
 import { DocumentItemSkeleton } from '../components/DocumentItemSkeleton';
 import { DocumentList } from '../components/DocumentList';
@@ -40,6 +41,14 @@ registerLocale('en-GB', enGB);
  * Derives the default match type from the EXACT field in LKP_MAIN_FIELDS.
  * '*T*' → contains (like), 'T' → exact, 'T*' → startsWith
  */
+const STANDARD_COLUMNS = [
+    { id: 'name', label: 'Name', arLabel: 'الاسم' },
+    { id: 'doc_id', label: 'Doc #', arLabel: 'رقم المستند' },
+    { id: 'type', label: 'Type', arLabel: 'النوع' },
+    { id: 'date', label: 'Date', arLabel: 'التاريخ' },
+    { id: 'typist', label: 'Typist', arLabel: 'الكاتب' },
+];
+
 const getDefaultMatchType = (exact: string | undefined): 'like' | 'exact' | 'startsWith' => {
     if (!exact) return 'like';
     const trimmed = exact.trim();
@@ -78,6 +87,28 @@ function ProfileSearchPageContent() {
     useEffect(() => {
         setIsClient(true);
     }, []);
+
+    // View Mode Preference (Grid vs List) with DB persistence (separate for Profile Search)
+    const { updateProfileViewMode, isUpdatingProfileViewMode } = useUserPreferences();
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+    useEffect(() => {
+        if (user?.profile_view_mode) {
+            setViewMode(user.profile_view_mode as 'grid' | 'list');
+        } else {
+            const saved = localStorage.getItem('profile_view_mode') as 'grid' | 'list';
+            if (saved) setViewMode(saved);
+        }
+    }, [user?.profile_view_mode]);
+
+    const handleToggleViewMode = async (mode: 'grid' | 'list') => {
+        setViewMode(mode);
+        try {
+            await updateProfileViewMode(mode);
+        } catch (error) {
+            console.error("Failed to update profile view mode:", error);
+        }
+    };
 
     // Search Form State
     const [searchScope, setSearchScope] = useState<string>("");
@@ -128,12 +159,94 @@ function ProfileSearchPageContent() {
         return Object.values(scopeMap);
     }, [scopesData]);
 
+    // Column Customization State (similar to eDocs DM Explorer)
+    const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({});
+    const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
+    const columnPickerRef = useRef<HTMLDivElement>(null);
+
+    // Available form columns from typesData
+    const formAvailableColumns = useMemo(() => {
+        if (!typesData) return [];
+        return typesData
+            .filter(t => !['DOCNUMBER', 'DOCNAME'].includes(t.value.field_name.toUpperCase()))
+            .map(t => ({
+                id: t.value.display_field || t.value.field_name,
+                fieldName: t.value.field_name,
+                displayField: t.value.display_field || t.value.field_name,
+                label: t.value.type_name_en || t.label,
+                arLabel: t.label,
+            }));
+    }, [typesData]);
+
+    // Load persisted column selections when scope changes
+    useEffect(() => {
+        const storageKey = `ps_cols_${searchScope || 'all'}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                setVisibleColumns(JSON.parse(saved));
+            } catch {
+                setVisibleColumns({});
+            }
+        } else {
+            setVisibleColumns({});
+        }
+    }, [searchScope]);
+
+    // Close column picker when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (columnPickerRef.current && !columnPickerRef.current.contains(e.target as Node)) {
+                setIsColumnPickerOpen(false);
+            }
+        };
+        if (isColumnPickerOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isColumnPickerOpen]);
+
+    const toggleColumn = (colId: string, isChecked: boolean) => {
+        setVisibleColumns(prev => {
+            const updated = { ...prev, [colId]: isChecked };
+            const storageKey = `ps_cols_${searchScope || 'all'}`;
+            localStorage.setItem(storageKey, JSON.stringify(updated));
+            return updated;
+        });
+    };
+
+    const resetColumnsToDefault = () => {
+        setVisibleColumns({});
+        const storageKey = `ps_cols_${searchScope || 'all'}`;
+        localStorage.removeItem(storageKey);
+    };
+
+    const isColumnVisible = (colId: string, isStandard = true) => {
+        if (visibleColumns[colId] !== undefined) {
+            return visibleColumns[colId];
+        }
+        if (isStandard) return true;
+        // Form columns: show if in active search criteria
+        return committedParams?.criteria?.some(c => 
+            c.type?.value.field_name === colId || c.type?.value.display_field === colId
+        ) ?? false;
+    };
+
+    const visibleFormColumns = useMemo(() => {
+        return formAvailableColumns.filter(col => isColumnVisible(col.id, false));
+    }, [formAvailableColumns, visibleColumns, committedParams?.criteria]);
+
+    const requestedExtraColumns = useMemo(() => {
+        return visibleFormColumns.map(col => col.displayField);
+    }, [visibleFormColumns]);
+
     const { data: searchData, isFetching: isSearchLoading, error: searchError } = useProfileMultiSearch({
         scope: committedParams?.scope || '',
         criteria: committedParams?.criteria || [],
         dateFrom: committedParams?.dateFrom,
         dateTo: committedParams?.dateTo,
         page: committedParams?.page || 1,
+        extraColumns: requestedExtraColumns,
         enabled: isSearchTriggered && !!committedParams,
     });
 
@@ -277,6 +390,72 @@ function ProfileSearchPageContent() {
             searchMatchField: doc?.searchMatchField || firstCriterion.type?.value.display_field || undefined,
             searchFieldValue: doc?.searchFieldValue || undefined,
         };
+    };
+
+    // Extract dynamic form-specific columns from committed search criteria
+    const formCriteriaFields = useMemo(() => {
+        if (!committedParams?.criteria) return [];
+        return committedParams.criteria
+            .filter(c => c.type && c.type.value.field_name && !['DOCNUMBER', 'DOCNAME'].includes(c.type.value.field_name.toUpperCase()))
+            .map(c => ({
+                fieldName: c.type!.value.field_name,
+                displayField: c.type!.value.display_field || c.type!.value.field_name,
+                label: c.type!.label,
+                englishLabel: c.type!.value.type_name_en,
+            }));
+    }, [committedParams?.criteria]);
+
+    // Active form scope label for header display
+    const activeScopeLabel = useMemo(() => {
+        if (!committedParams?.scope || committedParams.scope === '0') return '';
+        const found = mergedScopes.find(s => s.value === committedParams.scope);
+        return found ? found.label : committedParams.scope;
+    }, [committedParams?.scope, mergedScopes]);
+
+    const renderDocumentIcon = (mediaType: string, customSize = 20) => {
+        const iconMap: Record<string, string> = {
+            image: '/file-image.svg',
+            video: '/file-video.svg',
+            excel: '/file-excel.svg',
+            pdf: '/file-pdf.svg',
+            powerpoint: '/file-powerpoint.svg',
+            word: '/file-word.svg',
+            zip: '/file-zip.svg',
+            audio: '/file-audio.svg',
+            cad: '/file-cad.svg',
+            code: '/file-code.svg',
+            email: '/file-email.svg',
+            font: '/file-font.svg',
+            database: '/file-database.svg',
+            vector: '/file-vector.svg',
+            archive: '/file-archive.svg',
+            executable: '/file-executable.svg',
+            disc: '/file-disc.svg',
+            visio: '/file-visio.svg',
+            onenote: '/file-onenote.svg',
+            text: '/file-document.svg',
+            file: '/file-document.svg',
+        };
+        const src = iconMap[mediaType] || '/file-document.svg';
+        return <Image src={src} alt={mediaType} width={customSize} height={customSize} className="flex-shrink-0" />;
+    };
+
+    const getMediaTypeBadge = (mediaType: string) => {
+        const colorMap: Record<string, string> = {
+            pdf: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800',
+            word: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
+            excel: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
+            powerpoint: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-800',
+            image: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
+            video: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/40 dark:text-pink-400 dark:border-pink-800',
+            zip: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
+        };
+        const badgeClass = colorMap[mediaType] || 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+        return (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border uppercase tracking-wider ${badgeClass}`}>
+                {mediaType}
+            </span>
+        );
     };
 
     const API_PROXY_URL = '/api';
@@ -492,27 +671,250 @@ function ProfileSearchPageContent() {
                                 </form>
                             </div>
 
+                            {/* Results Header: Count + Active Form Scope + Column Chooser + View Mode Toggles */}
+                            {documents.length > 0 && !isSearchLoading && (
+                                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white dark:bg-[#333] p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <div className="flex items-center gap-2 flex-wrap text-sm text-gray-600 dark:text-gray-300">
+                                        <span>
+                                            {lang === 'ar' ? 'تم العثور على' : 'Found'} <strong className="text-gray-900 dark:text-white font-semibold">{documents.length}</strong> {lang === 'ar' ? 'مستند' : 'documents'}
+                                        </span>
+                                        {activeScopeLabel && (
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                <span className="opacity-75 mr-1 font-normal">{lang === 'ar' ? 'النموذج:' : 'Form:'}</span> {activeScopeLabel}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Action buttons: Customize Columns (List view) + View Mode Toggle */}
+                                    <div className="flex items-center gap-2">
+                                        {/* Column Chooser Popover (like eDocs DM Explorer) */}
+                                        {viewMode === 'list' && (
+                                            <div className="relative" ref={columnPickerRef}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsColumnPickerOpen(prev => !prev)}
+                                                    className={`px-2.5 py-1.5 rounded-md transition flex items-center gap-1.5 text-xs font-medium border ${isColumnPickerOpen ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-400 dark:border-blue-600 shadow-sm' : 'bg-white dark:bg-[#444] text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                                    title={lang === 'ar' ? 'إضافة أو إزالة الأعمدة' : 'Add or remove columns'}
+                                                >
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"/></svg>
+                                                    <span>{lang === 'ar' ? 'الأعمدة' : 'Columns'}</span>
+                                                    <span className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                                                        {STANDARD_COLUMNS.filter(c => isColumnVisible(c.id, true)).length + visibleFormColumns.length}
+                                                    </span>
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                                </button>
+
+                                                {isColumnPickerOpen && (
+                                                    <div 
+                                                        className="absolute right-0 mt-2 w-72 bg-white dark:bg-[#2a2a2a] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-3 px-4 z-40"
+                                                    >
+                                                        <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-gray-200 dark:border-gray-700">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"/></svg>
+                                                                <span className="font-semibold text-xs text-gray-800 dark:text-gray-200">
+                                                                    {lang === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}
+                                                                </span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={resetColumnsToDefault}
+                                                                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium hover:underline"
+                                                            >
+                                                                {lang === 'ar' ? 'إعادة ضبط' : 'Reset'}
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Standard Columns */}
+                                                        <div className="mb-3">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                                                {lang === 'ar' ? 'الخصائص القياسية (Standard)' : 'Standard Properties'}
+                                                            </span>
+                                                            <div className="space-y-1">
+                                                                {STANDARD_COLUMNS.map(col => (
+                                                                    <label key={col.id} className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/60 px-2 py-1 rounded transition select-none">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isColumnVisible(col.id, true)}
+                                                                            onChange={(e) => toggleColumn(col.id, e.target.checked)}
+                                                                            className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                                                                        />
+                                                                        <span>{lang === 'ar' ? col.arLabel : col.label}</span>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Form-Specific Columns */}
+                                                        {formAvailableColumns.length > 0 && (
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                                                    {lang === 'ar' ? 'حقول النموذج (Form Fields)' : 'Form Fields'}
+                                                                </span>
+                                                                <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                                                                    {formAvailableColumns.map(col => (
+                                                                        <label key={col.id} className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/60 px-2 py-1 rounded transition select-none">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isColumnVisible(col.id, false)}
+                                                                                onChange={(e) => toggleColumn(col.id, e.target.checked)}
+                                                                                className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                                                                            />
+                                                                            <span className="truncate" title={lang === 'ar' ? col.arLabel : col.label}>
+                                                                                {lang === 'ar' ? col.arLabel : col.label}
+                                                                            </span>
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* View Mode Toggle (Grid vs List) */}
+                                        <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1 border border-gray-200 dark:border-gray-600">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleViewMode('grid')}
+                                                disabled={isUpdatingProfileViewMode}
+                                                className={`p-1.5 rounded-md transition flex items-center gap-1.5 text-xs font-medium ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                                title={t('gridView') || 'Grid View'}
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                                                <span className="hidden sm:inline">{t('gridView') || 'Grid'}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleViewMode('list')}
+                                                disabled={isUpdatingProfileViewMode}
+                                                className={`p-1.5 rounded-md transition flex items-center gap-1.5 text-xs font-medium ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                                title={t('listView') || 'List View'}
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                                                <span className="hidden sm:inline">{t('listView') || 'List'}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Results */}
                             {isSearchLoading ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
-                                    {Array.from({ length: 10 }).map((_, index) => (
-                                        <DocumentItemSkeleton key={index} />
-                                    ))}
-                                </div>
+                                viewMode === 'grid' ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
+                                        {Array.from({ length: 10 }).map((_, index) => (
+                                            <DocumentItemSkeleton key={index} />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-[#1a1a1a] p-12 items-center justify-center">
+                                        <Spinner size="lg" />
+                                        <span className="text-sm text-gray-500 dark:text-gray-400 mt-3">{t('searching') || 'Searching...'}</span>
+                                    </div>
+                                )
                             ) : documents.length > 0 ? (
                                 <>
-                                    <DocumentList
-                                        documents={documents}
-                                        onDocumentClick={handleDocumentClick}
-                                        apiURL={API_PROXY_URL}
-                                        onTagSelect={() => { }}
-                                        isLoading={false}
-                                        processingDocs={[]}
-                                        enableCollage={true}
-                                        showFavoriteButton={false}
-                                        lang={lang}
-                                        t={t}
-                                    />
+                                    {viewMode === 'grid' ? (
+                                        <DocumentList
+                                            documents={documents}
+                                            onDocumentClick={handleDocumentClick}
+                                            apiURL={API_PROXY_URL}
+                                            onTagSelect={() => { }}
+                                            isLoading={false}
+                                            processingDocs={[]}
+                                            enableCollage={true}
+                                            showFavoriteButton={false}
+                                            lang={lang}
+                                            t={t}
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-[#1a1a1a] shadow-sm mb-6">
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse text-sm">
+                                                    <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700">
+                                                        <tr>
+                                                            {isColumnVisible('name', true) && (
+                                                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">{lang === 'ar' ? 'الاسم' : 'Name'}</th>
+                                                            )}
+                                                            {isColumnVisible('doc_id', true) && (
+                                                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 w-28">{lang === 'ar' ? 'رقم المستند' : 'Doc #'}</th>
+                                                            )}
+                                                            {isColumnVisible('type', true) && (
+                                                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 w-28">{lang === 'ar' ? 'النوع' : 'Type'}</th>
+                                                            )}
+                                                            {isColumnVisible('date', true) && (
+                                                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 w-36">{lang === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                                            )}
+                                                            {isColumnVisible('typist', true) && (
+                                                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 w-32">{lang === 'ar' ? 'الكاتب' : 'Typist'}</th>
+                                                            )}
+                                                            {/* Dynamic Form-Specific Columns */}
+                                                            {visibleFormColumns.map((col) => (
+                                                                <th key={col.id} className="px-4 py-3 font-semibold text-blue-600 dark:text-blue-400 w-44 whitespace-nowrap">
+                                                                    {lang === 'ar' ? col.arLabel : col.label}
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                                        {documents.map((doc) => {
+                                                            const displayName = doc.docname || doc.title || `Document ${doc.doc_id}`;
+                                                            return (
+                                                                <tr
+                                                                    key={doc.doc_id}
+                                                                    onClick={() => handleDocumentClick(doc)}
+                                                                    className="group cursor-pointer hover:bg-blue-50/50 dark:hover:bg-[#2c2c2c] transition-colors"
+                                                                >
+                                                                    {isColumnVisible('name', true) && (
+                                                                        <td className="px-4 py-3 flex items-center gap-3">
+                                                                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                                                                                {renderDocumentIcon(doc.media_type)}
+                                                                            </div>
+                                                                            <span className="font-medium text-gray-800 dark:text-gray-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={displayName}>
+                                                                                {displayName}
+                                                                            </span>
+                                                                        </td>
+                                                                    )}
+                                                                    {isColumnVisible('doc_id', true) && (
+                                                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono text-xs">
+                                                                            #{doc.doc_id}
+                                                                        </td>
+                                                                    )}
+                                                                    {isColumnVisible('type', true) && (
+                                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                                            {getMediaTypeBadge(doc.media_type)}
+                                                                        </td>
+                                                                    )}
+                                                                    {isColumnVisible('date', true) && (
+                                                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
+                                                                            {doc.date || '--'}
+                                                                        </td>
+                                                                    )}
+                                                                    {isColumnVisible('typist', true) && (
+                                                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
+                                                                            {doc.typist || '--'}
+                                                                        </td>
+                                                                    )}
+                                                                    {/* Dynamic Form Values */}
+                                                                    {visibleFormColumns.map((col) => {
+                                                                        const val = doc.form_values?.[col.displayField] 
+                                                                            || doc.form_values?.[col.fieldName] 
+                                                                            || (doc.display_value && (committedParams?.criteria?.[0]?.type?.value.field_name === col.fieldName || committedParams?.criteria?.[0]?.type?.value.display_field === col.displayField) ? doc.display_value : undefined);
+                                                                        return (
+                                                                            <td key={col.id} className="px-4 py-3 text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap text-xs">
+                                                                                {val || '--'}
+                                                                            </td>
+                                                                        );
+                                                                    })}
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                     {totalPages > 1 && (
                                         <Pagination
                                             currentPage={currentPage}

@@ -40,6 +40,7 @@ interface MultiSearchParams {
     dateFrom: Date | undefined;
     dateTo: Date | undefined;
     page: number;
+    extraColumns?: string[];
 }
 
 const formatToApiDate = (date: Date | undefined): string => {
@@ -87,7 +88,7 @@ export function useProfileSearchTypes(scope?: string) {
 }
 
 export function useProfileMultiSearch(params: MultiSearchParams & { enabled?: boolean }) {
-    const { scope, criteria, dateFrom, dateTo, page, enabled = false } = params;
+    const { scope, criteria, dateFrom, dateTo, page, extraColumns, enabled = false } = params;
 
     // Build a stable query key from criteria
     const criteriaKey = criteria.map(c => ({
@@ -101,7 +102,8 @@ export function useProfileMultiSearch(params: MultiSearchParams & { enabled?: bo
             'profilesearch', 'multi-search',
             scope, JSON.stringify(criteriaKey),
             formatToApiDate(dateFrom), formatToApiDate(dateTo),
-            page
+            page,
+            JSON.stringify(extraColumns || [])
         ],
         queryFn: async (): Promise<ProfileSearchResponse> => {
             const body = {
@@ -120,6 +122,7 @@ export function useProfileMultiSearch(params: MultiSearchParams & { enabled?: bo
                 date_to: formatToApiDate(dateTo) || null,
                 page,
                 page_size: 20,
+                extra_columns: extraColumns || [],
             };
 
             const data = await apiClient.post('/api/profilesearch/search', body);

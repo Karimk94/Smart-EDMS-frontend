@@ -98,11 +98,43 @@ export function useUserPreferences() {
         }
     });
 
+    const updateProfileViewModeMutation = useMutation({
+        mutationFn: async (profile_view_mode: 'grid' | 'list') => {
+            await apiClient.put('/api/user/profile-view-mode', { profile_view_mode });
+            return profile_view_mode;
+        },
+        onMutate: async (newProfileViewMode) => {
+            await queryClient.cancelQueries({ queryKey: ['user'] });
+            const previousUser = queryClient.getQueryData(['user']);
+            
+            localStorage.setItem('profile_view_mode', newProfileViewMode);
+            
+            queryClient.setQueryData(['user'], (oldUser: any) => {
+                if (!oldUser) return oldUser;
+                return { ...oldUser, profile_view_mode: newProfileViewMode };
+            });
+            
+            return { previousUser };
+        },
+        onError: (err, newProfileViewMode, context) => {
+            if (context?.previousUser) {
+                queryClient.setQueryData(['user'], context.previousUser);
+                const prevProfileViewMode = (context.previousUser as any).profile_view_mode;
+                if (prevProfileViewMode) localStorage.setItem('profile_view_mode', prevProfileViewMode);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['user'] });
+        }
+    });
+
     return {
         updateLanguage: updateLanguageMutation.mutateAsync,
         isUpdatingLanguage: updateLanguageMutation.isPending,
         updateTheme: updateThemeMutation.mutateAsync,
         updateViewMode: updateViewModeMutation.mutateAsync,
         isUpdatingViewMode: updateViewModeMutation.isPending,
+        updateProfileViewMode: updateProfileViewModeMutation.mutateAsync,
+        isUpdatingProfileViewMode: updateProfileViewModeMutation.isPending,
     };
 }

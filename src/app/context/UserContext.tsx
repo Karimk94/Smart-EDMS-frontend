@@ -17,6 +17,7 @@ interface User {
     quota: number;
     remaining_quota: number;
     view_mode?: 'grid' | 'list';
+    profile_view_mode?: 'grid' | 'list';
     tab_permissions?: TabPermission[];
 }
 

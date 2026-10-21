@@ -14,6 +14,7 @@ interface User {
     is_ems_admin_group_member?: boolean;
     is_docs_supervisor?: boolean;
     view_mode?: 'grid' | 'list';
+    profile_view_mode?: 'grid' | 'list';
     tab_permissions?: { tab_key: string; can_read: boolean; can_write: boolean }[];
     session_id?: string;
 }

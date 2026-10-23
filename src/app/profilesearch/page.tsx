@@ -3,7 +3,7 @@
 import { enGB } from 'date-fns/locale/en-GB';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { SearchCriterion, SearchType, useProfileMultiSearch, useProfileSearchScopes, useProfileSearchTypes } from '../../hooks/useProfileSearch';
@@ -87,6 +87,13 @@ function ProfileSearchPageContent() {
     useEffect(() => {
         setIsClient(true);
     }, []);
+
+    // Route guard: if profilesearch is not allowed for user, redirect to portal
+    useEffect(() => {
+        if (user && !isLoadingUser && !allowedSections.includes('profilesearch')) {
+            router.push('/');
+        }
+    }, [user, isLoadingUser, allowedSections, router]);
 
     // View Mode Preference (Grid vs List) with DB persistence (separate for Profile Search)
     const { updateProfileViewMode, isUpdatingProfileViewMode } = useUserPreferences();
@@ -221,7 +228,7 @@ function ProfileSearchPageContent() {
         localStorage.removeItem(storageKey);
     };
 
-    const isColumnVisible = (colId: string, isStandard = true) => {
+    const isColumnVisible = useCallback((colId: string, isStandard = true) => {
         if (visibleColumns[colId] !== undefined) {
             return visibleColumns[colId];
         }
@@ -230,11 +237,11 @@ function ProfileSearchPageContent() {
         return committedParams?.criteria?.some(c => 
             c.type?.value.field_name === colId || c.type?.value.display_field === colId
         ) ?? false;
-    };
+    }, [visibleColumns, committedParams?.criteria]);
 
     const visibleFormColumns = useMemo(() => {
         return formAvailableColumns.filter(col => isColumnVisible(col.id, false));
-    }, [formAvailableColumns, visibleColumns, committedParams?.criteria]);
+    }, [formAvailableColumns, isColumnVisible]);
 
     const requestedExtraColumns = useMemo(() => {
         return visibleFormColumns.map(col => col.displayField);

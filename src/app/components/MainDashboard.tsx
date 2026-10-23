@@ -72,7 +72,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
             };
             const order = ['recent', 'favorites', 'folders', 'profilesearch'];
             const firstAllowed = order.find(s => allowedSections.includes(s as any));
-            router.push(firstAllowed ? sectionRoutes[firstAllowed] : '/dashboard');
+            router.push(firstAllowed ? sectionRoutes[firstAllowed] : '/');
         }
     }, [user, isLoadingUser, allowedSections, initialSection, router]);
 

@@ -29,6 +29,8 @@ interface UserContextType {
     isAuthenticated: boolean;
     isEditor: boolean;
     login: (credentials: any) => Promise<any>;
+    ssoLogin?: () => Promise<any>;
+    isSsoLoggingIn?: boolean;
     logout: () => Promise<void>;
     currentLang: 'en' | 'ar';
     currentTheme: 'light' | 'dark';
@@ -39,7 +41,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-    const { user, isLoadingUser, login, logout, isAuthenticated } = useAuth();
+    const { user, isLoadingUser, login, ssoLogin, isSsoLoggingIn, logout, isAuthenticated } = useAuth();
     const [isClient, setIsClient] = useState(false);
 
     const [currentLang, setCurrentLang] = useState<'en' | 'ar'>('en');
@@ -59,6 +61,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             setCurrentTheme(storedTheme);
         }
     }, []);
+
+    // Redirect unauthenticated users away from protected routes to /login
+    useEffect(() => {
+        if (!isLoadingUser && !isAuthenticated && typeof window !== 'undefined') {
+            const path = window.location.pathname;
+            if (!path.startsWith('/login') && !path.startsWith('/shared') && path !== '/') {
+                window.location.href = `/login?redirect=${encodeURIComponent(path + window.location.search)}`;
+            }
+        }
+    }, [isLoadingUser, isAuthenticated]);
 
     // Apply theme globally when user is loaded
     useEffect(() => {
@@ -87,19 +99,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     // 'favorites' is merged with 'recent' (Smart EDMS) — one toggle controls both
     const allSections: SectionKey[] = ['recent', 'favorites', 'folders', 'profilesearch'];
 
-    const allowedSections: SectionKey[] = user?.tab_permissions
-        ? (() => {
-            const allowed = user.tab_permissions
-                .filter(p => p.can_read)
-                .map(p => p.tab_key as SectionKey)
-                .filter(s => allSections.includes(s));
-            // If 'recent' is allowed, also allow 'favorites' (merged)
-            if (allowed.includes('recent') && !allowed.includes('favorites')) {
-                allowed.push('favorites');
-            }
-            return allowed;
-        })()
-        : allSections; // Default: show all if no permissions data yet
+    const allowedSections: SectionKey[] = user
+        ? (user.tab_permissions
+            ? (() => {
+                const allowed = user.tab_permissions
+                    .filter(p => p.can_read)
+                    .map(p => p.tab_key as SectionKey)
+                    .filter(s => allSections.includes(s));
+                // If 'recent' is allowed, also allow 'favorites' (merged)
+                if (allowed.includes('recent') && !allowed.includes('favorites')) {
+                    allowed.push('favorites');
+                }
+                return allowed;
+            })()
+            : [])
+        : [];
 
     const writableSections: SectionKey[] = user?.tab_permissions
         ? (() => {
@@ -121,6 +135,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated, // Use the one from useAuth which checks query success
         isEditor: user?.security_level === 'Editor' || user?.security_level === 'Admin',
         login,
+        ssoLogin,
+        isSsoLoggingIn,
         logout,
         currentLang,
         currentTheme,

@@ -9,8 +9,16 @@ console.log('Starting the deployment bundling process...');
 console.log('Running npm install...');
 execSync('npm install', { stdio: 'inherit' });
 
-console.log('Running npm run build...');
-execSync('npm run build', { stdio: 'inherit' });
+console.log('\nRunning production build...');
+try {
+  console.log('Attempting build with Turbopack (--turbopack)...');
+  execSync('npm run build -- --turbopack', { stdio: 'inherit' });
+  console.log('Turbopack build completed successfully.');
+} catch (turbopackError) {
+  console.warn('\n[Warning] Turbopack build failed. Failing over to standard build...');
+  execSync('npm run build', { stdio: 'inherit' });
+  console.log('Standard build completed successfully.');
+}
 
 // --- Step 2: Define what to include in the zip ---
 const output = fs.createWriteStream(path.join(__dirname, 'deploy.zip'));
@@ -43,6 +51,7 @@ console.log('\nAdding files to the deployment bundle...');
 
 const files_and_folders_to_bundle = [
   '.next',
+  //'web.config',
   // 'node_modules',
   // 'public',
   // 'src',

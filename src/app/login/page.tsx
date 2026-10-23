@@ -69,7 +69,8 @@ function LoginContent() {
   const t = useTranslations(lang);
 
   const router = useRouter();
-  const { login, isLoggingIn, isAuthenticated, isLoadingUser, user } = useAuth();
+  const { login, isLoggingIn, ssoLogin, isSsoLoggingIn, isAuthenticated, isLoadingUser, user } = useAuth();
+  const [ssoError, setSsoError] = useState<string | null>(null);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -88,6 +89,23 @@ function LoginContent() {
       router.push(redirectPath);
     }
   }, [isAuthenticated, isLoadingUser, router, searchParams, user, lang, theme]);
+
+  const handleSsoLogin = async () => {
+    setSsoError(null);
+    try {
+      const data = await ssoLogin();
+      if (data?.user) {
+        if (data.user.lang) setLang(data.user.lang);
+        if (data.user.theme) setTheme(data.user.theme);
+      }
+      const redirectPath = getSafeRedirect(searchParams.get('redirect'), data?.user?.tab_permissions);
+      router.push(redirectPath);
+    } catch (err: any) {
+      console.error('SSO Login exception:', err);
+      const detail = err?.data?.detail || err?.message || t('ssoError');
+      setSsoError(detail);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +189,48 @@ function LoginContent() {
             <Image src="/logo.png" alt="Company Logo" width={140} height={56} className="h-14 w-auto object-contain" priority />
           </div>
           <h1 className="text-2xl font-bold text-center">{t('loginTitle')}</h1>
+
+          {/* SSO / IAM Login */}
+          <div className="space-y-3 pt-2">
+            <button
+              type="button"
+              onClick={handleSsoLogin}
+              disabled={isSsoLoggingIn || isLoggingIn}
+              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-md shadow-sm transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {isSsoLoggingIn ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{t('ssoLoggingIn')}</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span>{t('ssoLogin')}</span>
+                </>
+              )}
+            </button>
+
+            {ssoError && (
+              <div className="p-3 text-xs text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400 rounded-md border border-red-200 dark:border-red-800">
+                {ssoError}
+              </div>
+            )}
+
+            <div className="relative flex items-center justify-center my-4">
+              <div className="border-t border-gray-300 dark:border-gray-600 w-full"></div>
+              <span className="bg-white dark:bg-gray-800 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">
+                {t('orDivider')}
+              </span>
+              <div className="border-t border-gray-300 dark:border-gray-600 w-full"></div>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label

@@ -9,11 +9,12 @@ interface EmsAdminAccessResponse {
 export function useEmsAdminAuth() {
     const router = useRouter();
 
-    const useCheckAccess = () => useQuery({
+    const useCheckAccess = (options?: { enabled?: boolean }) => useQuery({
         queryKey: ['emsAdminAccess'],
         queryFn: async () => {
             return apiClient.get('/api/ems-admin/check-access') as Promise<EmsAdminAccessResponse>;
         },
+        enabled: options?.enabled ?? true,
         retry: false,
         staleTime: 0,
         gcTime: 0,

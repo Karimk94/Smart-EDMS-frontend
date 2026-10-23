@@ -42,8 +42,8 @@
     "typescript": "^5.9.2"
   },
   "allowScripts": {
-    "exifreader@4.32.0": true,
     "sharp@0.34.5": true,
-    "unrs-resolver@1.11.1": true
+    "unrs-resolver@1.11.1": true,
+    "exifreader@4.44.0": true
   }
 }

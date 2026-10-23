@@ -536,5 +536,9 @@
     "none": "None",
     "type": "Type",
     "gridView": "Grid View",
-    "listView": "List View"
+    "listView": "List View",
+    "ssoLogin": "Sign in with RTA Single Sign On",
+    "ssoLoggingIn": "Signing in with RTA Single Sign On...",
+    "orDivider": "or continue with username and password",
+    "ssoError": "Automatic sign-in failed. Please verify your Windows login or use manual credentials."
 }

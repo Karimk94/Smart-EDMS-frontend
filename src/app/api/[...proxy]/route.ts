@@ -116,6 +116,26 @@ async function proxyHandler(req: NextRequest): Promise<NextResponse> {
 
   headers.set('X-App-Source', 'smart-edms');
 
+  // Forward authenticated Windows/IIS user for SSO endpoints
+  if (path.includes('/auth/sso')) {
+    const iisUser = req.headers.get('x-iisnode-auth_user')
+      || req.headers.get('x-iisnode-logon_user')
+      || req.headers.get('x-iisnode-remote_user')
+      || req.headers.get('x-iisnode-unencrypted_user')
+      || req.headers.get('x-remote-user')
+      || req.headers.get('remote-user')
+      || req.headers.get('x-forwarded-user')
+      || req.headers.get('x-authenticated-user');
+
+    if (iisUser) {
+      headers.set('X-Remote-User', iisUser);
+    } else if (process.env.NODE_ENV !== 'production' && process.env.USERNAME) {
+      // Local development only - never use server identity in production
+      const domain = process.env.USERDOMAIN ? `${process.env.USERDOMAIN}\\` : '';
+      headers.set('X-Remote-User', `${domain}${process.env.USERNAME}`);
+    }
+  }
+
   const timeoutMs = getTimeoutForPath(path);
 
   // --- Retry loop ---

@@ -235,11 +235,12 @@ export function useAdmin() {
     const queryClient = useQueryClient();
 
     // Queries
-    const useCheckAccess = () => useQuery({
+    const useCheckAccess = (options?: { enabled?: boolean }) => useQuery({
         queryKey: ['adminAccess'],
         queryFn: async () => {
             return apiClient.get('/api/admin/check-access');
         },
+        enabled: options?.enabled ?? true,
         retry: false,
     });
 

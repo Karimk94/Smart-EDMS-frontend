@@ -1862,6 +1862,7 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 ) : (
                     <div className="flex flex-col gap-8">
 
+                        {/* Libraries / Quick Access section (photos, videos, files) is hidden for now to save space
                         {standardItems.length > 0 && !searchTerm && (
                             <div className="animate-fade-in">
                                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">
@@ -1889,11 +1890,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                                 </div>
                             </div>
                         )}
+                        */}
 
                         <div className="flex-1">
-                            {(standardItems.length > 0 && userItems.length > 0 && !searchTerm) && (
-                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{t('folders') || 'Folders'}</h3>
-                            )}
+                            {/* Folders subheader hidden along with libraries section to save space */}
 
                             <div className="mb-4">
                                 {viewMode === 'grid' ? (

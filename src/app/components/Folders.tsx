@@ -134,6 +134,9 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
     const [isNavigating, setIsNavigating] = useState(false);
     const isLoading = isInitialLoading || isOperationLoading;
 
+    // True while search query is in flight.
+    const isSearchFetching = !!searchTerm && isFetching;
+
     // Auto-clear operation loading, refreshing & navigation when fetch settles
     const prevIsFetchingRef = useRef(false);
     useEffect(() => {
@@ -143,8 +146,8 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
             setIsNavigating(false);
         }
         prevIsFetchingRef.current = isFetching;
-        onFolderSearchFetchingChange?.(isFetching);
-    }, [isFetching, onFolderSearchFetchingChange]);
+        onFolderSearchFetchingChange?.(isSearchFetching);
+    }, [isFetching, isSearchFetching, onFolderSearchFetchingChange]);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -1858,6 +1861,10 @@ export const Folders: React.FC<FoldersProps> = ({ onFolderClick, onDocumentClick
                 ) : isNavigating ? (
                     <div className="py-8">
                         <Spinner size="lg" center label={t('loading') || 'Loading...'} />
+                    </div>
+                ) : isSearchFetching ? (
+                    <div className="py-8">
+                        <Spinner size="lg" center label={t('searching') || 'Searching...'} />
                     </div>
                 ) : (
                     <div className="flex flex-col gap-8">

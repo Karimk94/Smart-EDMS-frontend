@@ -35,7 +35,7 @@ export function useFolderContents({
 }: UseFolderContentsParams) {
     return useQuery({
         queryKey: ['folders', parentId, searchTerm],
-        queryFn: async (): Promise<FoldersResponse> => {
+        queryFn: async ({ signal }): Promise<FoldersResponse> => {
             const params = new URLSearchParams();
             if (parentId) params.append('parent_id', parentId);
 
@@ -47,7 +47,7 @@ export function useFolderContents({
 
             if (searchTerm) params.append('search', searchTerm);
 
-            return apiClient.get(`${apiURL}/folders?${params.toString()}`);
+            return apiClient.get(`${apiURL}/folders?${params.toString()}`, { signal });
         },
         enabled: isEnabled,
         staleTime: 1000 * 60, // 1 minute

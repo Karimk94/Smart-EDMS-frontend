@@ -3,7 +3,7 @@
 import { useEmsAdminAuth } from '@/hooks/useEmsAdminAuth';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
@@ -17,6 +17,7 @@ interface EmsAdminLayoutProps {
 
 export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
     const router = useRouter();
+    const pathname = usePathname();
     const { useCheckAccess } = useEmsAdminAuth();
     const { data: accessData, isLoading, isError } = useCheckAccess();
     const { user, logout, isLoggingOut } = useAuth();
@@ -33,6 +34,20 @@ export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
         } catch (error) {
             console.error('Failed to update language', error);
         }
+    };
+
+    const tabs = [
+        { name: t('overview'), href: '/ems-admin', icon: '🏠', exact: true },
+        { name: t('companies'), href: '/ems-admin/companies', icon: '🏢' },
+        { name: t('departments'), href: '/ems-admin/departments', icon: '🏛️' },
+        { name: t('emsSections'), href: '/ems-admin/sections', icon: '📋' },
+    ];
+
+    const isTabActive = (tab: { href: string; exact?: boolean }) => {
+        if (tab.exact) {
+            return pathname === tab.href;
+        }
+        return pathname.startsWith(tab.href);
     };
 
     if (isLoading) {
@@ -115,12 +130,36 @@ export default function EmsAdminLayout({ children }: EmsAdminLayoutProps) {
                         </button>
                     </div>
 
-                    {/* Right: Empty */}
+                    {/* Right: User Badge */}
                     <div className="flex items-center gap-4 ml-auto">
                         <UserAccessBadge user={user} lang={lang} onLogout={logout} logoutText={t('logout')} isLoggingOut={isLoggingOut} loggingOutText={t('loggingOut')} />
                     </div>
                 </div>
             </header>
+
+            {/* EMS Admin Navigation Tabs Bar */}
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <nav className="flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="EMS Admin Tabs">
+                        {tabs.map((tab) => {
+                            const active = isTabActive(tab);
+                            return (
+                                <Link
+                                    key={tab.href}
+                                    href={tab.href}
+                                    className={`inline-flex items-center gap-2 py-3 px-3 border-b-2 font-medium text-sm transition whitespace-nowrap ${active
+                                            ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-semibold'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
+                                        }`}
+                                >
+                                    <span>{tab.icon}</span>
+                                    <span>{tab.name}</span>
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                </div>
+            </div>
 
             {children}
         </div>

@@ -3,6 +3,17 @@ import { UploadFileItem } from './UploadFileItem';
 import ExifReader from 'exifreader';
 import { UploadStatus, UploadableFile } from '../../interfaces';
 import { useToast } from '../context/ToastContext';
+import { useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
+import { LoadingButton } from './LoadingButton';
+import { UploadModalProps } from '../../interfaces/PropsInterfaces';
+
+const MAX_RETRIES_PER_FILE = 3; // Max attempts per file before moving to end of queue
+
+const generateIdempotencyKey = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
 
 const formatDateTimeForAPI = (date: Date | null): string | null => {
   if (!date) return null;
@@ -58,28 +69,20 @@ const removeExtension = (filename: string) => {
   return filename.replace(/\.[^/.]+$/, "");
 };
 
-const generateIdempotencyKey = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-};
-
-import { UploadModalProps } from '../../interfaces/PropsInterfaces';
-
-import { useQueryClient } from '@tanstack/react-query';
-import Image from 'next/image';
-import { LoadingButton } from './LoadingButton';
-
-export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme, t }) => {
+export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAnalyze, theme, t, onUploadSuccess }) => {
   const [files, setFiles] = useState<UploadableFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileIdCounter = useRef(0);
-  // In-flight XHRs and idempotency keys per file id, used for cancellation
-  const xhrMap = useRef<Map<string, { xhr: XMLHttpRequest; idempotencyKey: string }>>(new Map());
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+
+  // Ref so the upload loop can always read the latest files state
+  const filesRef = useRef<UploadableFile[]>([]);
+  filesRef.current = files;
+
+  // A ref to signal the running queue to skip the current file
+  const skipCurrentRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,31 +93,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
-
-  // Abort any in-flight uploads if the modal unmounts mid-upload
-  useEffect(() => {
-    // Capture the current ref value so the cleanup function uses a stable
-    // snapshot rather than reading xhrMap.current at cleanup time.
-    const currentXhrMap = xhrMap.current;
-    return () => {
-      currentXhrMap.forEach(({ xhr, idempotencyKey }) => {
-        try {
-          xhr.abort();
-          fetch(`${apiURL}/upload_document/cancel`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idempotency_key: idempotencyKey }),
-            // keepalive lets the cancel request survive page navigation
-            keepalive: true,
-          }).catch(() => { /* best effort */ });
-        } catch {
-          // ignore
-        }
-      });
-      currentXhrMap.clear();
-    };
-  }, [apiURL]);
 
   const extractExifDate = async (file: File): Promise<Date | null> => {
     try {
@@ -134,11 +112,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
     return null;
   };
 
-  const handleFiles = async (selectedFiles: FileList | null) => {
-    if (!selectedFiles) return;
-
-    const newUploadPromises = Array.from(selectedFiles).map(async (file) => {
-
+  const processFilesIntoUploadable = async (fileArray: File[]): Promise<UploadableFile[]> => {
+    const newUploadPromises = fileArray.map(async (file) => {
       let finalDate: Date | null = null;
       let dateSource: UploadableFile['dateSource'] = undefined;
 
@@ -163,14 +138,32 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
         file,
         status: 'pending',
         progress: 0,
+        retryCount: 0,
+        idempotencyKey: generateIdempotencyKey(),
         editedFileName: removeExtension(file.name),
         editedDateTaken: finalDate,
         dateSource: dateSource
       } as UploadableFile;
     });
 
-    const newUploads = await Promise.all(newUploadPromises);
+    return Promise.all(newUploadPromises);
+  };
+
+  const handleFiles = async (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
+    const newUploads = await processFilesIntoUploadable(Array.from(selectedFiles));
     setFiles(prev => [...prev, ...newUploads]);
+  };
+
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles) return;
+    // webkitdirectory gives us all files recursively — filter out any empty entries
+    const fileArray = Array.from(selectedFiles).filter(f => f.size > 0 || f.name !== '');
+    const newUploads = await processFilesIntoUploadable(fileArray);
+    setFiles(prev => [...prev, ...newUploads]);
+    // Reset input so same folder can be re-selected if needed
+    e.target.value = '';
   };
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -209,153 +202,206 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
   };
 
   /**
-   * Cancels an in-progress upload:
-   * 1) aborts the XHR (stops the browser -> API transfer and closes the connection)
-   * 2) calls POST /upload_document/cancel so the API stops the API -> DMS transfer
-   *    between chunks and deletes the partially-created document.
+   * Move a file to the end of the queue and reset it to pending so it will
+   * be retried in the next natural turn of the sequential loop.
    */
-  const handleCancelUpload = (id: string) => {
-    const entry = xhrMap.current.get(id);
-    if (!entry) return;
-
-    // Mark as cancelled immediately so the onabort handler treats the abort as intentional
-    updateFileStatus(id, 'cancelled', { error: undefined });
-
-    try {
-      entry.xhr.abort();
-    } catch {
-      // ignore abort errors
+  const handleSkipToEnd = (id: string) => {
+    setFiles(prev => {
+      const idx = prev.findIndex(f => f.id === id);
+      if (idx === -1) return prev;
+      const item = { ...prev[idx], status: 'pending' as UploadStatus, progress: 0, error: undefined };
+      const rest = prev.filter((_, i) => i !== idx);
+      return [...rest, item];
+    });
+    // If this file is currently uploading, abort it
+    if (skipCurrentRef.current) {
+      skipCurrentRef.current();
     }
+  };
 
-    fetch(`${apiURL}/upload_document/cancel`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idempotency_key: entry.idempotencyKey }),
-    }).catch(() => { /* best effort — the disconnect watcher on the API also handles this */ });
+  /**
+   * Upload a single file via XHR. Returns a promise that resolves with
+   * success/failure info and supports external abort via the passed signal resolver.
+   */
+  const uploadOneFile = (
+    uploadableFile: UploadableFile,
+    onSkipSignal: (abortFn: () => void) => void,
+  ): Promise<{ success: boolean; docnumber?: number; error?: string; skipped?: boolean }> => {
+    return new Promise((resolve) => {
+      const { file, editedFileName, editedDateTaken, idempotencyKey } = uploadableFile;
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('docname', (editedFileName && editedFileName.trim()) ? editedFileName.trim() : removeExtension(file.name));
+      formData.append('abstract', ``);
+
+      const formattedDate = formatDateTimeForAPI(editedDateTaken);
+      if (formattedDate) {
+        formData.append('date_taken', formattedDate);
+      }
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${apiURL}/upload_document`, true);
+      xhr.withCredentials = true;
+
+      // Send a stable idempotency key so the backend can deduplicate retries.
+      // The same key is reused across all retry attempts for this file.
+      if (idempotencyKey) {
+        xhr.setRequestHeader('Idempotency-Key', idempotencyKey);
+      }
+
+      // Expose an abort function so external "skip" can cancel this XHR and
+      // also notify the backend to release the idempotency lock.
+      onSkipSignal(() => {
+        xhr.abort();
+        // Tell backend to release the idempotency lock so the next retry works
+        if (idempotencyKey) {
+          fetch(`${apiURL}/upload_document/cancel`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idempotency_key: idempotencyKey }),
+          }).catch(() => {}); // best-effort
+        }
+        resolve({ success: false, skipped: true });
+      });
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          updateFileStatus(uploadableFile.id, 'uploading', { progress: percentComplete });
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            if (response.success) {
+              resolve({ success: true, docnumber: response.docnumber });
+            } else {
+              resolve({ success: false, error: response.error || t('uploadFailed') });
+            }
+          } catch (e) {
+            resolve({ success: false, error: t('failedToParseServerResponse') });
+          }
+        } else {
+          let errorMsg = `${t('serverError')} ${xhr.status}`;
+          try {
+            const response = JSON.parse(xhr.responseText);
+            errorMsg = response.error || errorMsg;
+          } catch (e) {}
+          resolve({ success: false, error: errorMsg });
+        }
+      };
+
+      xhr.onerror = () => resolve({ success: false, error: t('networkErrorDuringUpload') });
+      xhr.ontimeout = () => resolve({ success: false, error: t('uploadTimedOut') });
+      xhr.onabort = () => resolve({ success: false, skipped: true });
+
+      xhr.send(formData);
+    });
   };
 
   const handleUpload = async () => {
-    // Cancelled files are included so they can be re-uploaded after a cancel
-    const pendingFiles = files.filter(f => f.status === 'pending' || f.status === 'cancelled');
-    if (pendingFiles.length === 0) return;
-
     setIsUploading(true);
     let successCount = 0;
     let errorCount = 0;
-    let cancelledCount = 0;
+    const successfulDocnumbers: number[] = [];
 
-    const uploadPromises = pendingFiles.map(uploadableFile => {
-      return new Promise<void>((resolve) => {
-        const { id, file, editedFileName, editedDateTaken } = uploadableFile;
-        updateFileStatus(id, 'uploading', { progress: 0 });
+    // We process the queue sequentially. Whenever a file fails we increment its
+    // retryCount. If retryCount < MAX_RETRIES_PER_FILE we move it to the end and
+    // keep going. Once retryCount reaches the limit the file stays as 'error'.
+    const processedIds = new Set<string>();
 
-        const idempotencyKey = generateIdempotencyKey();
+    // Keep looping while there are still pending files that haven't been permanently failed
+    while (true) {
+      // Always read from the ref for the latest state
+      const currentFiles = filesRef.current;
 
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('docname', (editedFileName && editedFileName.trim()) ? editedFileName.trim() : removeExtension(file.name));
-        formData.append('abstract', ``);
+      // Find the next pending file that hasn't been permanently failed
+      const next = currentFiles.find(f => f.status === 'pending');
+      if (!next) break;
 
-        const formattedDate = formatDateTimeForAPI(editedDateTaken);
-        if (formattedDate) {
-          formData.append('date_taken', formattedDate);
-        }
+      // Mark as uploading
+      updateFileStatus(next.id, 'uploading', { progress: 0 });
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${apiURL}/upload_document`, true);
-        xhr.withCredentials = true;
-        // Identifies this upload so it can be cancelled via /upload_document/cancel
-        xhr.setRequestHeader('Idempotency-Key', idempotencyKey);
-
-        xhrMap.current.set(id, { xhr, idempotencyKey });
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            updateFileStatus(id, 'uploading', { progress: percentComplete });
-          }
+      // Register skip signal
+      let skipped = false;
+      const result = await uploadOneFile(next, (abortFn) => {
+        skipCurrentRef.current = () => {
+          skipped = true;
+          abortFn();
         };
-
-        xhr.onload = () => {
-          xhrMap.current.delete(id);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              if (response.success) {
-                updateFileStatus(id, 'success', { progress: 100, docnumber: response.docnumber });
-                successCount++;
-              } else {
-                const errorMsg = response.error || t('uploadFailed');
-                updateFileStatus(id, 'error', { error: errorMsg });
-                errorCount++;
-              }
-            } catch (e) {
-              updateFileStatus(id, 'error', { error: t('failedToParseServerResponse') });
-              errorCount++;
-            }
-          } else if (xhr.status === 499) {
-            // Server confirmed the upload was cancelled / client disconnected
-            cancelledCount++;
-            updateFileStatus(id, 'cancelled', { progress: 0 });
-          } else {
-            let errorMsg = `${t('serverError')} ${xhr.status}`;
-            try {
-              const response = JSON.parse(xhr.responseText);
-              errorMsg = response.error || response.detail || errorMsg;
-            } catch (e) {
-            }
-            updateFileStatus(id, 'error', { error: errorMsg });
-            errorCount++;
-          }
-          resolve();
-        };
-
-        xhr.onerror = () => {
-          xhrMap.current.delete(id);
-          updateFileStatus(id, 'error', { error: t('networkErrorDuringUpload') });
-          errorCount++;
-          resolve();
-        };
-
-        xhr.onabort = () => {
-          xhrMap.current.delete(id);
-          // Intentional cancellation — do not treat as an error
-          updateFileStatus(id, 'cancelled', { progress: 0 });
-          cancelledCount++;
-          resolve();
-        };
-
-        xhr.send(formData);
       });
-    });
+      skipCurrentRef.current = null;
 
-    await Promise.all(uploadPromises);
+      if (result.skipped) {
+        // The user pressed Skip — file was already moved to end by handleSkipToEnd
+        // Just reset status to pending if it somehow isn't already
+        setFiles(prev => prev.map(f => f.id === next.id ? { ...f, status: 'pending', progress: 0 } : f));
+        continue;
+      }
+
+      if (result.success) {
+        updateFileStatus(next.id, 'success', { progress: 100, docnumber: result.docnumber });
+        if (result.docnumber != null) successfulDocnumbers.push(result.docnumber);
+        successCount++;
+      } else {
+        const newRetryCount = (next.retryCount ?? 0) + 1;
+
+        if (newRetryCount >= MAX_RETRIES_PER_FILE) {
+          // Exhausted all retries — permanently mark as error
+          updateFileStatus(next.id, 'error', { error: result.error, retryCount: newRetryCount });
+          errorCount++;
+        } else {
+          // Still has retries left — move to end of queue as pending
+          setFiles(prev => {
+            const idx = prev.findIndex(f => f.id === next.id);
+            if (idx === -1) return prev;
+            const updatedItem: UploadableFile = {
+              ...prev[idx],
+              status: 'pending',
+              progress: 0,
+              error: result.error,
+              retryCount: newRetryCount,
+            };
+            const rest = prev.filter((_, i) => i !== idx);
+            return [...rest, updatedItem];
+          });
+          // Small delay before re-queuing
+          await new Promise(res => setTimeout(res, 1000));
+        }
+      }
+    }
+
     setIsUploading(false);
 
-    if (errorCount === 0 && cancelledCount === 0 && successCount > 0) {
+    const successfulUploads = filesRef.current.filter(f => f.status === 'success');
+    if (onAnalyze && successfulUploads.length > 0) {
+      onAnalyze(successfulUploads);
+    }
+
+    if (errorCount === 0 && successCount > 0) {
       showToast(`${t('SuccessfullyUploaded')} ${successCount} ${t('file(s)')}`, 'success');
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-    } else if (successCount > 0) {
+      if (onUploadSuccess && successfulDocnumbers.length > 0) {
+        onUploadSuccess(successfulDocnumbers);
+      }
+    } else if (errorCount > 0 && successCount > 0) {
       showToast(`${t('uploadCompletedWith')} ${errorCount} ${t('error(s)')} `, 'warning');
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-    } else if (errorCount > 0) {
+      if (onUploadSuccess && successfulDocnumbers.length > 0) {
+        onUploadSuccess(successfulDocnumbers);
+      }
+    } else if (errorCount > 0 && successCount === 0) {
       showToast(t('AllUploadsFailed'), 'error');
-    } else if (cancelledCount > 0) {
-      showToast(t('uploadCancelled'), 'warning');
     }
   };
 
-  const handleAnalyze = () => {
-    const successfulUploads = files.filter(f => f.status === 'success' && f.docnumber);
-    if (successfulUploads.length > 0) {
-      onAnalyze(successfulUploads);
-    }
-  };
-
-  const pendingFilesCount = files.filter(f => f.status === 'pending' || f.status === 'cancelled').length;
+  const pendingFilesCount = files.filter(f => f.status === 'pending').length;
   const successfulUploadsCount = files.filter(f => f.status === 'success' && f.docnumber != null).length;
 
   return (
@@ -370,14 +416,37 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
           <div
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
             className={`flex-1 border-2 border-dashed rounded-xl flex flex-col justify-center items-center p-4 md:p-8 text-center transition-colors min-h-[150px] ${isDragOver ? 'border-red-500 bg-[#222]' : 'border-gray-600'}`}>
             <Image src="/upload.svg" alt="Upload Icon" width={40} height={40} className="text-gray-400 mb-2 invert" />
             <p className="mt-2 text-lg text-gray-300">{t('dragAndDrop')}</p>
             <p className="text-sm text-gray-500">{t('or')}</p>
+
+            {/* Browse individual files */}
             <label htmlFor="file-upload" className="mt-2 cursor-pointer px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-600 transition">
               {t('browseFiles')}
             </label>
             <input id="file-upload" type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
+
+            {/* Browse an entire folder (all children + sub-children) */}
+            <label
+              htmlFor="directory-upload"
+              className="mt-2 cursor-pointer px-4 py-2 bg-indigo-700 text-white text-sm font-medium rounded-md hover:bg-indigo-800 transition flex items-center gap-2"
+              title={t('selectFolderTooltip')}
+            >
+              <Image src="/folder.svg" alt="" width={16} height={16} className="brightness-0 invert" />
+              {t('selectFolder')}
+            </label>
+            <input
+              id="directory-upload"
+              type="file"
+              className="hidden"
+              // @ts-ignore — webkitdirectory is non-standard but widely supported
+              webkitdirectory=""
+              multiple
+              onChange={handleFolderSelect}
+            />
+            <p className="mt-2 text-xs text-gray-500">{t('selectsAllFilesRecursively')}</p>
 
             {/* Rate limit notice */}
             <p className="mt-3 text-xs text-amber-400 bg-amber-900/30 px-3 py-2 rounded-md border border-amber-700/50">
@@ -386,8 +455,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
           </div>
         </div>
 
-        <div className="w-full md:w-2/3 flex flex-col bg-[#282828] rounded-xl p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">{t('uploadQueue')} ({files.length})</h3>
+        <div className="w-full md:w-2/3 flex flex-col bg-[#282828] rounded-xl p-4 md:p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <span className="bg-blue-600 w-2 h-2 rounded-full"></span>
+            {t('uploadQueue')} ({files.length})
+          </h3>
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 mb-4">
             {files.length > 0 ? (
               files.map(f => (
@@ -397,7 +469,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
                   onRemove={() => removeFile(f.id)}
                   onUpdateFileName={handleUpdateFileName}
                   onUpdateDateTaken={handleUpdateDateTaken}
-                  onCancel={() => handleCancelUpload(f.id)}
+                  onSkipToEnd={isUploading ? () => handleSkipToEnd(f.id) : undefined}
                   t={t as (key: string) => string}
                 />
               ))
@@ -417,13 +489,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose, apiURL, onAna
             >
               {`${t('uploadPending')} (${pendingFilesCount})`}
             </LoadingButton>
-            <button
-              onClick={handleAnalyze}
-              disabled={successfulUploadsCount === 0 || isUploading}
-              className="px-4 py-2 md:px-6 md:py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
-            >
-              {t('analyzeWithAI')} ({successfulUploadsCount})
-            </button>
             <button
               onClick={onClose}
               disabled={isUploading}

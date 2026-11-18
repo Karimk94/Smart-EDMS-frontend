@@ -44,7 +44,11 @@ function SecurityLevelBadge({ level }: { level: string | null }) {
     );
 }
 
-export default function LoginLogsTab() {
+interface LoginLogsTabProps {
+    showTitle?: boolean;
+}
+
+export default function LoginLogsTab({ showTitle = true }: LoginLogsTabProps = {}) {
     const { user } = useAuth();
     const lang = user?.lang || "en";
     const t = useTranslations(lang as "en" | "ar");
@@ -77,14 +81,16 @@ export default function LoginLogsTab() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
             {/* Header with Search */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {t("loginHistory") || "Login History"}
-                    </h2>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                        ({total} {t("total") || "total"})
-                    </span>
-                </div>
+                {showTitle ? (
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {t("loginHistory") || "Login History"}
+                        </h2>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                            ({total} {t("total") || "total"})
+                        </span>
+                    </div>
+                ) : <div />}
                 <div className="relative">
                     <input
                         type="text"
@@ -102,13 +108,7 @@ export default function LoginLogsTab() {
                     />
                     {isLoading && (
                         <div className="absolute right-3 top-2.5">
-                            <Image
-                                src="/icons/spinner.svg"
-                                alt=""
-                                width={16}
-                                height={16}
-                                className="animate-spin h-4 w-4"
-                            />
+                            <Spinner size="xs" />
                         </div>
                     )}
                 </div>
@@ -220,7 +220,7 @@ export default function LoginLogsTab() {
                             {t("previous") || "Previous"}
                         </button>
                         <span className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
-                            {t("page")} {page} {t("of")} {totalPages}
+                            {t("page") || "Page"} {page} {t("of") || "of"} {totalPages}
                         </span>
                         <button
                             onClick={() => goToPage(page + 1)}
@@ -242,3 +242,4 @@ export default function LoginLogsTab() {
         </div>
     );
 }
+

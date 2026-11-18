@@ -4,6 +4,8 @@ import DatePicker from 'react-datepicker';
 import { UploadFileItemProps } from '../../interfaces';
 import { Spinner } from './Spinner';
 
+const MAX_RETRIES_PER_FILE = 3;
+
 const formatDateForInput = (date: Date | null): string => {
   if (!date) return '';
   const offset = date.getTimezoneOffset() * 60000;
@@ -29,9 +31,10 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
   onUpdateFileName,
   onUpdateDateTaken,
   onCancel,
+  onSkipToEnd,
   t
 }) => {
-  const { id, file, status, progress, error, editedFileName, editedDateTaken, dateSource } = uploadableFile;
+  const { id, file, status, progress, error, editedFileName, editedDateTaken, dateSource, retryCount } = uploadableFile;
   // Cancelled files can be edited / removed / re-uploaded, just like pending or errored ones
   const isActionable = status === 'pending' || status === 'error' || status === 'cancelled';
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -80,8 +83,13 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
 
   const isHighlighted = dateSource === 'file' || dateSource === 'filename_partial';
 
+  // Show retry badge when file has at least one failed attempt and hasn't exhausted all retries
+  const showRetryBadge = (retryCount ?? 0) > 0 && (retryCount ?? 0) < MAX_RETRIES_PER_FILE;
+  // Show skip button when uploading is active (onSkipToEnd provided) and file is currently uploading or pending with errors
+  const showSkipButton = !!onSkipToEnd && (status === 'uploading' || (status === 'pending' && (retryCount ?? 0) > 0));
+
   return (
-    <div className="bg-[#333] p-4 rounded-lg flex items-start gap-4">
+    <div className={`bg-[#333] p-4 rounded-lg flex items-start gap-4 ${status === 'error' ? 'border border-red-800/50' : ''}`}>
       <div className="flex-shrink-0 mt-1">
         {getStatusIndicator()}
       </div>
@@ -132,22 +140,51 @@ export const UploadFileItem: React.FC<UploadFileItemProps> = ({
         )}
         {status === 'error' && <p className="text-xs text-red-400 mt-1 truncate">{error}</p>}
         {status === 'cancelled' && <p className="text-xs text-gray-400 mt-1 italic">{translate('uploadCancelled')}</p>}
+
+        {/* Retry attempt badge */}
+        {showRetryBadge && (
+          <p className="text-xs text-amber-400 mt-1">
+            {translate('retryAttempt') || 'Retry'} {retryCount}/{MAX_RETRIES_PER_FILE}
+          </p>
+        )}
+        {/* Exhausted-retries message */}
+        {status === 'error' && (retryCount ?? 0) >= MAX_RETRIES_PER_FILE && (
+          <p className="text-xs text-red-500 mt-1 font-medium">
+            {translate('maxRetriesReached') || 'Max retries reached'}
+          </p>
+        )}
       </div>
-      {status === 'uploading' && onCancel && (
-        <button
-          onClick={onCancel}
-          title={translate('cancelUpload')}
-          aria-label={translate('cancelUpload')}
-          className="text-red-400 hover:text-red-300 mt-1 p-1 leading-none"
-        >
-          <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
-        </button>
-      )}
-      {isActionable && (
-        <button onClick={onRemove} title={translate('removeFile')} className="text-gray-400 hover:text-white mt-1 p-1 leading-none">
-          <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
-        </button>
-      )}
+
+      {/* Action buttons */}
+      <div className="flex flex-col gap-1 mt-1 flex-shrink-0">
+        {/* Skip button — shown while uploading/pending-with-retries */}
+        {showSkipButton && (
+          <button
+            onClick={onSkipToEnd}
+            title={translate('skipToEndTooltip') || 'Skip to end of queue'}
+            className="text-xs text-amber-400 hover:text-amber-200 border border-amber-700/60 rounded px-2 py-0.5 leading-none transition whitespace-nowrap"
+          >
+            {translate('skip') || 'Skip'}
+          </button>
+        )}
+
+        {status === 'uploading' && onCancel && (
+          <button
+            onClick={onCancel}
+            title={translate('cancelUpload')}
+            aria-label={translate('cancelUpload')}
+            className="text-red-400 hover:text-red-300 p-1 leading-none"
+          >
+            <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
+          </button>
+        )}
+
+        {isActionable && (
+          <button onClick={onRemove} title={translate('removeFile')} className="text-gray-400 hover:text-white p-1 leading-none">
+            <Image src="/icons/close.svg" alt="" width={16} height={16} className="dark:invert" />
+          </button>
+        )}
+      </div>
     </div>
   );
 };

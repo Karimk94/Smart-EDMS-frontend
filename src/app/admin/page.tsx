@@ -12,6 +12,7 @@ import { useTranslations } from "../hooks/useTranslations";
 import EdmsUsersTab from "./components/EdmsUsersTab";
 import ProfilesTab from "./components/ProfilesTab";
 import LoginLogsTab from "./components/LoginLogsTab";
+import UploadPerformanceTab from "./components/UploadPerformanceTab";
 import ActiveSessionsTab from "./components/ActiveSessionsTab";
 import OracleSessionsTab from "./components/OracleSessionsTab";
 import SqlQueryTab from "./components/SqlQueryTab";
@@ -51,6 +52,7 @@ const createDefaultAddTabPermissions = (): AddTabPermissionsState => ({
 export default function AdminPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasAccess, setHasAccess] = useState(false);
+    const [isUpperAdmin, setIsUpperAdmin] = useState(false);
 
     const { user } = useAuth();
     const lang = user?.lang || 'en';
@@ -70,6 +72,12 @@ export default function AdminPage() {
         isRetryingSelectedQueue,
         clearCompletedQueue,
         isClearingCompletedQueue,
+        skipQueueJob,
+        isSkippingQueueJob,
+        deleteQueueJob,
+        isDeletingQueueJob,
+        deleteFailedQueue,
+        isDeletingFailedQueue,
         pauseQueueWorker,
         isPausingQueueWorker,
         resumeQueueWorker,
@@ -152,8 +160,14 @@ export default function AdminPage() {
     const [retryingDocnumber, setRetryingDocnumber] = useState<number | null>(null);
     const [expandedErrorRows, setExpandedErrorRows] = useState<Record<number, boolean>>({});
     const [queueViewFilter, setQueueViewFilter] = useState<'failed' | 'in_progress' | 'queued'>('failed');
-    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions' | 'oracle_sessions' | 'sql_query' | 'checked_out'>('users');
-    const [lastSmartTab, setLastSmartTab] = useState<'users' | 'worker' | 'login_history' | 'active_sessions'>('users');
+    const [skippingDocnumber, setSkippingDocnumber] = useState<number | null>(null);
+    const [deletingDocnumber, setDeletingDocnumber] = useState<number | null>(null);
+    const [deleteQueueTarget, setDeleteQueueTarget] = useState<{
+        type: 'single' | 'all';
+        docnumber?: number;
+    } | null>(null);
+    const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'worker' | 'performance' | 'edms_users' | 'profiles' | 'login_history' | 'active_sessions' | 'oracle_sessions' | 'sql_query' | 'checked_out'>('users');
+    const [lastSmartTab, setLastSmartTab] = useState<'users' | 'worker' | 'performance' | 'login_history' | 'active_sessions'>('users');
     const [lastEdmsTab, setLastEdmsTab] = useState<'edms_users' | 'oracle_sessions' | 'checked_out' | 'sql_query' | 'profiles'>('edms_users');
 
     const router = useRouter();
@@ -166,6 +180,8 @@ export default function AdminPage() {
     useEffect(() => {
         if (accessData) {
             setHasAccess(accessData.has_access);
+            const upper = accessData.is_upper_admin === true || accessData.admin_level === 'upper';
+            setIsUpperAdmin(upper);
             setIsLoading(false);
             if (!accessData.has_access) {
                 // Optional: redirect logic could go here, but let's keep the error UI
@@ -333,6 +349,55 @@ export default function AdminPage() {
         }
     };
 
+    const handleSkipSingleDoc = async (docnumber: number) => {
+        setSkippingDocnumber(docnumber);
+        try {
+            await skipQueueJob(docnumber);
+            showToast(`Document ${docnumber} moved to end of queue`, "success");
+            await refetchQueueStatus();
+        } catch (err: any) {
+            showToast(err.message || `Failed to skip doc ${docnumber}`, "error");
+        } finally {
+            setSkippingDocnumber(null);
+        }
+    };
+
+    const handleDeleteSingleDoc = (docnumber: number) => {
+        setDeleteQueueTarget({ type: 'single', docnumber });
+    };
+
+    const handleDeleteAllFailed = () => {
+        setDeleteQueueTarget({ type: 'all' });
+    };
+
+    const confirmExecuteQueueDelete = async () => {
+        if (!deleteQueueTarget) return;
+        if (deleteQueueTarget.type === 'single' && deleteQueueTarget.docnumber) {
+            const docnumber = deleteQueueTarget.docnumber;
+            setDeletingDocnumber(docnumber);
+            try {
+                await deleteQueueJob(docnumber);
+                showToast(`Document ${docnumber} removed from processing queue`, "success");
+                await refetchQueueStatus();
+            } catch (err: any) {
+                showToast(err.message || `Failed to delete doc ${docnumber} from queue`, "error");
+            } finally {
+                setDeletingDocnumber(null);
+                setDeleteQueueTarget(null);
+            }
+        } else if (deleteQueueTarget.type === 'all') {
+            try {
+                const result = await deleteFailedQueue();
+                showToast(result?.message || `Deleted failed queue jobs`, "success");
+                await refetchQueueStatus();
+            } catch (err: any) {
+                showToast(err.message || "Failed to delete failed queue jobs", "error");
+            } finally {
+                setDeleteQueueTarget(null);
+            }
+        }
+    };
+
     const handleRetrySingleDoc = async (docnumber: number) => {
         setRetryingDocnumber(docnumber);
         try {
@@ -458,6 +523,12 @@ export default function AdminPage() {
                                         >
                                             <span>👥</span>
                                             <span>{t('adminUsers') || 'Users'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setActiveAdminTab('performance'); setLastSmartTab('performance'); }}
+                                            className={`px-2.5 py-1 rounded text-xs font-semibold transition-all whitespace-nowrap ${activeAdminTab === 'performance' ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                                        >
+                                            {t('uploadPerformance') || 'Upload Performance'}
                                         </button>
                                         <button
                                             onClick={() => { setActiveAdminTab('worker'); setLastSmartTab('worker'); }}
@@ -618,6 +689,11 @@ export default function AdminPage() {
                 {/* Checked-Out Documents Tab */}
                 {activeAdminTab === 'checked_out' && <CheckedOutTab />}
 
+                {/* Upload Performance Tab */}
+                {activeAdminTab === 'performance' && (
+                    <UploadPerformanceTab />
+                )}
+
                 {/* Processing Queue Status */}
                 {activeAdminTab === 'worker' && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
@@ -661,6 +737,16 @@ export default function AdminPage() {
                             >
                                 {isClearingCompletedQueue ? 'Clearing...' : 'Clear Completed (>24h)'}
                             </button>
+                            {isUpperAdmin && (
+                                <button
+                                    onClick={handleDeleteAllFailed}
+                                    disabled={isDeletingFailedQueue || (queueStatus?.summary?.failed ?? 0) === 0}
+                                    className="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Delete all failed jobs permanently from the queue"
+                                >
+                                    {isDeletingFailedQueue ? 'Deleting...' : 'Delete All Failed'}
+                                </button>
+                            )}
                             <span className="text-xs text-gray-500 dark:text-gray-400">
                                 {isQueueLoading ? 'Loading...' : 'Auto-refresh every 8s'}
                             </span>
@@ -795,15 +881,35 @@ export default function AdminPage() {
                                                     </div>
                                                 </td>
                                                 <td className="py-2 pl-4">
-                                                    <button
-                                                        onClick={() => handleRetrySingleDoc(f.docnumber)}
-                                                        disabled={queueViewFilter !== 'failed' || (isRetryingSelectedQueue && retryingDocnumber === f.docnumber)}
-                                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        {queueViewFilter !== 'failed'
-                                                            ? 'N/A'
-                                                            : (isRetryingSelectedQueue && retryingDocnumber === f.docnumber ? 'Retrying...' : 'Retry')}
-                                                    </button>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            onClick={() => handleRetrySingleDoc(f.docnumber)}
+                                                            disabled={queueViewFilter !== 'failed' || (isRetryingSelectedQueue && retryingDocnumber === f.docnumber)}
+                                                            className="px-2 py-1 rounded text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            {queueViewFilter !== 'failed'
+                                                                ? 'N/A'
+                                                                : (isRetryingSelectedQueue && retryingDocnumber === f.docnumber ? 'Retrying...' : 'Retry')}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleSkipSingleDoc(f.docnumber)}
+                                                            disabled={isSkippingQueueJob && skippingDocnumber === f.docnumber}
+                                                            className="px-2 py-1 rounded text-xs font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            title="Move to end of queue to allow other documents to proceed"
+                                                        >
+                                                            {isSkippingQueueJob && skippingDocnumber === f.docnumber ? 'Skipping...' : 'Skip'}
+                                                        </button>
+                                                        {isUpperAdmin && (
+                                                            <button
+                                                                onClick={() => handleDeleteSingleDoc(f.docnumber)}
+                                                                disabled={isDeletingQueueJob && deletingDocnumber === f.docnumber}
+                                                                className="px-2 py-1 rounded text-xs font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                title="Delete this stuck/failed job from the queue (Upper Admin)"
+                                                            >
+                                                                {isDeletingQueueJob && deletingDocnumber === f.docnumber ? 'Deleting...' : 'Delete'}
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -1446,6 +1552,39 @@ export default function AdminPage() {
                                 ) : (
                                     "Save Changes"
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+                        {/* Delete Queue Confirmation Modal */}
+            {deleteQueueTarget && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in" role="dialog" aria-modal="true">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-200 dark:border-gray-700">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                            <span className="text-red-500">⚠️</span>
+                            {deleteQueueTarget.type === 'all' ? 'Delete All Failed Jobs' : 'Delete Queue Job'}
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm">
+                            {deleteQueueTarget.type === 'all'
+                                ? 'Are you sure you want to permanently remove all failed jobs from the processing queue? This cannot be undone.'
+                                : `Are you sure you want to permanently remove document ${deleteQueueTarget.docnumber} from the processing queue?`}
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setDeleteQueueTarget(null)}
+                                disabled={isDeletingQueueJob || isDeletingFailedQueue}
+                                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmExecuteQueueDelete}
+                                disabled={isDeletingQueueJob || isDeletingFailedQueue}
+                                className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
+                            >
+                                {isDeletingQueueJob || isDeletingFailedQueue ? "Deleting..." : "Yes, Delete"}
                             </button>
                         </div>
                     </div>

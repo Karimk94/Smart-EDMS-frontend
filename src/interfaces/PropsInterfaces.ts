@@ -13,12 +13,12 @@ export interface EnhancedModalProps {
     onNavigatePrevious?: () => void;
     canNavigateNext?: boolean;
     canNavigatePrevious?: boolean;
-
+    
     // Group/collage information
     currentDocIndex?: number; // 0-based index in group
     totalInGroup?: number;   // Total documents in group
     isGrouped?: boolean;     // Whether this doc is part of a group
-
+    
     // Search context for highlighting
     searchTerm?: string;
     searchMatchType?: 'like' | 'exact' | 'startsWith';
@@ -29,9 +29,9 @@ export interface EnhancedModalProps {
 export interface UploadModalProps {
     onClose: () => void;
     apiURL: string;
-    onAnalyze: (uploadedFiles: UploadableFile[]) => void;
     theme: 'light' | 'dark';
     t: Function;
+    onUploadSuccess?: (docnumbers: number[]) => void;
 }
 
 export interface FolderUploadModalProps {
@@ -44,6 +44,18 @@ export interface FolderUploadModalProps {
     t: Function;
     /** Pre-seeded files from an OS drag-and-drop onto the folder grid */
     initialFiles?: File[];
+    onUploadSuccess?: (docnumbers: number[]) => void;
+}
+
+export interface DualUploadModalProps {
+    onClose: () => void;
+    apiURL: string;
+    theme: 'light' | 'dark';
+    parentId: string | null;
+    parentName: string;
+    onUploadComplete: () => void;
+    t: Function;
+    onUploadSuccess?: (docnumbers: number[]) => void;
 }
 
 export interface UploadFileItemProps {
@@ -51,9 +63,7 @@ export interface UploadFileItemProps {
     onRemove: () => void;
     onUpdateFileName: (id: string, newName: string) => void;
     onUpdateDateTaken: (id: string, newDate: Date | null) => void;
-    /** Called to abort the in-flight XHR upload for this file */
-    onCancel?: () => void;
-    /** Translation function (optional; falls back to raw keys) */
+    onSkipToEnd?: () => void; // Move a failed item to end of queue
     t?: (key: string) => string;
 }
 
@@ -132,6 +142,7 @@ export interface PersonSelectorProps {
     headers?: Record<string, string>;
     onSelect?: (person: { USER_ID: string; FULL_NAME: string }) => void;
     mode?: 'persons' | 'groups';
+    onCreatePerson?: (name: string) => void;
 }
 
 export interface YearFilterProps {
@@ -229,8 +240,8 @@ export interface PowerPointModalProps extends EnhancedModalProps {
 export interface ShareModalProps {
     isOpen: boolean;
     onClose: () => void;
-    documentId?: string;
-    folderId?: string;
+    documentId?: string | number;
+    folderId?: string | number;
     documentName: string;
     itemType?: 'file' | 'folder';
     t: Function;
@@ -245,7 +256,7 @@ export interface Trustee {
 export interface SecurityModalProps {
     isOpen: boolean;
     onClose: () => void;
-    docId: string;
+    docId: string | number;
     library: string;
     itemName: string;
     t: Function;
@@ -286,7 +297,21 @@ export interface CreateFolderModalProps {
     apiURL: string;
     onFolderCreated: () => void;
     t: Function;
-    initialParentId?: string;
+    initialParentId?: string | number;
+}
+
+export interface AddFolderTagModalProps {
+    folder: {
+        id: string | number;
+        name: string;
+        system_id?: string;
+        type?: string;
+    };
+    onClose: () => void;
+    apiURL: string;
+    lang?: 'en' | 'ar';
+    t: Function;
+    onTagAdded?: () => void;
 }
 
 export interface AdvancedFiltersProps {
@@ -329,6 +354,8 @@ export interface DocumentItemProps {
     itemTags?: TagObject[];
     isTagsLoading?: boolean;
     showFavoriteButton?: boolean;
+    /** Incremented to bust browser-cached thumbnails after processing completes. */
+    thumbnailRefreshKey?: number;
 
     lang: 'en' | 'ar';
     t: Function;
@@ -353,21 +380,22 @@ export interface HeaderProps {
     apiURL: string;
     onOpenUploadModal: () => void;
     isProcessing: boolean;
+    onClearProcessing?: () => void;
     isEditor: boolean;
     isSidebarOpen: boolean;
     toggleSidebar: () => void;
-    activeSection?: 'recent' | 'favorites' | 'folders' | 'profilesearch';
+    activeSection?: 'recent' | 'favorites' | 'folders';
     isLoading?: boolean;
 }
 
 export interface SidebarProps {
     isSidebarOpen: boolean;
-    activeSection: 'recent' | 'favorites' | 'folders' | 'profilesearch';
-    handleSectionChange: (section: 'recent' | 'favorites' | 'folders' | 'profilesearch') => void;
+    activeSection: 'recent' | 'favorites' | 'folders';
+    handleSectionChange: (section: 'recent' | 'favorites' | 'folders') => void;
     isShowingFullMemories: boolean;
     t: Function;
     lang: 'en' | 'ar';
-    hiddenSections?: ('recent' | 'favorites' | 'folders' | 'profilesearch')[];
+    hiddenSections?: ('recent' | 'favorites' | 'folders')[];
 }
 
 export interface SearchBarProps {
@@ -421,7 +449,7 @@ export interface ShareInfo {
     expiry_date: string | null;
     share_type: 'file' | 'folder';
     skip_otp?: boolean; // true for restricted shares (specific email) - skip OTP verification
-    note?: string | null; // optional note/message attached to the share link
+    note?: string | null; // Optional note/message attached by the sharer
 }
 
 export interface FolderItem {
@@ -429,6 +457,7 @@ export interface FolderItem {
     name: string;
     type: 'folder' | 'file';
     media_type: string;
+    is_original?: boolean;
 }
 
 export interface BreadcrumbItem {
@@ -442,3 +471,5 @@ export interface StoredSession {
     shareType: 'file' | 'folder';
     folderId?: string;
 }
+
+

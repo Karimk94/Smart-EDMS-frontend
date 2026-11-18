@@ -10,6 +10,7 @@ import { LoadingButton } from './LoadingButton';
 import { ModalNavigationBar } from './ModalNavigationBar';
 import { ReadOnlyTagDisplay } from './ReadOnlyTagDisplay';
 import { TagEditor } from './TagEditor';
+import { DocumentEventSection } from './DocumentEventSection';
 import { useDocumentMetadata } from '../../hooks/useDocumentMetadata';
 
 const safeParseDate = (dateString: string): Date | null => {
@@ -91,8 +92,8 @@ export const VideoModal: React.FC<VideoModalProps> = ({
   const [initialDate, setInitialDate] = useState<Date | null>(safeParseDate(doc.date));
 
   const [isEditingAbstract, setIsEditingAbstract] = useState(false);
-  const [abstract, setAbstract] = useState(doc.abstract || '');
-  const [initialAbstract, setInitialAbstract] = useState(doc.abstract || '');
+  const [abstract, setAbstract] = useState(doc.abstract || doc.title || '');
+  const [initialAbstract, setInitialAbstract] = useState(doc.abstract || doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -311,7 +312,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({
           t={t}
         />
 
-        <div className="p-6">
+        <div className="p-6 pb-12">
           <div className={`relative ${isFullScreen ? 'fixed inset-0 z-[60] bg-black flex items-center justify-center' : ''} `}>
             <video ref={videoRef} controls autoPlay className={isFullScreen ? 'w-full h-full' : 'w-full max-h-[70vh] rounded-lg bg-black'}>
               <source src={`${apiURL}/video/${doc.doc_id}`} type={getVideoMimeType(doc.docname)} />
@@ -348,12 +349,12 @@ export const VideoModal: React.FC<VideoModalProps> = ({
                       </div>
                     ) : (
                       <div className="flex items-start justify-between">
-                        <p className={`text-sm ${textMuted} mt-1 pr-4 whitespace-pre-wrap`}>{abstract || t('noAbstract')}</p>
+                        <p className={`text-sm ${textMuted} mt-1 pr-4 whitespace-pre-wrap break-words`}>{abstract || t('noAbstract')}</p>
                         <button onClick={handleEditAbstract} className={`px-4 py-1 ${buttonBg} ${buttonText} text-xs rounded-md ${buttonHoverBg} flex-shrink-0`}>{t('edit')}</button>
                       </div>
                     )
                   ) : (
-                    <p className={`text-sm ${textMuted} mt-1 pr-4 whitespace-pre-wrap`}>{abstract}</p>
+                    <p className={`text-sm ${textMuted} mt-1 pr-4 whitespace-pre-wrap break-words`}>{abstract}</p>
                   )}
                 </div>
               )}
@@ -392,6 +393,19 @@ export const VideoModal: React.FC<VideoModalProps> = ({
                   </p>
                 )}
               </div>
+
+              <DocumentEventSection
+                docId={doc.doc_id}
+                initialEventName={doc.event_name}
+                apiURL={apiURL}
+                isEditor={isEditor}
+                theme={theme}
+                t={t}
+                onEventUpdated={(newName) => {
+                  doc.event_name = newName || undefined;
+                }}
+              />
+
               {isEditor ? (
                 <TagEditor docId={doc.doc_id} apiURL={apiURL} lang={lang} theme={theme} t={t} />
               ) : (

@@ -18,12 +18,17 @@ interface UseDocumentsParams {
     selectedYears: number[];
     filterMediaType: 'image' | 'video' | 'pdf' | null;
     lang: 'en' | 'ar';
+    reviewStatus?: 'verified' | null;
     isEnabled?: boolean;
 }
 
 interface DocumentsResponse {
     documents: Document[];
     total_pages: number;
+    search_meta?: {
+        tokens: string[];
+        required_concepts: string[];
+    };
 }
 
 const formatToApiDateTime = (date: Date | null): string => {
@@ -49,6 +54,7 @@ export function useDocuments({
     selectedYears,
     filterMediaType,
     lang,
+    reviewStatus,
     isEnabled = true
 }: UseDocumentsParams) {
     return useQuery({
@@ -65,7 +71,8 @@ export function useDocuments({
             selectedTags,
             selectedYears,
             filterMediaType,
-            lang
+            lang,
+            reviewStatus
         ],
         queryFn: async ({ signal }): Promise<DocumentsResponse> => {
             // Folders section logic handled separately unless inside standard folders
@@ -79,17 +86,20 @@ export function useDocuments({
             params.append('lang', lang);
 
             if (searchTerm) params.append('search', searchTerm);
+            if (reviewStatus) params.append('review_status', reviewStatus);
             if (selectedPerson && selectedPerson.length > 0) {
                 const personNames = selectedPerson
                     .map((p) => {
+                        if (p.name_english && p.name_english.trim()) return p.name_english.trim();
+                        if (p.name_arabic && p.name_arabic.trim()) return p.name_arabic.trim();
                         const parts = p.label.split(' - ');
-                        if (lang === 'ar' && parts.length > 1) {
-                            return parts[parts.length - 1].trim();
-                        }
                         return parts[0].trim();
                     })
+                    .filter(Boolean)
                     .join(',');
-                params.append('persons', personNames);
+                if (personNames) {
+                    params.append('persons', personNames);
+                }
                 if (selectedPerson.length > 1) {
                     params.append('person_condition', personCondition);
                 }
@@ -154,7 +164,8 @@ export function useDocuments({
 
             return {
                 documents: fetchedDocs,
-                total_pages: data.total_pages || 1
+                total_pages: data.total_pages || 1,
+                search_meta: data.search_meta
             };
         },
         enabled: isEnabled && (activeSection !== 'folders' || !!activeFolder),

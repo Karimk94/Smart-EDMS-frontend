@@ -181,19 +181,25 @@ async function handleResponse(response: Response): Promise<any> {
 
 // --- API Client ---
 
+/** Default headers to include with all requests */
+const DEFAULT_HEADERS: Record<string, string> = {
+    'X-App-Source': 'smart-edms',
+};
+
 export const apiClient = {
-    async get(url: string, options?: RequestInit): Promise<any> {
+    async get<T = any>(url: string, options?: RequestInit): Promise<T> {
         return fetchWithRetry(async () => {
             const response = await fetch(url, {
                 ...options,
                 method: 'GET',
                 credentials: 'include',
+                headers: { ...DEFAULT_HEADERS, ...(options?.headers || {}) },
             });
             return handleResponse(response);
         }, 'GET');
     },
 
-    async post(url: string, body?: any, options?: RequestInit): Promise<any> {
+    async post<T = any>(url: string, body?: any, options?: RequestInit): Promise<T> {
         return fetchWithRetry(async () => {
             const isFormData = body instanceof FormData;
             const response = await fetch(url, {
@@ -201,33 +207,34 @@ export const apiClient = {
                 method: 'POST',
                 credentials: 'include',
                 headers: isFormData
-                    ? { ...(options?.headers || {}) }
-                    : { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+                    ? { ...DEFAULT_HEADERS, ...(options?.headers || {}) }
+                    : { 'Content-Type': 'application/json', ...DEFAULT_HEADERS, ...(options?.headers || {}) },
                 body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
             });
             return handleResponse(response);
         }, 'POST');
     },
 
-    async put(url: string, body?: any, options?: RequestInit): Promise<any> {
+    async put<T = any>(url: string, body?: any, options?: RequestInit): Promise<T> {
         return fetchWithRetry(async () => {
             const response = await fetch(url, {
                 ...options,
                 method: 'PUT',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+                headers: { 'Content-Type': 'application/json', ...DEFAULT_HEADERS, ...(options?.headers || {}) },
                 body: body ? JSON.stringify(body) : undefined,
             });
             return handleResponse(response);
         }, 'PUT');
     },
 
-    async delete(url: string, options?: RequestInit): Promise<any> {
+    async delete<T = any>(url: string, options?: RequestInit): Promise<T> {
         return fetchWithRetry(async () => {
             const response = await fetch(url, {
                 ...options,
                 method: 'DELETE',
                 credentials: 'include',
+                headers: { ...DEFAULT_HEADERS, ...(options?.headers || {}) },
             });
             return handleResponse(response);
         }, 'DELETE');

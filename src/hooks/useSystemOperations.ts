@@ -47,3 +47,17 @@ export function useProcessDocuments() {
         },
     });
 }
+
+
+interface RerunAnalysisParams {
+    docId: number | string;
+    apiURL: string;
+}
+
+export function useRerunAnalysis() {
+    return useMutation<void, Error, RerunAnalysisParams>({
+        mutationFn: async ({ docId, apiURL }) => {
+            await apiClient.post(`${apiURL}/documents/${docId}/rerun-analysis`);
+        },
+    });
+}

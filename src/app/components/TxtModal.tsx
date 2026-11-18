@@ -64,8 +64,8 @@ export const TxtModal: React.FC<TxtModalProps> = ({
   const [initialDate, setInitialDate] = useState<Date | null>(safeParseDate(doc.date));
 
   const [isEditingAbstract, setIsEditingAbstract] = useState(false);
-  const [abstract, setAbstract] = useState(doc.abstract || '');
-  const [initialAbstract, setInitialAbstract] = useState(doc.abstract || '');
+  const [abstract, setAbstract] = useState(doc.abstract || doc.title || '');
+  const [initialAbstract, setInitialAbstract] = useState(doc.abstract || doc.title || '');
 
   const [isFavorite, setIsFavorite] = useState(doc.is_favorite);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -77,14 +77,14 @@ export const TxtModal: React.FC<TxtModalProps> = ({
   }, [doc.is_favorite]);
 
   useEffect(() => {
-    setAbstract(doc.abstract || '');
-    setInitialAbstract(doc.abstract || '');
+    setAbstract(doc.abstract || doc.title || '');
+    setInitialAbstract(doc.abstract || doc.title || '');
     const newDate = safeParseDate(doc.date);
     setDocumentDate(newDate);
     setInitialDate(newDate);
     setIsEditingAbstract(false);
     setIsEditingDate(false);
-  }, [doc.abstract, doc.date, doc.title]);
+  }, [doc.abstract, doc.title, doc.date]);
 
   const { data: fetchedContent, isLoading: isFetchingContent } = useDocumentContent(doc.doc_id, {
     responseType: 'text',
@@ -297,7 +297,7 @@ export const TxtModal: React.FC<TxtModalProps> = ({
           </div>
 
           {/* Details Panel */}
-          <div className={`transition-all duration-300 ${isDetailsVisible ? 'md:col-span-1 opacity-100' : 'hidden opacity-0'} p-4 bg-gray-50 dark:bg-[#1f1f1f] rounded-lg overflow-y-auto`}>
+          <div className={`transition-all duration-300 ${isDetailsVisible ? 'md:col-span-1 opacity-100' : 'hidden opacity-0'} p-4 pb-8 bg-gray-50 dark:bg-[#1f1f1f] rounded-lg overflow-y-auto`}>
             {/* Abstract Section */}
             {(isEditor || abstract) && (
               <div className="mb-4">
@@ -317,12 +317,12 @@ export const TxtModal: React.FC<TxtModalProps> = ({
                     </div>
                   ) : (
                     <div className="flex items-start justify-between">
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 pr-4">{abstract || t('noAbstract')}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 pr-4 whitespace-pre-wrap break-words">{abstract || t('noAbstract')}</p>
                       <button onClick={handleEditAbstract} className="px-4 py-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white text-xs rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 flex-shrink-0">{t('edit')}</button>
                     </div>
                   )
                 ) : (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 pr-4">{abstract}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 pr-4 whitespace-pre-wrap break-words">{abstract}</p>
                 )}
               </div>
             )}

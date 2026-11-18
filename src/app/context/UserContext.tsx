@@ -19,6 +19,7 @@ interface User {
     view_mode?: 'grid' | 'list';
     profile_view_mode?: 'grid' | 'list';
     tab_permissions?: TabPermission[];
+    is_upper_admin?: boolean;
 }
 
 type SectionKey = 'recent' | 'favorites' | 'folders' | 'profilesearch';

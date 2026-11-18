@@ -30,6 +30,7 @@ import { Spinner, PageSpinner } from './Spinner';
 // Lazy-loaded modals — only loaded on user interaction
 const UploadModal = React.lazy(() => import('./UploadModal').then(m => ({ default: m.UploadModal })));
 const FolderUploadModal = React.lazy(() => import('./FolderUploadModal').then(m => ({ default: m.FolderUploadModal })));
+const DualUploadModal = React.lazy(() => import('./DualUploadModal').then(m => ({ default: m.DualUploadModal })));
 const ClearCacheModal = React.lazy(() => import('./ClearCacheModal').then(m => ({ default: m.ClearCacheModal })));
 
 type ActiveSection = 'recent' | 'favorites' | 'folders' | 'profilesearch';
@@ -111,7 +112,23 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     // Debounce search term to reduce API calls during typing
     const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
+    // Whether the current section grants write (editor) access to this user.
+    const sectionIsWritable = isSectionWritable(activeSection);
+
+    // A "Viewer" by security level may only ever see documents that an editor
+    // has marked as "Completed" (review status === 'verified'), regardless of
+    // any per-tab can_write permission. This guarantees that incomplete
+    // documents — which are already hidden from a viewer in the Folders section
+    // — are also hidden from the Recent and Favorites sections, so a viewer
+    // never sees a document before it is finished by the editors.
+    const isViewer = (user?.security_level || '').trim().toLowerCase() === 'viewer';
+    // Apply the completed-only filter whenever the user is a Viewer OR the
+    // current section is not writable (e.g. an editor with read-only access).
+    const mustFilterCompleted = isViewer || !sectionIsWritable;
+
     // --- Documents ---
+    // Pass reviewStatus='verified' to server so SQL query and count only include
+    // completed documents for viewers. This ensures total_pages and pagination are 100% correct.
     const {
         data: documentsData,
         isLoading: isDocumentsLoading,
@@ -121,10 +138,21 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
         activeSection, activeFolder, currentPage, searchTerm: debouncedSearchTerm,
         dateFrom, dateTo, selectedPerson, personCondition,
         selectedTags, selectedYears, filterMediaType, lang,
+        reviewStatus: mustFilterCompleted ? 'verified' : null,
         isEnabled: !!user
     });
 
     const documents = documentsData?.documents || [];
+
+    // Keep currently open modal doc synchronized when documents list updates
+    useEffect(() => {
+        if (documentModals.selectedDoc && documentsData?.documents) {
+            const freshDoc = documentsData.documents.find(d => d.doc_id === documentModals.selectedDoc?.doc_id);
+            if (freshDoc) {
+                documentModals.setSelectedDoc(freshDoc);
+            }
+        }
+    }, [documentsData?.documents]);
     const totalPages = documentsData?.total_pages || 1;
     // Use isFetching to show skeleton during search/page change (isLoading is false when keepPreviousData is used)
     const isLoading = isDocumentsLoading;
@@ -134,6 +162,9 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
     // --- Upload & Cache ---
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isFolderUploadModalOpen, setIsFolderUploadModalOpen] = useState(false);
+    const [isDualUploadModalOpen, setIsDualUploadModalOpen] = useState(false);
+    const [dualUploadParentId, setDualUploadParentId] = useState<string | null>(null);
+    const [dualUploadParentName, setDualUploadParentName] = useState<string>('');
     const [uploadParentId, setUploadParentId] = useState<string | null>(null);
     const [uploadParentName, setUploadParentName] = useState<string>('');
     /** Files pre-seeded from an OS drag-and-drop onto the folder grid */
@@ -230,6 +261,18 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
         queryClient.invalidateQueries({ queryKey: ['folders'] });
     };
 
+    const handleDualUploadClick = (parentId: string | null, parentName: string) => {
+        setDualUploadParentId(parentId);
+        setDualUploadParentName(parentName);
+        setIsDualUploadModalOpen(true);
+    };
+
+    const handleDualUploadComplete = () => {
+        setIsDualUploadModalOpen(false);
+        setFolderRefreshTrigger(prev => prev + 1);
+        queryClient.invalidateQueries({ queryKey: ['folders'] });
+    };
+
     const handlePageChange = (newPage: number) => {
         if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
             setIsPageChanging(true);
@@ -255,6 +298,11 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
 
     const handleUpdateMetadataSuccess = () => {
         queryClient.invalidateQueries({ queryKey: ['documents'] });
+        queryClient.invalidateQueries({ queryKey: ['documentTags'] });
+        queryClient.invalidateQueries({ queryKey: ['documentTagsBatch'] });
+        queryClient.invalidateQueries({ queryKey: ['allTags'] });
+        queryClient.invalidateQueries({ queryKey: ['persons'] });
+        queryClient.invalidateQueries({ queryKey: ['documentMetadata'] });
         if (activeSection === 'folders') {
             queryClient.invalidateQueries({ queryKey: ['folders'] });
         }
@@ -319,6 +367,7 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         onFolderClick={handleFolderClick}
                         onDocumentClick={documentModals.handleDocumentClick}
                         onUploadClick={handleFolderUploadClick}
+                        onDualUploadClick={handleDualUploadClick}
                         t={t}
                         apiURL={API_PROXY_URL}
                         isEditor={isSectionWritable('folders')}
@@ -472,6 +521,19 @@ export function MainDashboard({ initialSection = 'recent', initialFolderId = nul
                         onUploadComplete={handleFolderUploadComplete}
                         t={t}
                         initialFiles={uploadInitialFiles}
+                    />
+                )}
+
+                {isDualUploadModalOpen && isSectionWritable('folders') && (
+                    <DualUploadModal
+                        onClose={() => setIsDualUploadModalOpen(false)}
+                        apiURL={API_PROXY_URL}
+                        theme={theme}
+                        parentId={dualUploadParentId}
+                        parentName={dualUploadParentName}
+                        onUploadComplete={handleDualUploadComplete}
+                        t={t}
+                        onUploadSuccess={addProcessingDocs}
                     />
                 )}
 

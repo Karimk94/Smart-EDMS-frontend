@@ -16,6 +16,8 @@
     "docx-preview": "^0.3.7",
     "exifreader": "^4.32.0",
     "heic2any": "^0.0.4",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
     "jszip": "^3.10.1",
     "next": "^15",
     "react": "^19",
